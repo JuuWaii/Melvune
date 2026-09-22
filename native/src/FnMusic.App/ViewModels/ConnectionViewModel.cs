@@ -20,6 +20,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
     public event PropertyChangedEventHandler? PropertyChanged;
     public event Action? SessionChanging;
     public NasApiClient? AuthenticatedClient { get; private set; }
+    public MusicPlaybackRouter PlaybackRouter { get; } = new();
     public string ServerAddress { get => serverAddress; set { serverAddress = value; Changed(); } }
     public string Username { get => username; set { username = value; Changed(); } }
     public bool RememberSession { get => rememberSession; set { rememberSession = value; Changed(); } }
@@ -80,7 +81,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
     public Task SaveConnectionAsync() => RunAsync(async () =>
     {
         var next = ServerEndpoint.Parse(ServerAddress);
-        SessionChanging?.Invoke(); AuthenticatedClient = null;
+        RevokeAuthenticatedSource();
         if (endpoint is not null && next.StorageKey != endpoint.StorageKey)
             await vault.ClearAsync(endpoint.StorageKey, lifetime.Token);
         bool same = endpoint?.StorageKey == next.StorageKey;
@@ -100,7 +101,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
         { Status = "请输入账号和密码。"; return; }
         string loginUsername = Username.Trim();
         // 先撤销旧的本地持久状态，失败登录不能恢复此前账户。
-        SessionChanging?.Invoke(); AuthenticatedClient = null;
+        RevokeAuthenticatedSource();
         await vault.ClearAsync(endpoint.StorageKey, lifetime.Token);
         Account = "尚未登录";
         try
@@ -126,7 +127,12 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
     {
         Guid sourceId = await sourceRegistry.GetOrCreateAsync(accountKey, lifetime.Token);
         var scoped = new NasApiClient(endpoint!, sourceInstanceId: sourceId);
-        scoped.RestoreSession(token);
+        try
+        {
+            scoped.RestoreSession(token);
+            PlaybackRouter.Register(new NasPlaybackSource(scoped));
+        }
+        catch { scoped.Dispose(); throw; }
         client?.Dispose();
         client = scoped;
         AuthenticatedClient = scoped;
@@ -134,7 +140,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
     public Task LogoutAsync() => RunAsync(async () =>
     {
         if (endpoint is null || client is null) return;
-        SessionChanging?.Invoke(); AuthenticatedClient = null;
+        RevokeAuthenticatedSource();
         await vault.ClearAsync(endpoint.StorageKey, lifetime.Token);
         Account = "尚未登录";
         try { await client.LogoutAsync(lifetime.Token); Status = "已退出登录。"; }
@@ -142,7 +148,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
     });
     public async Task ExpireSessionAsync()
     {
-        SessionChanging?.Invoke(); AuthenticatedClient = null;
+        RevokeAuthenticatedSource();
         client?.ClearSession(); Account = "尚未登录";
         Status = "登录已失效，请重新登录。";
         if (endpoint is null) return;
@@ -150,5 +156,17 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
         catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
         catch (Exception) { Status = "登录已失效。本机保存的会话未能删除，请重试退出登录。"; }
     }
-    public void Dispose() { lifetime.Cancel(); client?.Dispose(); lifetime.Dispose(); }
+    private void RevokeAuthenticatedSource()
+    {
+        SessionChanging?.Invoke();
+        if (AuthenticatedClient is { } active) PlaybackRouter.Unregister(active.SourceInstanceId);
+        AuthenticatedClient = null;
+    }
+    public void Dispose()
+    {
+        lifetime.Cancel();
+        if (AuthenticatedClient is { } active) PlaybackRouter.Unregister(active.SourceInstanceId);
+        AuthenticatedClient = null;
+        client?.Dispose(); lifetime.Dispose();
+    }
 }

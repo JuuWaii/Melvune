@@ -22,8 +22,7 @@ public sealed partial class MainWindow
 #if DEBUG
         if (IsSyntheticPreview) return Services.PlaybackVerification.CreateWave();
 #endif
-        var api = ViewModel.AuthenticatedClient ?? throw new MusicApiException(MusicFailure.Unauthorized);
-        return await api.OpenTrackStreamAsync(track.Reference, ct);
+        return await ViewModel.PlaybackRouter.OpenAsync(track.Reference, ct);
     }
 #if DEBUG
     // 显式测试入口隔离真实账户与曲名；仍使用生产 XAML、事件和播放器。

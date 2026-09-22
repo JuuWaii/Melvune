@@ -600,6 +600,80 @@ await Test("queue rejects a foreign source reference without replacing the snaps
     Check(queue.Current?.Reference == first.Reference && queue.Count == 1);
     return Task.CompletedTask;
 });
+await Test("playback router selects exact sources and never falls back for missing or unsupported sources", async () =>
+{
+    var router = new MusicPlaybackRouter();
+    Guid first = Guid.NewGuid(), second = Guid.NewGuid(), unsupported = Guid.NewGuid();
+    int calls = 0;
+    router.Register(new FakePlaybackSource(first, MusicSourceCapabilities.Playback, (track, _) =>
+    { calls++; Check(track.SourceInstanceId == first); return Task.FromResult<Stream>(new MemoryStream([1])); }));
+    router.Register(new FakePlaybackSource(second, MusicSourceCapabilities.Playback, (track, _) =>
+    { calls++; Check(track.SourceInstanceId == second); return Task.FromResult<Stream>(new MemoryStream([2])); }));
+    router.Register(new FakePlaybackSource(unsupported, MusicSourceCapabilities.Browse, (_, _) => throw new Exception("Unsupported source called")));
+    using var one = await router.OpenAsync(new(first, "same-id"), default);
+    using var two = await router.OpenAsync(new(second, "same-id"), default);
+    Check(one.ReadByte() == 1 && two.ReadByte() == 2 && calls == 2);
+    await Fails(MusicFailure.Unavailable, () => router.OpenAsync(new(Guid.NewGuid(), "same-id"), default));
+    await Fails(MusicFailure.Rejected, () => router.OpenAsync(new(unsupported, "same-id"), default));
+    Check(!router.CanPlay(new(unsupported, "same-id")) && calls == 2);
+    router.Unregister(first);
+    Check(!router.CanPlay(new(first, "same-id")) && router.CanPlay(new(second, "same-id")));
+    router.Unregister(second); router.Unregister(unsupported);
+});
+await Test("playback router rejects duplicate and empty source registrations", () =>
+{
+    var router = new MusicPlaybackRouter();
+    var provider = new FakePlaybackSource(Guid.NewGuid(), MusicSourceCapabilities.Playback, (_, _) => Task.FromResult<Stream>(new MemoryStream()));
+    router.Register(provider);
+    try { router.Register(provider); throw new Exception("Duplicate accepted"); } catch (InvalidOperationException) { }
+    try { router.Register(new FakePlaybackSource(Guid.Empty, MusicSourceCapabilities.Playback, (_, _) => throw new Exception())); throw new Exception("Empty accepted"); }
+    catch (ArgumentException) { }
+    router.Unregister(provider.Source.Id);
+    return Task.CompletedTask;
+});
+await Test("playback router cancels disconnected sources and disposes late streams after re-registration", async () =>
+{
+    var router = new MusicPlaybackRouter(); Guid id = Guid.NewGuid();
+    var completion = new TaskCompletionSource<Stream>(TaskCreationOptions.RunContinuationsAsynchronously);
+    CancellationToken requestToken = default;
+    router.Register(new FakePlaybackSource(id, MusicSourceCapabilities.Playback, (_, ct) => { requestToken = ct; return completion.Task; }));
+    var pending = router.OpenAsync(new(id, "track"), default);
+    router.Unregister(id);
+    Check(requestToken.IsCancellationRequested);
+    router.Register(new FakePlaybackSource(id, MusicSourceCapabilities.Playback, (_, _) => Task.FromResult<Stream>(new MemoryStream([3]))));
+    var late = new MemoryStream([1]); completion.SetResult(late);
+    await Fails(MusicFailure.Unavailable, () => pending);
+    Check(!late.CanRead);
+    using var current = await router.OpenAsync(new(id, "track"), default);
+    Check(current.ReadByte() == 3);
+    router.Unregister(id);
+});
+await Test("playback router isolates late unauthorized failures from replacement registrations", async () =>
+{
+    var router = new MusicPlaybackRouter(); Guid id = Guid.NewGuid();
+    var completion = new TaskCompletionSource<Stream>(TaskCreationOptions.RunContinuationsAsynchronously);
+    router.Register(new FakePlaybackSource(id, MusicSourceCapabilities.Playback, (_, _) => completion.Task));
+    var pending = router.OpenAsync(new(id, "track"), default);
+    router.Unregister(id);
+    router.Register(new FakePlaybackSource(id, MusicSourceCapabilities.Playback, (_, _) => Task.FromException<Stream>(new MusicApiException(MusicFailure.Unauthorized))));
+    completion.SetException(new MusicApiException(MusicFailure.Unauthorized));
+    await Fails(MusicFailure.Unavailable, () => pending);
+    await Fails(MusicFailure.Unauthorized, () => router.OpenAsync(new(id, "track"), default));
+    router.Unregister(id);
+});
+await Test("playback router preserves caller cancellation and disposes a provider stream that ignored it", async () =>
+{
+    var router = new MusicPlaybackRouter(); Guid id = Guid.NewGuid();
+    var completion = new TaskCompletionSource<Stream>(TaskCreationOptions.RunContinuationsAsynchronously);
+    router.Register(new FakePlaybackSource(id, MusicSourceCapabilities.Playback, (_, _) => completion.Task));
+    using var canceled = new CancellationTokenSource();
+    var pending = router.OpenAsync(new(id, "track"), canceled.Token);
+    canceled.Cancel();
+    var late = new MemoryStream([1]); completion.SetResult(late);
+    try { await pending; throw new Exception("Cancellation ignored"); } catch (OperationCanceledException) { }
+    Check(!late.CanRead);
+    router.Unregister(id);
+});
 Console.WriteLine($"Native checks: {passed} passed.");
 return;
 
@@ -611,6 +685,11 @@ sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> response)
 sealed class AsyncFakeHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> response) : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => response(request);
+}
+sealed class FakePlaybackSource(Guid id, MusicSourceCapabilities capabilities, Func<TrackReference, CancellationToken, Task<Stream>> open) : IMusicPlaybackSource
+{
+    public MusicSource Source { get; } = new(id, "test", "synthetic", capabilities);
+    public Task<Stream> OpenAsync(TrackReference track, CancellationToken ct) => open(track, ct);
 }
 static class UriExtensions
 {

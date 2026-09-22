@@ -230,10 +230,12 @@ public sealed partial class MainWindow
     { if (queue is not null && QueueModePicker.SelectedIndex is >= 0 and <= 3) queue.Mode = (QueueMode)QueueModePicker.SelectedIndex; }
     private async Task PlayTrackAsync(MusicTrack track)
     {
-        if ((ViewModel.AuthenticatedClient is null && !IsSyntheticPreview) || closed) return;
+        if (closed) return;
         CancelWork(); music.Stop(); mediaReady = false;
-        var ct = work.Token;
         UpdateQueueStatus();
+        if (!IsSyntheticPreview && !ViewModel.PlaybackRouter.CanPlay(track.Reference))
+        { NowPlaying.Text = ""; PlaybackStatus.Text = "歌曲来源未连接或不支持播放。"; return; }
+        var ct = work.Token;
         PlaybackStatus.Text = "正在加载音频…";
         try
         {
@@ -246,7 +248,11 @@ public sealed partial class MainWindow
         catch (MusicApiException error) when (error.Failure == MusicFailure.Unauthorized)
         {
             if (!closed && !ct.IsCancellationRequested)
-            { await ViewModel.ExpireSessionAsync(); PlaybackStatus.Text = "登录已失效，请在连接与账号中重新登录。"; }
+            {
+                if (ViewModel.AuthenticatedClient?.SourceInstanceId == track.SourceInstanceId)
+                    await ViewModel.ExpireSessionAsync();
+                PlaybackStatus.Text = "歌曲来源的登录已失效，请重新连接。";
+            }
         }
         catch (FileNotFoundException) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "未找到 FFmpeg。请安装 FFmpeg 并配置 PATH 后重新启动客户端。"; }
         catch (Exception) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "音频加载失败，请检查网络、登录状态或选择其他曲目。"; }
