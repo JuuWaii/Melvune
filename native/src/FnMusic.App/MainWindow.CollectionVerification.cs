@@ -115,9 +115,25 @@ public sealed partial class MainWindow
             pendingSeek = 20; CommitSeek();
             for (int i = 0; i < 80 && (submittedSeek is not null || Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - 20) > 2); i++) await Task.Delay(100);
             Verify("local_seek", music.Player.PlaybackSession.CanSeek && submittedSeek is null && Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - 20) < 2);
+            var activeLocalAudio = music.Player.Source;
+            var localItems = TrackList.ItemsSource;
+            ResetLibrary();
+            Verify("nas_reset_preserves_local_view_and_playback", ReferenceEquals(music.Player.Source, activeLocalAudio) && mediaReady
+                && queue.Count == 1 && ReferenceEquals(TrackList.ItemsSource, localItems) && searchQuery == "000-playback" && localView);
+            await SwitchCollectionAsync(null);
+            ResetLibrary();
+            Verify("nas_reset_clears_remote_view_only", TrackList.ItemsSource is null && total == 0 && queue.Count == 1
+                && ReferenceEquals(music.Player.Source, activeLocalAudio) && mediaReady);
             Stop_Click(this, new RoutedEventArgs());
             await SwitchCollectionAsync(null);
             Verify("local_return_to_nas", !localView && TrackList.SelectedItem is MusicTrack { Id: "synthetic-a" } && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));
+            var remoteTrack = TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException();
+            queue.Replace([remoteTrack], remoteTrack.Reference);
+            await ShowLocalMusicAsync();
+            localItems = TrackList.ItemsSource;
+            ResetLibrary();
+            Verify("nas_reset_removes_remote_queue_keeps_local_view", queue.Count == 0 && music.Player.Source is null
+                && ReferenceEquals(TrackList.ItemsSource, localItems) && total == 53 && localView);
             var scanEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var pendingScan = ScanLocalAsync(local.Settings, default, async (_, ct) =>
             { scanEntered.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); return new("", "", 0); });

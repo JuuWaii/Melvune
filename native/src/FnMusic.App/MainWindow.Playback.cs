@@ -372,15 +372,24 @@ public sealed partial class MainWindow
     {
         favoriteWork.Cancel(); favoriteWork.Dispose(); favoriteWork = new();
         favoritesView = false; FavoriteStatus.Text = "";
-        CancelWork(); music.Stop(); mediaReady = false;
+        // 当前队列全部来自仍连接的本地库时，飞牛会话变化不应打断它。
+        bool preserveLocalQueue = localSource is not null && queue.Count > 0
+            && queue.Tracks.All(track => track.SourceInstanceId == localSource.Source.Id)
+            && ViewModel.PlaybackRouter.CanPlay(queue.Tracks[0].Reference);
+        if (!preserveLocalQueue)
+        {
+            CancelWork(); music.Stop(); mediaReady = false;
+            queue.Clear(); QueueStatus.Text = "播放队列为空"; NowPlaying.Text = "";
+            PlaybackStatus.Text = localView ? "本地音乐可直接播放。" : "登录后刷新曲库。";
+        }
+        // 浏览来源与播放来源可以不同；保留本地筛选、分页及正在进行的扫描。
+        if (localView) { UpdateFavoriteButton(); return; }
         libraryWork.Cancel();
         searchQuery = ""; SearchInput.Text = "";
         parentArtist = null; collectionKind = null; collection = null; collectionListPage = 1;
         CollectionList.ItemsSource = null; CollectionOpen.IsEnabled = false; UpdateCollectionView();
-        TrackList.ItemsSource = null; NowPlaying.Text = PageStatus.Text = "";
-        queue.Clear(); QueueStatus.Text = "播放队列为空";
+        TrackList.ItemsSource = null; PageStatus.Text = "";
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
-        PlaybackStatus.Text = "登录后刷新曲库。";
     }
     private void ClosePlayback()
     { closed = true; localLifetime.Cancel(); localLifetime.Dispose(); if (localSource is not null) ViewModel.PlaybackRouter.Unregister(localSource.Source.Id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
