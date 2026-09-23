@@ -240,6 +240,7 @@ public sealed partial class MainWindow
         UpdateQueueStatus();
         if (!IsSyntheticPreview && !ViewModel.PlaybackRouter.CanPlay(track.Reference))
         { NowPlaying.Text = ""; PlaybackStatus.Text = "歌曲来源未连接或不支持播放。"; return; }
+        _ = LoadLyricsAsync(track);
         var ct = work.Token;
         PlaybackStatus.Text = "正在加载音频…";
         try
@@ -295,7 +296,7 @@ public sealed partial class MainWindow
             await PlayTrackAsync(selectedTrack);
     }
     private void Resume_Click(object sender, RoutedEventArgs e) { if (mediaReady) { music.Player.Play(); PlaybackStatus.Text = "正在播放"; } }
-    private void Stop_Click(object sender, RoutedEventArgs e) { CancelWork(); music.Stop(); mediaReady = false; PlaybackStatus.Text = "已停止"; NowPlaying.Text = ""; }
+    private void Stop_Click(object sender, RoutedEventArgs e) { ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false; PlaybackStatus.Text = "已停止"; NowPlaying.Text = ""; }
     private void Mute_Click(object sender, RoutedEventArgs e) => music.Player.IsMuted = MuteToggle.IsChecked == true;
     private void Volume_Changed(object sender, RangeBaseValueChangedEventArgs e) { if (music is not null) music.Player.Volume = e.NewValue / 100; }
     private void Seek_Changed(object sender, RangeBaseValueChangedEventArgs e)
@@ -329,6 +330,7 @@ public sealed partial class MainWindow
     private void UpdateProgress()
     {
         if (closed) return;
+        UpdateLyricsPosition();
         var session = music.Player.PlaybackSession;
         double duration = session.NaturalDuration.TotalSeconds;
         if (submittedSeek is not null && DateTimeOffset.UtcNow >= seekDeadline)
@@ -370,6 +372,7 @@ public sealed partial class MainWindow
     private void CancelWork() { ResetSeek(); work.Cancel(); work.Dispose(); work = new(); }
     private void ResetLibrary()
     {
+        coverCache.Clear();
         favoriteWork.Cancel(); favoriteWork.Dispose(); favoriteWork = new();
         favoritesView = false; FavoriteStatus.Text = "";
         // 当前队列全部来自仍连接的本地库时，飞牛会话变化不应打断它。
@@ -378,7 +381,7 @@ public sealed partial class MainWindow
             && ViewModel.PlaybackRouter.CanPlay(queue.Tracks[0].Reference);
         if (!preserveLocalQueue)
         {
-            CancelWork(); music.Stop(); mediaReady = false;
+            ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false;
             queue.Clear(); QueueStatus.Text = "播放队列为空"; NowPlaying.Text = "";
             PlaybackStatus.Text = localView ? "本地音乐可直接播放。" : "登录后刷新曲库。";
         }
@@ -392,5 +395,5 @@ public sealed partial class MainWindow
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
     }
     private void ClosePlayback()
-    { closed = true; localLifetime.Cancel(); localLifetime.Dispose(); if (localSource is not null) ViewModel.PlaybackRouter.Unregister(localSource.Source.Id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { closed = true; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); if (localSource is not null) ViewModel.PlaybackRouter.Unregister(localSource.Source.Id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

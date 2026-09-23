@@ -15,6 +15,42 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+await Test("lyrics timestamps translations offsets and seeking", () =>
+{
+    var lyrics = Lyrics.Parse("[ar:Artist]\n[offset:100]\n[00:20.25]later\n[00:01.00][00:03.000]first\n[00:01.00]translation", 200);
+    Check(lyrics.IsTimed && lyrics.Lines.Count == 3 && Math.Abs(lyrics.Lines[0].Seconds - 1.1) < .001);
+    Check(lyrics.Lines[0].Text == "first\ntranslation" && lyrics.FindLine(0) == -1 && lyrics.FindLine(4) == 1 && lyrics.FindLine(100) == 2);
+    Check(lyrics.FindLine(double.NaN) == -1 && !Lyrics.Parse("[ti:Title]\nplain text").IsTimed);
+    Check(Lyrics.Parse("[ti:Title]").Lines.Count == 0);
+    return Task.CompletedTask;
+});
+await Test("NAS lyrics select preferred and encode scoped track", async () =>
+{
+    using var api = new NasApiClient(endpoint, new FakeHandler(request =>
+    {
+        Check(request.RequestUri!.AbsolutePath.EndsWith("/lyric/list") && request.RequestUri.Query == "?trackGUID=a%26b");
+        return Json("""{"code":0,"data":{"preferred":"manual","list":[{"guid":"embedded","source":1,"content":"[00:01]embedded"},{"guid":"manual","source":4,"content":"[00:02]preferred","offset":500}]}}""");
+    }));
+    var lyrics = await api.GetLyricsAsync(new(Guid.Empty, "a&b"), default);
+    Check(lyrics.Lines.Single() == new LyricLine(2.5, "preferred"));
+});
+await Test("cover retrieval rejects redirects and non-images", async () =>
+{
+    using var redirect = new NasApiClient(endpoint, new FakeHandler(_ => new(HttpStatusCode.Found)));
+    await Fails(MusicFailure.RedirectRejected, () => redirect.GetCoverAsync("cover", default));
+    using var html = new NasApiClient(endpoint, new FakeHandler(_ => new(HttpStatusCode.OK) { Content = new StringContent("html") }));
+    await Fails(MusicFailure.InvalidResponse, () => html.GetCoverAsync("cover", default));
+    using var missing = new NasApiClient(endpoint, new FakeHandler(_ => new(HttpStatusCode.NotFound)));
+    Check(await missing.GetCoverAsync("cover", default) is null);
+    using var image = new NasApiClient(endpoint, new FakeHandler(request =>
+    {
+        Check(request.RequestUri!.Query == "?coverId=a%26b&size=256");
+        var content = new ByteArrayContent([1, 2, 3]);
+        content.Headers.ContentType = new("image/png");
+        return new(HttpStatusCode.OK) { Content = content };
+    }));
+    Check((await image.GetCoverAsync("a&b", default))!.SequenceEqual(new byte[] { 1, 2, 3 }));
+});
 await Test("favorite list maps state and mutations use explicit scoped bodies", async () =>
 {
     int calls = 0;
@@ -317,6 +353,12 @@ await Test("local music scans nested audio files with stable identities and open
     Check(source.Tracks.Count == 2 && source.Tracks.All(track => track.SourceInstanceId == settings.SourceId));
     var again = await LocalMusicSource.ScanAsync(settings, default);
     Check(source.Tracks.Select(t => t.Reference).SequenceEqual(again.Tracks.Select(t => t.Reference)));
+    var sidecarTrack = source.Tracks.First(t => source.GetFilePath(t.Reference).EndsWith("song.WAV", StringComparison.OrdinalIgnoreCase));
+    await File.WriteAllTextAsync(Path.Combine(directory, "song.lrc"), "[00:01.50]本地歌词");
+    await File.WriteAllBytesAsync(Path.Combine(directory, "song.png"), [7, 8]);
+    Check((await source.GetLyricsAsync(sidecarTrack.Reference, default)).Lines.Single() == new LyricLine(1.5, "本地歌词"));
+    Check((await source.GetSidecarCoverAsync(sidecarTrack.Reference, default))!.SequenceEqual(new byte[] { 7, 8 }));
+    await Fails(MusicFailure.Rejected, () => source.GetLyricsAsync(new(Guid.NewGuid(), sidecarTrack.Id), default));
     var router = new MusicPlaybackRouter(); router.Register(source);
     using (var stream = await router.OpenAsync(source.Tracks.First().Reference, default)) Check(stream.CanSeek && stream.ReadByte() is 1 or 4);
     await Fails(MusicFailure.Rejected, () => source.OpenAsync(new(settings.SourceId, "../ignore.txt"), default));

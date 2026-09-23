@@ -76,6 +76,6 @@ public sealed partial class NasApiClient
                 throw new MusicApiException(MusicFailure.InvalidResponse);
             count = value;
         }
-        return new MusicCollection(id.GetString()!, name.GetString()!, count);
+        return new MusicCollection(id.GetString()!, name.GetString()!, count) { CoverId = ReadOptionalString(item, "coverId") };
     }
 }

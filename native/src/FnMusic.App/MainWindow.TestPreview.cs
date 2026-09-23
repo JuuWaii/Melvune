@@ -31,6 +31,8 @@ public sealed partial class MainWindow
         Title = Environment.GetCommandLineArgs().Contains("--preview-collections") ? "飞牛音乐 · 合成专辑歌手验证" : Environment.GetCommandLineArgs().Contains("--preview-search") ? "飞牛音乐 · 合成搜索交互验证" : "飞牛音乐 · 合成音频交互验证";
         SettingsPanel.Visibility = Visibility.Collapsed;
         LibraryPanel.Visibility = Visibility.Visible;
+        if (Environment.GetCommandLineArgs().Contains("--preview-light")) Root.RequestedTheme = ElementTheme.Light;
+        if (Environment.GetCommandLineArgs().Contains("--preview-dark")) Root.RequestedTheme = ElementTheme.Dark;
         await LoadPageAsync(1);
         PlaybackStatus.Text = "合成音频交互验证，默认静音。";
         music.Player.IsMuted = true; MuteToggle.IsChecked = true;

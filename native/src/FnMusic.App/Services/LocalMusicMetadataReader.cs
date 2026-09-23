@@ -11,6 +11,6 @@ public static class LocalMusicMetadataReader
         timeout.CancelAfter(TimeSpan.FromSeconds(3));
         var file = await StorageFile.GetFileFromPathAsync(path).AsTask(timeout.Token);
         var metadata = await file.Properties.GetMusicPropertiesAsync().AsTask(timeout.Token);
-        return new(metadata.Title, metadata.Artist, metadata.Duration.TotalSeconds);
+        return new(metadata.Title, metadata.Artist, metadata.Duration.TotalSeconds) { Album = metadata.Album };
     }
 }

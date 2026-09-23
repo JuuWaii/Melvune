@@ -10,8 +10,9 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         Title = "飞牛音乐 · 原生预览";
-        AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1080, 880));
+        AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1360, 900));
         InitializePlayback();
+        InitializePresentation();
         ViewModel.SessionChanging += ResetLibrary;
         Closed += (_, _) => { ClosePlayback(); ViewModel.Dispose(); };
     }

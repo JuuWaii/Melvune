@@ -88,7 +88,8 @@ public sealed partial class NasApiClient : IDisposable
             double duration = item.TryGetProperty("duration", out var d) && d.ValueKind == JsonValueKind.Number && d.TryGetDouble(out double ms) && double.IsFinite(ms) ? Math.Max(0, ms / 1000) : 0;
             bool cue = item.TryGetProperty("isCue", out var c) && c.ValueKind == JsonValueKind.True;
             tracks.Add(new MusicTrack(id.GetString()!, title, artist, duration, cue)
-            { SourceInstanceId = SourceInstanceId, IsFavorite = item.TryGetProperty("isFavorite", out var favorite) && favorite.ValueKind == JsonValueKind.True });
+            { SourceInstanceId = SourceInstanceId, CoverId = ReadOptionalString(item, "coverId"), Album = ReadAlbum(item),
+                IsFavorite = item.TryGetProperty("isFavorite", out var favorite) && favorite.ValueKind == JsonValueKind.True });
         }
         return new TrackPage(tracks, count);
     }
@@ -188,4 +189,11 @@ public sealed partial class NasApiClient : IDisposable
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new MusicApiException(MusicFailure.Unavailable); }
     }
     public void Dispose() { ClearSession(); http.Dispose(); }
+    private static string? ReadOptionalString(JsonElement item, string name) =>
+        item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
+    private static string ReadAlbum(JsonElement item)
+    {
+        if (!item.TryGetProperty("album", out var album)) return "";
+        return album.ValueKind == JsonValueKind.String ? album.GetString()! : album.ValueKind == JsonValueKind.Object ? ReadOptionalString(album, "name") ?? "" : "";
+    }
 }

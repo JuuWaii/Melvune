@@ -104,6 +104,8 @@ GET 的规范化包含参数排序、空值处理和 URL 编码/解码；POST �
 | 历史 | `/play-history/list` | POST `/play-history/delete` |
 | 歌词 | `/lyric/list` | 未确认 |
 
+2026-09-23：已接入并完成当前实例只读验证：`lyric/list?trackGUID=…`（`list/preferred`，内容项 `content/guid/source/offset`）及 `static/cover?coverId=…&size=256` 图片。歌曲/专辑解析保留 `coverId`，歌曲保留字符串或对象形式的专辑名。偏移矩阵及更多服务端版本仍需验证，详见 [封面与歌词](../NATIVE_PRESENTATION.md)。
+
 这些路径只用于后续定位。请求参数、分页、所有权、权限和响应模型需逐项验证，不能直接作为“功能已支持”的依据。
 
 ## 6. 可重复诊断与隐私边界

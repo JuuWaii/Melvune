@@ -96,6 +96,8 @@ public sealed partial class MainWindow
             Verify("favorite_state_reloaded", TrackList.SelectedItem is MusicTrack { IsFavorite: false });
             string localDirectory = Path.Combine(AppContext.BaseDirectory, "local-fixture", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(localDirectory);
+            await File.WriteAllTextAsync(Path.Combine(localDirectory, "000-playback.lrc"), "[00:00]第一行\n[00:10]第二行\n[00:20]第三行");
+            await File.WriteAllBytesAsync(Path.Combine(localDirectory, "000-playback.png"), Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a/noAAAAASUVORK5CYII="));
             using (var wave = Services.PlaybackVerification.CreateWave())
             using (var file = File.Create(Path.Combine(localDirectory, "000-playback.wav"))) await wave.CopyToAsync(file);
             for (int i = 1; i <= 52; i++) await File.WriteAllBytesAsync(Path.Combine(localDirectory, $"track-{i:000}.wav"), [0]);
@@ -111,10 +113,21 @@ public sealed partial class MainWindow
             await StartQueueAsync(TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
             for (int i = 0; i < 80 && (!mediaReady || music.Player.PlaybackSession.Position.TotalSeconds <= 0); i++) await Task.Delay(100);
             Verify("local_file_playback", mediaReady && music.Player.PlaybackSession.Position.TotalSeconds > 0 && queue.Current?.SourceInstanceId == local.Source.Id);
+            await LoadArtworkAsync(NowCover);
+            Verify("local_cover_decoded", NowCover.Source is not null);
+            Verify("local_lyrics_loaded", currentLyrics.IsTimed && currentLyrics.Lines.Count == 3);
+            LyricsPanel.Visibility = Visibility.Visible;
             music.Player.Pause();
             pendingSeek = 20; CommitSeek();
             for (int i = 0; i < 80 && (submittedSeek is not null || Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - 20) > 2); i++) await Task.Delay(100);
             Verify("local_seek", music.Player.PlaybackSession.CanSeek && submittedSeek is null && Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - 20) < 2);
+            UpdateLyricsPosition();
+            Verify("lyrics_follow_seek", activeLyric >= 1 && LyricsList.SelectedIndex == activeLyric);
+            Root.RequestedTheme = ElementTheme.Light;
+            Verify("light_theme", Root.ActualTheme == ElementTheme.Light);
+            Root.RequestedTheme = ElementTheme.Dark;
+            Verify("dark_theme", Root.ActualTheme == ElementTheme.Dark);
+            ApplySystemTheme();
             var activeLocalAudio = music.Player.Source;
             var localItems = TrackList.ItemsSource;
             ResetLibrary();
@@ -125,6 +138,7 @@ public sealed partial class MainWindow
             Verify("nas_reset_clears_remote_view_only", TrackList.ItemsSource is null && total == 0 && queue.Count == 1
                 && ReferenceEquals(music.Player.Source, activeLocalAudio) && mediaReady);
             Stop_Click(this, new RoutedEventArgs());
+            Verify("stop_clears_presentation", NowCover.Source is null && currentLyrics.Lines.Count == 0 && LyricsList.ItemsSource is null);
             await SwitchCollectionAsync(null);
             Verify("local_return_to_nas", !localView && TrackList.SelectedItem is MusicTrack { Id: "synthetic-a" } && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));
             var remoteTrack = TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException();

@@ -10,6 +10,8 @@ public sealed record MusicTrack(string Id, string Title, string Artist, double D
     public Guid SourceInstanceId { get; init; }
     public TrackReference Reference => new(SourceInstanceId, Id);
     public bool IsFavorite { get; init; }
+    public string Album { get; init; } = "";
+    public string? CoverId { get; init; }
     public string DisplayDuration => TimeSpan.FromSeconds(Math.Clamp(DurationSeconds, 0, 864000)).ToString(DurationSeconds >= 3600 ? @"h\:mm\:ss" : @"m\:ss");
 }
 public sealed record TrackPage(IReadOnlyList<MusicTrack> Tracks, int Total);

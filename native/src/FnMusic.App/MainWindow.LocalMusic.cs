@@ -80,6 +80,7 @@ public sealed partial class MainWindow
 
     private void ReplaceLocalSource(LocalMusicSource source)
     {
+        coverCache.Clear();
         if (localSource is not null) ViewModel.PlaybackRouter.Unregister(localSource.Source.Id);
         ViewModel.PlaybackRouter.Register(source); localSource = source;
     }

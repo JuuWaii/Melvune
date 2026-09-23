@@ -9,6 +9,8 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-native-presentation"))
+        { RunPresentationVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-favorites"))
         { RunFavoriteVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-collections"))
@@ -25,6 +27,8 @@ public partial class App : Application
         window.Activate();
     }
 #if DEBUG
+    private async void RunPresentationVerification()
+    { await Services.PresentationVerification.RunAsync(); Exit(); }
     private async void RunFavoriteVerification()
     { await Services.FavoriteVerification.RunAsync(); Exit(); }
     private async void RunCollectionVerification()
