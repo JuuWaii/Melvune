@@ -346,6 +346,22 @@ await Test("local metadata enriches tracks without changing references and falls
     var failed = await LocalMusicSource.ScanAsync(settings, default, (_, _) => throw new IOException());
     Check(failed.Tracks[0].Reference == plain.Tracks[0].Reference && failed.Tracks[0].Title == "one");
 });
+await Test("local scan reports progress and cancellation during metadata prevents a partial result", async () =>
+{
+    string directory = Path.Combine(testDirectory, "scan-progress"); Directory.CreateDirectory(directory);
+    for (int i = 0; i < 26; i++) await File.WriteAllBytesAsync(Path.Combine(directory, $"{i}.wav"), [1]);
+    var reports = new List<int>();
+    var settings = new LocalMusicSettings(Guid.NewGuid(), directory);
+    var result = await LocalMusicSource.ScanAsync(settings, default, progress: new InlineProgress<int>(reports.Add));
+    Check(result.Tracks.Count == 26 && reports.SequenceEqual(new[] { 0, 25, 26 }));
+    using var cancel = new CancellationTokenSource();
+    var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    var pending = LocalMusicSource.ScanAsync(settings, cancel.Token, async (_, ct) =>
+    { entered.SetResult(); await Task.Delay(Timeout.Infinite, ct); return new("", "", 0); });
+    await entered.Task.WaitAsync(TimeSpan.FromSeconds(5)); cancel.Cancel();
+    try { await pending; throw new Exception("Partial result accepted"); } catch (OperationCanceledException) { }
+    Check(result.Tracks.Count == 26);
+});
 await Test("local scan honors cancellation and rejects missing roots", async () =>
 {
     using var canceled = new CancellationTokenSource(); canceled.Cancel();
@@ -734,6 +750,10 @@ sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> response)
 sealed class AsyncFakeHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> response) : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => response(request);
+}
+sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
+{
+    public void Report(T value) => report(value);
 }
 sealed class FakePlaybackSource(Guid id, MusicSourceCapabilities capabilities, Func<TrackReference, CancellationToken, Task<Stream>> open) : IMusicPlaybackSource
 {

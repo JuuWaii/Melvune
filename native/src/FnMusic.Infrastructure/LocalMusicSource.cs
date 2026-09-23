@@ -24,7 +24,7 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
     }
 
     public static Task<LocalMusicSource> ScanAsync(LocalMusicSettings settings, CancellationToken ct,
-        Func<string, CancellationToken, Task<LocalMusicMetadata>>? readMetadata = null) => Task.Run(async () =>
+        Func<string, CancellationToken, Task<LocalMusicMetadata>>? readMetadata = null, IProgress<int>? progress = null) => Task.Run(async () =>
     {
         if (settings.SourceId == Guid.Empty || !Path.IsPathFullyQualified(settings.Directory)) throw new ArgumentException("Invalid local library");
         string root = Path.GetFullPath(settings.Directory);
@@ -32,6 +32,7 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
         EnsureRegularPath(root);
         var files = new Dictionary<string, string>();
         var tracks = new List<MusicTrack>();
+        progress?.Report(0);
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
         foreach (string file in Directory.EnumerateFiles(root, "*", options))
         {
@@ -56,8 +57,11 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
                 catch (Exception) { /* 不支持的标签不能阻止文件被浏览和播放。 */ }
             }
             tracks.Add(new(id, title, artist, duration, false) { SourceInstanceId = settings.SourceId });
+            ct.ThrowIfCancellationRequested();
+            if (tracks.Count % 25 == 0) progress?.Report(tracks.Count);
         }
         ct.ThrowIfCancellationRequested();
+        progress?.Report(tracks.Count);
         tracks.Sort((a, b) => { int title = StringComparer.OrdinalIgnoreCase.Compare(a.Title, b.Title); return title != 0 ? title : StringComparer.Ordinal.Compare(a.Id, b.Id); });
         return new LocalMusicSource(settings with { Directory = root }, files, tracks);
     }, ct);

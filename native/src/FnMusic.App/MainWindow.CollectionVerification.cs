@@ -118,6 +118,15 @@ public sealed partial class MainWindow
             Stop_Click(this, new RoutedEventArgs());
             await SwitchCollectionAsync(null);
             Verify("local_return_to_nas", !localView && TrackList.SelectedItem is MusicTrack { Id: "synthetic-a" } && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));
+            var scanEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pendingScan = ScanLocalAsync(local.Settings, default, async (_, ct) =>
+            { scanEntered.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); return new("", "", 0); });
+            await scanEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Verify("local_scan_cancel_visible", CancelLocalScan.Visibility == Visibility.Visible);
+            CancelLocalScan_Click(this, new RoutedEventArgs());
+            try { await pendingScan; throw new InvalidOperationException(); } catch (OperationCanceledException) { }
+            Verify("local_scan_cancel_preserves_source", ReferenceEquals(localSource, local) && CancelLocalScan.Visibility == Visibility.Collapsed
+                && LocalScanStatus.Text.Contains("已取消") && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; }

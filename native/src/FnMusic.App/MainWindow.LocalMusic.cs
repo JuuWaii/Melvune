@@ -9,6 +9,7 @@ public sealed partial class MainWindow
 {
     private bool localView, localImportBusy;
     private LocalMusicSource? localSource;
+    private CancellationTokenSource? localScan;
     private readonly CancellationTokenSource localLifetime = new();
     private readonly LocalMusicSettingsStore localSettingsStore = new(Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FnMusic.Native"));
@@ -58,14 +59,14 @@ public sealed partial class MainWindow
                 ? saved.SourceId : Guid.NewGuid();
             SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
             PlaybackStatus.Text = "正在扫描本地音乐…";
-            var scanned = await LocalMusicSource.ScanAsync(new(id, path), localLifetime.Token, Services.LocalMusicMetadataReader.ReadAsync);
+            var scanned = await ScanLocalAsync(new(id, path), localLifetime.Token);
             await localSettingsStore.SaveAsync(scanned.Settings, localLifetime.Token);
             if (closed) return;
             libraryWork.Cancel();
             ReplaceLocalSource(scanned);
             await ShowLocalMusicAsync();
         }
-        catch (OperationCanceledException) when (closed) { }
+        catch (OperationCanceledException) { }
         catch (Exception)
         {
             if (!closed)
@@ -95,7 +96,7 @@ public sealed partial class MainWindow
             {
                 var saved = localSource?.Settings ?? await localSettingsStore.LoadAsync(ct);
                 if (saved is null) { PageStatus.Text = "尚未导入本地音乐，请选择“导入文件夹”。"; return; }
-                var source = await LocalMusicSource.ScanAsync(saved, ct, Services.LocalMusicMetadataReader.ReadAsync);
+                var source = await ScanLocalAsync(saved, ct);
                 if (ct.IsCancellationRequested || closed) return;
                 ReplaceLocalSource(source);
             }
@@ -108,7 +109,50 @@ public sealed partial class MainWindow
             PageStatus.Text = $"本地音乐 · 第 {page} 页，共 {total} 首";
             PreviousPage.IsEnabled = page > 1; NextPage.IsEnabled = page * 50 < total;
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
+        catch (OperationCanceledException)
+        { if (!closed && !ct.IsCancellationRequested) PageStatus.Text = "扫描已取消，点击本地音乐可返回原列表。"; }
         catch (Exception) { if (!closed && !ct.IsCancellationRequested) PageStatus.Text = "本地目录不可用，请检查磁盘或重新导入；已保存的目录配置仍保留。"; }
+    }
+
+    private void CancelLocalScan_Click(object sender, RoutedEventArgs e) => localScan?.Cancel();
+
+    private async Task<LocalMusicSource> ScanLocalAsync(LocalMusicSettings settings, CancellationToken parent,
+        Func<string, CancellationToken, Task<LocalMusicMetadata>>? reader = null)
+    {
+        localScan?.Cancel();
+        using var scan = CancellationTokenSource.CreateLinkedTokenSource(parent, localLifetime.Token);
+        localScan = scan;
+        CancelLocalScan.Visibility = Visibility.Visible;
+        LocalScanStatus.Text = "正在扫描本地音乐…";
+        var progress = new Progress<int>(count =>
+        {
+            if (!closed && ReferenceEquals(localScan, scan) && !scan.IsCancellationRequested)
+                LocalScanStatus.Text = $"已读取 {count} 首，正在扫描…";
+        });
+        try
+        {
+            var result = await LocalMusicSource.ScanAsync(settings, scan.Token, reader ?? Services.LocalMusicMetadataReader.ReadAsync, progress);
+            scan.Token.ThrowIfCancellationRequested();
+            if (!closed && ReferenceEquals(localScan, scan)) LocalScanStatus.Text = $"扫描完成，共 {result.Tracks.Count} 首。";
+            return result;
+        }
+        catch (OperationCanceledException)
+        {
+            if (!closed && ReferenceEquals(localScan, scan)) LocalScanStatus.Text = "扫描已取消，原音乐库保留。";
+            throw;
+        }
+        catch
+        {
+            if (!closed && ReferenceEquals(localScan, scan)) LocalScanStatus.Text = "扫描失败，原音乐库保留。";
+            throw;
+        }
+        finally
+        {
+            if (ReferenceEquals(localScan, scan))
+            {
+                localScan = null;
+                if (!closed) CancelLocalScan.Visibility = Visibility.Collapsed;
+            }
+        }
     }
 }

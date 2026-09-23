@@ -13,6 +13,8 @@
     <Button Content="音乐资料库" Click="Library_Click" />
     <Button Content="本地音乐" Click="LocalMusic_Click" />
     <Button Content="导入文件夹" Click="ImportLocal_Click" />
+    <TextBlock x:Name="LocalScanStatus" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
+    <Button x:Name="CancelLocalScan" Content="取消扫描" Visibility="Collapsed" Click="CancelLocalScan_Click" />
     <Button Content="连接与账号" Click="Settings_Click" />
     <TextBlock Text="原生播放预览" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
    </StackPanel>

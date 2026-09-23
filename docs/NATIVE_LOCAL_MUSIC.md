@@ -23,3 +23,9 @@ Debug 和 Release 构建通过，隐私扫描通过。测试生成的文件与�
 元数据接口依据 [Windows GetMusicPropertiesAsync](https://learn.microsoft.com/en-us/uwp/api/windows.storage.fileproperties.storageitemcontentproperties.getmusicpropertiesasync?view=winrt-26100)，系统选择器绑定所属 WinUI 窗口。读取仅在本机进行。
 
 交付前扩展运行 FFmpeg 格式与异常输入回归，总计 57 项通过。独立 Release 发布启动时发现缺失应用 XBF/PRI 资源，已补发布目标和必需资源检查，并在最终目录启动验证通过。
+
+## 扫描进度与取消
+
+导入、首次读取及手动刷新扫描时，侧栏显示已读取曲目数和“取消扫描”。进度每 25 首更新并显示最终计数；未预先统计整个目录，因此不显示虚假的百分比。取消停止元数据读取，未完成结果不替换来源或写入目录配置。刷新取消后可点击“本地音乐”恢复原列表。已经完成并开始保存的导入不再显示取消按钮。
+
+新扫描会取消尚未完成的旧扫描，旧进度回调不能覆盖新扫描状态。扫描失败或取消后，原来源与队列引用保留。基础检查增至 52 项，新增过程中取消与进度计数验证；窗口检查新增取消入口及取消后来源保持验证。以上是源码后续改进，此前交付的 preview.2 目录不自动更新。
