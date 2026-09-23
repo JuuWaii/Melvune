@@ -32,7 +32,23 @@ public sealed partial class MainWindow
             var input = new TextBox { Header = "音乐文件夹完整路径", PlaceholderText = @"例如 D:\Music", Text = localSource?.Settings.Directory ?? "" };
             var panel = new StackPanel { Spacing = 12 };
             panel.Children.Add(input);
-            panel.Children.Add(new TextBlock { Text = "包含子文件夹，最多 10000 首；跳过链接和无权限目录。首版显示文件名，暂不读取标签与时长。", TextWrapping = TextWrapping.Wrap });
+            var browse = new Button { Content = "浏览文件夹…" };
+            browse.Click += async (_, _) =>
+            {
+                browse.IsEnabled = false;
+                try
+                {
+                    var picker = new global::Windows.Storage.Pickers.FolderPicker();
+                    picker.FileTypeFilter.Add("*");
+                    WinRT.Interop.InitializeWithWindow.Initialize(picker, WinRT.Interop.WindowNative.GetWindowHandle(this));
+                    var folder = await picker.PickSingleFolderAsync();
+                    if (folder is not null) input.Text = folder.Path;
+                }
+                catch (Exception) { input.Header = "无法打开选择器，请直接输入文件夹完整路径"; }
+                finally { browse.IsEnabled = true; }
+            };
+            panel.Children.Add(browse);
+            panel.Children.Add(new TextBlock { Text = "包含子文件夹，最多 10000 首；跳过链接和无权限目录。读取标题、歌手与时长，无法读取时保留文件名。", TextWrapping = TextWrapping.Wrap });
             var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "导入本地音乐", Content = panel, PrimaryButtonText = "导入", CloseButtonText = "取消" };
             if (await dialog.ShowAsync() != ContentDialogResult.Primary || closed) return;
             if (!Path.IsPathFullyQualified(input.Text.Trim())) throw new ArgumentException("Absolute directory required");
@@ -42,7 +58,7 @@ public sealed partial class MainWindow
                 ? saved.SourceId : Guid.NewGuid();
             SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
             PlaybackStatus.Text = "正在扫描本地音乐…";
-            var scanned = await LocalMusicSource.ScanAsync(new(id, path), localLifetime.Token);
+            var scanned = await LocalMusicSource.ScanAsync(new(id, path), localLifetime.Token, Services.LocalMusicMetadataReader.ReadAsync);
             await localSettingsStore.SaveAsync(scanned.Settings, localLifetime.Token);
             if (closed) return;
             libraryWork.Cancel();
@@ -79,16 +95,17 @@ public sealed partial class MainWindow
             {
                 var saved = localSource?.Settings ?? await localSettingsStore.LoadAsync(ct);
                 if (saved is null) { PageStatus.Text = "尚未导入本地音乐，请选择“导入文件夹”。"; return; }
-                var source = await LocalMusicSource.ScanAsync(saved, ct);
+                var source = await LocalMusicSource.ScanAsync(saved, ct, Services.LocalMusicMetadataReader.ReadAsync);
                 if (ct.IsCancellationRequested || closed) return;
                 ReplaceLocalSource(source);
             }
             if (ct.IsCancellationRequested || closed) return;
-            var result = localSource!.Tracks.Where(track => track.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)).ToArray();
+            var result = localSource!.Tracks.Where(track => track.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
+                || track.Artist.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)).ToArray();
             total = result.Length; page = Math.Clamp(requestedPage, 1, Math.Max(1, (total + 49) / 50));
             TrackList.ItemsSource = result.Skip((page - 1) * 50).Take(50).ToArray();
             TrackList.SelectedIndex = total > 0 ? 0 : -1;
-            PageStatus.Text = $"本地音乐 · 第 {page} 页，共 {total} 首（按文件名显示）";
+            PageStatus.Text = $"本地音乐 · 第 {page} 页，共 {total} 首";
             PreviousPage.IsEnabled = page > 1; NextPage.IsEnabled = page * 50 < total;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }

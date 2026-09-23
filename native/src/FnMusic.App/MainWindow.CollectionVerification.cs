@@ -16,6 +16,7 @@ public sealed partial class MainWindow
         { stage = name; checks[name] = value; if (!value) throw new InvalidOperationException(); }
         try
         {
+            music.Player.IsMuted = true;
             if (!Environment.GetCommandLineArgs().Contains("--preview-collections")) throw new InvalidOperationException();
             SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
             foreach (var kind in new[] { CollectionKind.Album, CollectionKind.Artist })
@@ -98,7 +99,7 @@ public sealed partial class MainWindow
             using (var wave = Services.PlaybackVerification.CreateWave())
             using (var file = File.Create(Path.Combine(localDirectory, "000-playback.wav"))) await wave.CopyToAsync(file);
             for (int i = 1; i <= 52; i++) await File.WriteAllBytesAsync(Path.Combine(localDirectory, $"track-{i:000}.wav"), [0]);
-            var local = await FnMusic.Infrastructure.LocalMusicSource.ScanAsync(new(Guid.NewGuid(), localDirectory), default);
+            var local = await FnMusic.Infrastructure.LocalMusicSource.ScanAsync(new(Guid.NewGuid(), localDirectory), default, Services.LocalMusicMetadataReader.ReadAsync);
             ReplaceLocalSource(local);
             await ShowLocalMusicAsync();
             Verify("local_first_page", total == 53 && page == 1 && NextPage.IsEnabled && !FavoriteToggle.IsEnabled);
@@ -106,9 +107,14 @@ public sealed partial class MainWindow
             Verify("local_last_page", page == 2 && TrackList.ItemsSource is IEnumerable<MusicTrack> localLast && localLast.Count() == 3 && !NextPage.IsEnabled);
             SearchInput.Text = "000-playback"; await SearchAsync();
             Verify("local_search", total == 1 && localView && !FavoriteToggle.IsEnabled);
+            Verify("local_duration", TrackList.SelectedItem is MusicTrack durationTrack && Math.Abs(durationTrack.DurationSeconds - 60) < 1);
             await StartQueueAsync(TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
             for (int i = 0; i < 80 && (!mediaReady || music.Player.PlaybackSession.Position.TotalSeconds <= 0); i++) await Task.Delay(100);
             Verify("local_file_playback", mediaReady && music.Player.PlaybackSession.Position.TotalSeconds > 0 && queue.Current?.SourceInstanceId == local.Source.Id);
+            music.Player.Pause();
+            pendingSeek = 20; CommitSeek();
+            for (int i = 0; i < 80 && (submittedSeek is not null || Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - 20) > 2); i++) await Task.Delay(100);
+            Verify("local_seek", music.Player.PlaybackSession.CanSeek && submittedSeek is null && Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - 20) < 2);
             Stop_Click(this, new RoutedEventArgs());
             await SwitchCollectionAsync(null);
             Verify("local_return_to_nas", !localView && TrackList.SelectedItem is MusicTrack { Id: "synthetic-a" } && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));

@@ -5,6 +5,7 @@ using FnMusic.Core;
 namespace FnMusic.Infrastructure;
 
 public sealed record LocalMusicSettings(Guid SourceId, string Directory);
+public sealed record LocalMusicMetadata(string Title, string Artist, double DurationSeconds);
 
 /// <summary>只播放扫描快照里的文件；曲目 ID 不接受路径或 URI。</summary>
 public sealed class LocalMusicSource : IMusicPlaybackSource
@@ -22,7 +23,8 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
         Source = new(settings.SourceId, "本地音乐", "local", MusicSourceCapabilities.Browse | MusicSourceCapabilities.Search | MusicSourceCapabilities.Playback);
     }
 
-    public static Task<LocalMusicSource> ScanAsync(LocalMusicSettings settings, CancellationToken ct) => Task.Run(() =>
+    public static Task<LocalMusicSource> ScanAsync(LocalMusicSettings settings, CancellationToken ct,
+        Func<string, CancellationToken, Task<LocalMusicMetadata>>? readMetadata = null) => Task.Run(async () =>
     {
         if (settings.SourceId == Guid.Empty || !Path.IsPathFullyQualified(settings.Directory)) throw new ArgumentException("Invalid local library");
         string root = Path.GetFullPath(settings.Directory);
@@ -38,7 +40,22 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
             if (tracks.Count >= 10000) throw new InvalidDataException("Local library limit reached");
             string id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetRelativePath(root, file))));
             files.Add(id, file);
-            tracks.Add(new(id, Path.GetFileNameWithoutExtension(file), "本地文件", 0, false) { SourceInstanceId = settings.SourceId });
+            string title = Path.GetFileNameWithoutExtension(file), artist = "本地文件";
+            double duration = 0;
+            if (readMetadata is not null)
+            {
+                try
+                {
+                    EnsureRegularPath(file);
+                    var metadata = await readMetadata(file, ct).ConfigureAwait(false);
+                    if (!string.IsNullOrWhiteSpace(metadata.Title)) title = metadata.Title;
+                    if (!string.IsNullOrWhiteSpace(metadata.Artist)) artist = metadata.Artist;
+                    if (double.IsFinite(metadata.DurationSeconds) && metadata.DurationSeconds > 0) duration = Math.Min(metadata.DurationSeconds, 864000);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (Exception) { /* 不支持的标签不能阻止文件被浏览和播放。 */ }
+            }
+            tracks.Add(new(id, title, artist, duration, false) { SourceInstanceId = settings.SourceId });
         }
         ct.ThrowIfCancellationRequested();
         tracks.Sort((a, b) => { int title = StringComparer.OrdinalIgnoreCase.Compare(a.Title, b.Title); return title != 0 ? title : StringComparer.Ordinal.Compare(a.Id, b.Id); });

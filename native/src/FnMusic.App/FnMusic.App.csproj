@@ -11,7 +11,7 @@
     <SelfContained>true</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <DefaultLanguage>zh-CN</DefaultLanguage>
-    <Version>0.2.0-preview.1</Version>
+    <Version>0.2.0-preview.2</Version>
     <AssemblyVersion>0.2.0.0</AssemblyVersion>
   </PropertyGroup>
   <ItemGroup>
@@ -20,4 +20,11 @@
     <ProjectReference Include="../FnMusic.Infrastructure/FnMusic.Infrastructure.csproj" />
     <ProjectReference Include="../FnMusic.Windows/FnMusic.Windows.csproj" />
   </ItemGroup>
+  <Target Name="PublishNativeXamlResources" AfterTargets="Publish">
+    <ItemGroup>
+      <NativeXamlResource Include="$(TargetDir)App.xbf;$(TargetDir)MainWindow.xbf;$(TargetDir)$(AssemblyName).pri" />
+    </ItemGroup>
+    <Error Condition="!Exists('%(NativeXamlResource.Identity)')" Text="Required WinUI resource is missing: %(NativeXamlResource.Identity)" />
+    <Copy SourceFiles="@(NativeXamlResource)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

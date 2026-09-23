@@ -333,6 +333,19 @@ await Test("local music scans nested audio files with stable identities and open
     Check(missing);
     router.Unregister(settings.SourceId);
 });
+await Test("local metadata enriches tracks without changing references and falls back on invalid tags", async () =>
+{
+    string directory = Path.Combine(testDirectory, "metadata"); Directory.CreateDirectory(directory);
+    await File.WriteAllBytesAsync(Path.Combine(directory, "one.wav"), [1]);
+    var settings = new LocalMusicSettings(Guid.NewGuid(), directory);
+    var plain = await LocalMusicSource.ScanAsync(settings, default);
+    var enriched = await LocalMusicSource.ScanAsync(settings, default, (_, _) => Task.FromResult(new LocalMusicMetadata("Title", "Artist", 42)));
+    Check(enriched.Tracks[0].Reference == plain.Tracks[0].Reference && enriched.Tracks[0].Title == "Title" && enriched.Tracks[0].Artist == "Artist" && enriched.Tracks[0].DurationSeconds == 42);
+    var bad = await LocalMusicSource.ScanAsync(settings, default, (_, _) => Task.FromResult(new LocalMusicMetadata("", "", double.NaN)));
+    Check(bad.Tracks[0].Title == "one" && bad.Tracks[0].DurationSeconds == 0);
+    var failed = await LocalMusicSource.ScanAsync(settings, default, (_, _) => throw new IOException());
+    Check(failed.Tracks[0].Reference == plain.Tracks[0].Reference && failed.Tracks[0].Title == "one");
+});
 await Test("local scan honors cancellation and rejects missing roots", async () =>
 {
     using var canceled = new CancellationTokenSource(); canceled.Cancel();
