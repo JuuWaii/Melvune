@@ -12,6 +12,7 @@ public sealed partial class MainWindow
     { await ShowFavoritesAsync(); }
     private async Task ShowFavoritesAsync()
     {
+        localView = false;
         favoritesView = true; parentArtist = null; collectionKind = null; collection = null;
         SearchInput.Text = searchQuery = ""; UpdateCollectionView(); await LoadPageAsync(1);
     }
@@ -19,14 +20,14 @@ public sealed partial class MainWindow
     private void UpdateFavoriteButton()
     {
         if (FavoriteToggle is null) return;
-        FavoriteToggle.IsEnabled = !favoriteBusy && TrackList.SelectedItem is MusicTrack;
+        FavoriteToggle.IsEnabled = !localView && !favoriteBusy && TrackList.SelectedItem is MusicTrack;
         FavoriteToggle.Content = TrackList.SelectedItem is MusicTrack { IsFavorite: true } ? "取消收藏" : "收藏歌曲";
     }
     private async void Favorite_Click(object sender, RoutedEventArgs e)
     { await ToggleFavoriteAsync(); }
     private async Task ToggleFavoriteAsync()
     {
-        if (favoriteBusy || TrackList.SelectedItem is not MusicTrack track) return;
+        if (localView || favoriteBusy || TrackList.SelectedItem is not MusicTrack track) return;
         var api = ViewModel.AuthenticatedClient;
         if (api is null && !IsSyntheticPreview) { FavoriteStatus.Text = "请先登录后使用收藏。"; return; }
         var ct = favoriteWork.Token;

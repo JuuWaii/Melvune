@@ -93,6 +93,25 @@ public sealed partial class MainWindow
             Verify("favorite_removed", total == 0 && TrackList.SelectedItem is null && !FavoriteToggle.IsEnabled && queue.Count == 1);
             await SwitchCollectionAsync(null);
             Verify("favorite_state_reloaded", TrackList.SelectedItem is MusicTrack { IsFavorite: false });
+            string localDirectory = Path.Combine(AppContext.BaseDirectory, "local-fixture", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(localDirectory);
+            using (var wave = Services.PlaybackVerification.CreateWave())
+            using (var file = File.Create(Path.Combine(localDirectory, "000-playback.wav"))) await wave.CopyToAsync(file);
+            for (int i = 1; i <= 52; i++) await File.WriteAllBytesAsync(Path.Combine(localDirectory, $"track-{i:000}.wav"), [0]);
+            var local = await FnMusic.Infrastructure.LocalMusicSource.ScanAsync(new(Guid.NewGuid(), localDirectory), default);
+            ReplaceLocalSource(local);
+            await ShowLocalMusicAsync();
+            Verify("local_first_page", total == 53 && page == 1 && NextPage.IsEnabled && !FavoriteToggle.IsEnabled);
+            await LoadPageAsync(2);
+            Verify("local_last_page", page == 2 && TrackList.ItemsSource is IEnumerable<MusicTrack> localLast && localLast.Count() == 3 && !NextPage.IsEnabled);
+            SearchInput.Text = "000-playback"; await SearchAsync();
+            Verify("local_search", total == 1 && localView && !FavoriteToggle.IsEnabled);
+            await StartQueueAsync(TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
+            for (int i = 0; i < 80 && (!mediaReady || music.Player.PlaybackSession.Position.TotalSeconds <= 0); i++) await Task.Delay(100);
+            Verify("local_file_playback", mediaReady && music.Player.PlaybackSession.Position.TotalSeconds > 0 && queue.Current?.SourceInstanceId == local.Source.Id);
+            Stop_Click(this, new RoutedEventArgs());
+            await SwitchCollectionAsync(null);
+            Verify("local_return_to_nas", !localView && TrackList.SelectedItem is MusicTrack { Id: "synthetic-a" } && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; }

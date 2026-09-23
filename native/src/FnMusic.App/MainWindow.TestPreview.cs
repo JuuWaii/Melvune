@@ -20,7 +20,7 @@ public sealed partial class MainWindow
     private async Task<Stream> OpenPlaybackStreamAsync(MusicTrack track, CancellationToken ct)
     {
 #if DEBUG
-        if (IsSyntheticPreview) return Services.PlaybackVerification.CreateWave();
+        if (IsSyntheticPreview && track.SourceInstanceId == Guid.Empty) return Services.PlaybackVerification.CreateWave();
 #endif
         return await ViewModel.PlaybackRouter.OpenAsync(track.Reference, ct);
     }

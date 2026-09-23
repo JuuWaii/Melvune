@@ -1,0 +1,62 @@
+using System.Security.Cryptography;
+using System.Text;
+using FnMusic.Core;
+
+namespace FnMusic.Infrastructure;
+
+public sealed record LocalMusicSettings(Guid SourceId, string Directory);
+
+/// <summary>只播放扫描快照里的文件；曲目 ID 不接受路径或 URI。</summary>
+public sealed class LocalMusicSource : IMusicPlaybackSource
+{
+    private readonly Dictionary<string, string> files;
+    public MusicSource Source { get; }
+    public IReadOnlyList<MusicTrack> Tracks { get; }
+    public LocalMusicSettings Settings { get; }
+    private static readonly HashSet<string> extensions = new(StringComparer.OrdinalIgnoreCase)
+        { ".mp3", ".flac", ".wav", ".ogg", ".opus", ".m4a", ".aac", ".wma", ".aiff", ".aif", ".ape" };
+
+    private LocalMusicSource(LocalMusicSettings settings, Dictionary<string, string> files, List<MusicTrack> tracks)
+    {
+        Settings = settings; this.files = files; Tracks = tracks.AsReadOnly();
+        Source = new(settings.SourceId, "本地音乐", "local", MusicSourceCapabilities.Browse | MusicSourceCapabilities.Search | MusicSourceCapabilities.Playback);
+    }
+
+    public static Task<LocalMusicSource> ScanAsync(LocalMusicSettings settings, CancellationToken ct) => Task.Run(() =>
+    {
+        if (settings.SourceId == Guid.Empty || !Path.IsPathFullyQualified(settings.Directory)) throw new ArgumentException("Invalid local library");
+        string root = Path.GetFullPath(settings.Directory);
+        if (!Directory.Exists(root)) throw new DirectoryNotFoundException();
+        EnsureRegularPath(root);
+        var files = new Dictionary<string, string>();
+        var tracks = new List<MusicTrack>();
+        var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
+        foreach (string file in Directory.EnumerateFiles(root, "*", options))
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!extensions.Contains(Path.GetExtension(file))) continue;
+            if (tracks.Count >= 10000) throw new InvalidDataException("Local library limit reached");
+            string id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetRelativePath(root, file))));
+            files.Add(id, file);
+            tracks.Add(new(id, Path.GetFileNameWithoutExtension(file), "本地文件", 0, false) { SourceInstanceId = settings.SourceId });
+        }
+        ct.ThrowIfCancellationRequested();
+        tracks.Sort((a, b) => { int title = StringComparer.OrdinalIgnoreCase.Compare(a.Title, b.Title); return title != 0 ? title : StringComparer.Ordinal.Compare(a.Id, b.Id); });
+        return new LocalMusicSource(settings with { Directory = root }, files, tracks);
+    }, ct);
+
+    public Task<Stream> OpenAsync(TrackReference track, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        if (track.SourceInstanceId != Source.Id || !files.TryGetValue(track.TrackId, out var file))
+            throw new MusicApiException(MusicFailure.Rejected);
+        EnsureRegularPath(file);
+        return Task.FromResult<Stream>(new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 65536, FileOptions.Asynchronous));
+    }
+
+    private static void EnsureRegularPath(string path)
+    {
+        for (string? current = path; current is not null; current = Path.GetDirectoryName(current))
+            if ((File.GetAttributes(current) & FileAttributes.ReparsePoint) != 0) throw new IOException("Linked paths are not supported");
+    }
+}

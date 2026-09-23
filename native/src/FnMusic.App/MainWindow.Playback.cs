@@ -83,6 +83,7 @@ public sealed partial class MainWindow
     }
     private async Task ShowLibraryAsync()
     {
+        localView = false;
 #if DEBUG
         if (IsSyntheticPreview) { await ShowSyntheticPreviewAsync(); return; }
 #endif
@@ -94,7 +95,8 @@ public sealed partial class MainWindow
     private async void Library_Click(object sender, RoutedEventArgs e) => await ShowLibraryAsync();
     private void Settings_Click(object sender, RoutedEventArgs e)
     { LibraryPanel.Visibility = Visibility.Collapsed; SettingsPanel.Visibility = Visibility.Visible; }
-    private async void Refresh_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(1);
+    private async void Refresh_Click(object sender, RoutedEventArgs e)
+    { if (localView) await LoadLocalPageAsync(1, true); else await LoadPageAsync(1); }
     private async void Previous_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page - 1);
     private async void Next_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page + 1);
     private async void Search_Click(object sender, RoutedEventArgs e) => await SearchAsync();
@@ -112,10 +114,13 @@ public sealed partial class MainWindow
         await LoadPageAsync(1);
     }
     private async void ClearSearch_Click(object sender, RoutedEventArgs e)
-    { await SwitchCollectionAsync(null); }
+    { if (localView) { SearchInput.Text = searchQuery = ""; await LoadPageAsync(1); } else await SwitchCollectionAsync(null); }
 
     private async Task LoadPageAsync(int requestedPage)
     {
+        if (closed) return;
+        if (localView) { await LoadLocalPageAsync(requestedPage); return; }
+        libraryWork.Cancel();
         var api = ViewModel.AuthenticatedClient;
         if (api is null && !IsSyntheticPreview) { PlaybackStatus.Text = "请先在连接与账号中登录。"; return; }
         if (closed) return;
@@ -219,7 +224,7 @@ public sealed partial class MainWindow
     {
         if (track.IsCue) { PlaybackStatus.Text = "CUE 分轨播放将在转码适配阶段接入。"; return; }
         if (TrackList.ItemsSource is not IEnumerable<MusicTrack> tracks || !queue.Replace(tracks, track.Reference)) return;
-        queueOrigin = favoritesView ? "收藏当前页" : collectionKind is not null ? $"{CollectionLabel}详情当前页" : searchQuery.Length == 0 ? "曲库当前页" : "搜索结果当前页";
+        queueOrigin = localView ? "本地音乐当前页" : favoritesView ? "收藏当前页" : collectionKind is not null ? $"{CollectionLabel}详情当前页" : searchQuery.Length == 0 ? "曲库当前页" : "搜索结果当前页";
         await PlayTrackAsync(track);
     }
     private async void PreviousTrack_Click(object sender, RoutedEventArgs e)
@@ -254,7 +259,7 @@ public sealed partial class MainWindow
                 PlaybackStatus.Text = "歌曲来源的登录已失效，请重新连接。";
             }
         }
-        catch (FileNotFoundException) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "未找到 FFmpeg。请安装 FFmpeg 并配置 PATH 后重新启动客户端。"; }
+        catch (FileNotFoundException) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "音频文件或 FFmpeg 不可用，请检查文件位置与解码器安装。"; }
         catch (Exception) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "音频加载失败，请检查网络、登录状态或选择其他曲目。"; }
     }
     private void Pause_Click(object sender, RoutedEventArgs e) { music.Player.Pause(); if (mediaReady) PlaybackStatus.Text = "已暂停"; }
@@ -378,5 +383,5 @@ public sealed partial class MainWindow
         PlaybackStatus.Text = "登录后刷新曲库。";
     }
     private void ClosePlayback()
-    { closed = true; ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { closed = true; localLifetime.Cancel(); localLifetime.Dispose(); if (localSource is not null) ViewModel.PlaybackRouter.Unregister(localSource.Source.Id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

@@ -305,6 +305,42 @@ await Test("NAS assigns source identity across browsing routes and rejects forei
     await Fails(MusicFailure.Rejected, () => api.SetFavoriteAsync(foreign, true, default));
     Check(calls == 4);
 });
+await Test("local music scans nested audio files with stable identities and opens through the router", async () =>
+{
+    string directory = Path.Combine(testDirectory, "local-audio");
+    Directory.CreateDirectory(Path.Combine(directory, "album"));
+    await File.WriteAllBytesAsync(Path.Combine(directory, "song.WAV"), [1, 2, 3]);
+    await File.WriteAllBytesAsync(Path.Combine(directory, "album", "song.mp3"), [4, 5]);
+    await File.WriteAllTextAsync(Path.Combine(directory, "ignore.txt"), "not audio");
+    var settings = new LocalMusicSettings(Guid.NewGuid(), directory);
+    var source = await LocalMusicSource.ScanAsync(settings, default);
+    Check(source.Tracks.Count == 2 && source.Tracks.All(track => track.SourceInstanceId == settings.SourceId));
+    var again = await LocalMusicSource.ScanAsync(settings, default);
+    Check(source.Tracks.Select(t => t.Reference).SequenceEqual(again.Tracks.Select(t => t.Reference)));
+    var router = new MusicPlaybackRouter(); router.Register(source);
+    using (var stream = await router.OpenAsync(source.Tracks.First().Reference, default)) Check(stream.CanSeek && stream.ReadByte() is 1 or 4);
+    await Fails(MusicFailure.Rejected, () => source.OpenAsync(new(settings.SourceId, "../ignore.txt"), default));
+    await Fails(MusicFailure.Rejected, () => source.OpenAsync(new(Guid.NewGuid(), source.Tracks[0].Id), default));
+    var store = new LocalMusicSettingsStore(Path.Combine(testDirectory, "local-config"));
+    await store.SaveAsync(settings, default);
+    Check(await store.LoadAsync(default) == settings);
+    File.Delete(Path.Combine(directory, "song.WAV"));
+    Check((await LocalMusicSource.ScanAsync(settings, default)).Tracks.Count == 1 && source.Tracks.Count == 2);
+    bool missing = false;
+    foreach (var track in source.Tracks)
+        try { using var stream = await source.OpenAsync(track.Reference, default); }
+        catch (FileNotFoundException) { missing = true; }
+    Check(missing);
+    router.Unregister(settings.SourceId);
+});
+await Test("local scan honors cancellation and rejects missing roots", async () =>
+{
+    using var canceled = new CancellationTokenSource(); canceled.Cancel();
+    try { await LocalMusicSource.ScanAsync(new(Guid.NewGuid(), testDirectory), canceled.Token); throw new Exception("Cancellation ignored"); }
+    catch (OperationCanceledException) { }
+    try { await LocalMusicSource.ScanAsync(new(Guid.NewGuid(), Path.Combine(testDirectory, "missing")), default); throw new Exception("Missing accepted"); }
+    catch (DirectoryNotFoundException) { }
+});
 await Test("first login can clear a session before its directory exists", async () =>
 {
     var vault = new DpapiSessionVault(Path.Combine(testDirectory, "not-created"));
