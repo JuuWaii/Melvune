@@ -1,154 +1,52 @@
-using FnMusic.Infrastructure;
-using Windows.Media.Core;
-using Windows.Media.MediaProperties;
 using Windows.Media.Playback;
-using System.Runtime.InteropServices.WindowsRuntime;
 
 namespace FnMusic.App.Services;
 
-/// <summary>FFmpeg 解码为 PCM，Windows 媒体管线仅负责时钟、音量和设备输出。</summary>
+/// <summary>Owns the current seekable decoder; Windows handles clock, volume and output.</summary>
 public sealed class NativeMusicPlayer : IDisposable
 {
     public MediaPlayer Player { get; } = new() { AutoPlay = false, Volume = 0.5 };
-    private PcmSource? input;
-    private MediaSource? source;
+    private SeekablePlayback? seekable;
+    private readonly object cleanupGate = new();
     public Task PendingCleanup { get; private set; } = Task.CompletedTask;
-    public void Open(Stream stream, double durationSeconds)
+
+    public async Task OpenAsync(Stream stream, CancellationToken ct = default)
     {
         Stop();
+        var opening = new SeekablePlayback(stream);
+        seekable = opening;
+        using var cancel = ct.Register(() => _ = opening.Stop());
         try
         {
-            _ = FfmpegPcmDecoder.FindExecutable();
-            input = new PcmSource(stream, durationSeconds);
-            source = MediaSource.CreateFromMediaStreamSource(input.Source);
-            Player.Source = source;
+            var decoded = await opening.Opening;
+            ct.ThrowIfCancellationRequested();
+            if (!ReferenceEquals(seekable, opening) || opening.IsStopped)
+                throw new OperationCanceledException("Playback was replaced.");
+            Player.Source = decoded.CreateMediaPlaybackItem();
             Player.Play();
         }
-        catch { Stop(); stream.Dispose(); throw; }
+        catch
+        {
+            if (ReferenceEquals(seekable, opening)) Stop();
+            else TrackCleanup(opening.Stop());
+            throw;
+        }
     }
+
+    private void TrackCleanup(Task task)
+    {
+        lock (cleanupGate)
+            PendingCleanup = PendingCleanup.IsCompletedSuccessfully ? task : Task.WhenAll(PendingCleanup, task);
+    }
+
     public void Stop()
     {
-        Player.Pause(); Player.Source = null;
-        source?.Dispose(); source = null;
-        var previous = input; input = null;
-        if (previous is not null)
-        {
-            previous.Dispose();
-            PendingCleanup = PendingCleanup.IsCompletedSuccessfully ? previous.Cleanup : Task.WhenAll(PendingCleanup, previous.Cleanup);
-        }
+        var previous = seekable; seekable = null;
+        // Cancel IO before any media-pipeline operation that may wait for the decoder.
+        if (previous is not null) TrackCleanup(previous.Stop());
+        Player.Pause();
+        Player.Source = null;
     }
-    public void Dispose() { Stop(); Player.Dispose(); }
 
-    private sealed class PcmSource : IDisposable
-    {
-        private readonly Stream encoded;
-        private readonly SemaphoreSlim gate = new(1);
-        private readonly CancellationTokenSource lifetime = new();
-        private FfmpegPcmDecoder? decoder;
-        private PcmReadAheadBuffer? readAhead;
-        private bool allowReadAhead;
-        private long bytes;
-        private TimeSpan offset;
-        private bool disposed;
-        public Task Cleanup { get; private set; } = Task.CompletedTask;
-        public MediaStreamSource Source { get; }
-        public PcmSource(Stream encoded, double duration)
-        {
-            this.encoded = encoded;
-            allowReadAhead = duration > 0 && duration <= 480;
-            Source = new MediaStreamSource(new AudioStreamDescriptor(AudioEncodingProperties.CreatePcm(48000, 2, 16)))
-            { CanSeek = encoded.CanSeek && duration > 0, Duration = TimeSpan.FromSeconds(Math.Clamp(duration, 0, 864000)), BufferTime = TimeSpan.FromSeconds(1) };
-            Source.Starting += Starting;
-            Source.SampleRequested += SampleRequested;
-        }
-        private async void Starting(MediaStreamSource sender, MediaStreamSourceStartingEventArgs args)
-        {
-            var deferral = args.Request.GetDeferral();
-            try
-            {
-                await gate.WaitAsync(lifetime.Token).ConfigureAwait(false);
-                try
-                {
-                    if (disposed) return;
-                    if (decoder is null || args.Request.StartPosition is not null)
-                    {
-                        offset = args.Request.StartPosition ?? TimeSpan.Zero; bytes = 0;
-                        if (readAhead is null)
-                        {
-                            if (decoder is not null) await decoder.DisposeAsync().ConfigureAwait(false);
-                            encoded.Seek(0, SeekOrigin.Begin);
-                            decoder = new FfmpegPcmDecoder(encoded, allowReadAhead ? TimeSpan.Zero : offset);
-                            if (allowReadAhead) readAhead = new PcmReadAheadBuffer(decoder.Output);
-                        }
-                    }
-                    args.Request.SetActualStartPosition(offset + TimeSpan.FromSeconds((double)bytes / FfmpegPcmDecoder.BytesPerSecond));
-                }
-                finally { gate.Release(); }
-            }
-            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-            catch (Exception) { if (!disposed) sender.NotifyError(MediaStreamSourceErrorStatus.Other); }
-            finally { deferral.Complete(); }
-        }
-        private async void SampleRequested(MediaStreamSource sender, MediaStreamSourceSampleRequestedEventArgs args)
-        {
-            var deferral = args.Request.GetDeferral();
-            try
-            {
-                await gate.WaitAsync(lifetime.Token).ConfigureAwait(false);
-                try
-                {
-                    if (disposed || decoder is null) return;
-                    byte[] pcm = new byte[19200]; // 100 ms，定长且受背压控制。
-                    int count = 0;
-                    using var timeout = CancellationTokenSource.CreateLinkedTokenSource(lifetime.Token);
-                    timeout.CancelAfter(TimeSpan.FromSeconds(30));
-                    while (count < pcm.Length)
-                    {
-                        int read;
-                        try
-                        {
-                            long position = (long)(offset.TotalSeconds * FfmpegPcmDecoder.SampleRate) * FfmpegPcmDecoder.BytesPerFrame + bytes + count;
-                            read = readAhead is null ? await decoder.Output.ReadAsync(pcm.AsMemory(count), timeout.Token).ConfigureAwait(false)
-                                : await readAhead.ReadAtAsync(position, pcm.AsMemory(count), timeout.Token).ConfigureAwait(false);
-                        }
-                        catch (PcmCacheLimitException)
-                        {
-                            await readAhead!.DisposeAsync().ConfigureAwait(false); readAhead = null; allowReadAhead = false;
-                            await decoder.DisposeAsync().ConfigureAwait(false);
-                            encoded.Seek(0, SeekOrigin.Begin);
-                            offset += TimeSpan.FromSeconds((double)bytes / FfmpegPcmDecoder.BytesPerSecond); bytes = 0; count = 0;
-                            decoder = new FfmpegPcmDecoder(encoded, offset);
-                            continue;
-                        }
-                        if (read == 0) { await decoder.CheckCompletionAsync(timeout.Token).ConfigureAwait(false); break; }
-                        count += read;
-                    }
-                    if (count == 0) { args.Request.Sample = null; return; }
-                    if (count % FfmpegPcmDecoder.BytesPerFrame != 0) throw new IOException("Incomplete PCM frame.");
-                    var sample = MediaStreamSample.CreateFromBuffer(pcm.AsBuffer(0, count), offset + TimeSpan.FromSeconds((double)bytes / FfmpegPcmDecoder.BytesPerSecond));
-                    sample.Duration = TimeSpan.FromSeconds((double)count / FfmpegPcmDecoder.BytesPerSecond);
-                    bytes += count;
-                    args.Request.Sample = sample;
-                }
-                finally { gate.Release(); }
-            }
-            catch (OperationCanceledException) when (lifetime.IsCancellationRequested) { }
-            catch (Exception) { if (!disposed) sender.NotifyError(MediaStreamSourceErrorStatus.Other); }
-            finally { deferral.Complete(); }
-        }
-        public void Dispose()
-        {
-            if (disposed) return;
-            disposed = true; lifetime.Cancel();
-            Source.Starting -= Starting; Source.SampleRequested -= SampleRequested;
-            Cleanup = ReleaseAsync();
-        }
-        private async Task ReleaseAsync()
-        {
-            await gate.WaitAsync().ConfigureAwait(false);
-            try { if (readAhead is not null) await readAhead.DisposeAsync().ConfigureAwait(false); if (decoder is not null) await decoder.DisposeAsync().ConfigureAwait(false); }
-            catch (Exception) { /* 关闭窗口后的后台清理不得产生未观察异常或输出私人媒体信息。 */ }
-            finally { encoded.Dispose(); lifetime.Dispose(); gate.Release(); }
-        }
-    }
+    public void Dispose() { Stop(); Player.Dispose(); }
 }

@@ -2,6 +2,16 @@
   "version": 1,
   "dependencies": {
     "net10.0-windows10.0.26100": {
+      "FFmpegInteropX": {
+        "type": "Direct",
+        "requested": "[2.1.0.81200, )",
+        "resolved": "2.1.0.81200",
+        "contentHash": "cyu9aI+EPEfjCJ3UHBOcd+IhjUaYXvXuVZ28BY3KnC3+5pf+5Ell79QI1cubw/bbPhjgO3hewLSnrqbUIHcmgA==",
+        "dependencies": {
+          "FFmpegInteropX.Desktop.FFmpeg": "8.1.2",
+          "FFmpegInteropX.Desktop.Lib": "2.1.0"
+        }
+      },
       "Microsoft.Windows.SDK.BuildTools": {
         "type": "Direct",
         "requested": "[10.0.26100.9169, )",
@@ -25,10 +35,28 @@
           "Microsoft.WindowsAppSDK.WinUI": "[1.8.260803003]"
         }
       },
+      "FFmpegInteropX.Desktop.FFmpeg": {
+        "type": "Transitive",
+        "resolved": "8.1.2",
+        "contentHash": "NZ3oT7/9SKkoHB7AfgprBTA22GlidyNj9Vz21+MF25QAUkDq65YUQYUzC3ZPHL51DwsS+Fmf8nQhN2aOKSwqAg=="
+      },
+      "FFmpegInteropX.Desktop.Lib": {
+        "type": "Transitive",
+        "resolved": "2.1.0",
+        "contentHash": "QOvqv6RbyMTXoqY/3ugrLpnW7KeMB2/s10edJnoCerrpFiXhD1+YaRQbsD5yvxwHBOBxA4Cg0CXkz0xeUPCb3A==",
+        "dependencies": {
+          "Microsoft.Windows.CsWinRT": "2.2.0"
+        }
+      },
       "Microsoft.Web.WebView2": {
         "type": "Transitive",
         "resolved": "1.0.3179.45",
         "contentHash": "3pokSH5CnN0G6rGhGFo1y87inxYhNxBQ2Vdf0wlvBj99KHxQJormjDACmqRnFeUsmuNFIhWwfAL1ztq7wD5qRA=="
+      },
+      "Microsoft.Windows.CsWinRT": {
+        "type": "Transitive",
+        "resolved": "2.2.0",
+        "contentHash": "R8MDVawukHrKgYCFgYaoLfbAna/FrImEFRxDK9k8ITbrXv3KLE5uN6tRqrNV83H4MFdqJ/uiA/hg1cSsXkl0vw=="
       },
       "Microsoft.Windows.SDK.BuildTools.MSIX": {
         "type": "Transitive",
@@ -143,6 +171,19 @@
       }
     },
     "net10.0-windows10.0.26100/win-x64": {
+      "FFmpegInteropX.Desktop.FFmpeg": {
+        "type": "Transitive",
+        "resolved": "8.1.2",
+        "contentHash": "NZ3oT7/9SKkoHB7AfgprBTA22GlidyNj9Vz21+MF25QAUkDq65YUQYUzC3ZPHL51DwsS+Fmf8nQhN2aOKSwqAg=="
+      },
+      "FFmpegInteropX.Desktop.Lib": {
+        "type": "Transitive",
+        "resolved": "2.1.0",
+        "contentHash": "QOvqv6RbyMTXoqY/3ugrLpnW7KeMB2/s10edJnoCerrpFiXhD1+YaRQbsD5yvxwHBOBxA4Cg0CXkz0xeUPCb3A==",
+        "dependencies": {
+          "Microsoft.Windows.CsWinRT": "2.2.0"
+        }
+      },
       "Microsoft.Web.WebView2": {
         "type": "Transitive",
         "resolved": "1.0.3179.45",

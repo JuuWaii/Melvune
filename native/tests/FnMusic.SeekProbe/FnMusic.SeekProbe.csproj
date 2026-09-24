@@ -8,6 +8,8 @@
     <CsWinRTWindowsMetadata>"$(NuGetPackageRoot)/microsoft.windows.sdk.net.ref/10.0.26100.57/winmd"</CsWinRTWindowsMetadata>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../src/FnMusic.App/Services/SeekablePlayback.cs" Link="SeekablePlayback.cs" />
+    <Compile Include="../../src/FnMusic.App/Services/NativeMusicPlayer.cs" Link="NativeMusicPlayer.cs" />
     <ProjectReference Include="../../src/FnMusic.Infrastructure/FnMusic.Infrastructure.csproj" />
     <PackageReference Include="FFmpegInteropX" Version="2.1.0.81200" />
   </ItemGroup>

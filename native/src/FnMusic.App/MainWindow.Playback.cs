@@ -249,7 +249,7 @@ public sealed partial class MainWindow
             var stream = await OpenPlaybackStreamAsync(track, ct);
             if (ct.IsCancellationRequested || closed) { stream.Dispose(); return; }
             NowPlaying.Text = track.Title + " · " + track.Artist;
-            music.Open(stream, track.DurationSeconds);
+            await music.OpenAsync(stream, ct);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (MusicApiException error) when (error.Failure == MusicFailure.Unauthorized)

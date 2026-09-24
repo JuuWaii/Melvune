@@ -1,6 +1,6 @@
 # 长音频跳转：通用方案调研
 
-2026-09-24。状态：完成源码调研与独立本地 WAV 播放验证，尚未接入正式 App。
+2026-09-24。状态：可随机访问流已接入 App，当前使用准确定位；快速定位仍仅为实验，下一验证包尚未产出。
 
 ## 首轮可执行验证
 
@@ -10,9 +10,13 @@
 
 ## 结论
 
+App 现在异步创建 SeekablePlayback，持有原生媒体源直到停止。停止先关闭托管输入、取消网络读取，再在后台释放原生源；切歌与取消返回后检查实例身份，旧任务不能替换新源。FFmpeg 协议白名单为 `none`，仅允许应用提供的自定义输入，不允许解码器自行打开嵌套文件/网络 URL。正式播放不再走 stdin→PCM 预读链路；旧 CLI 解码器及缓存仍保留为基础回归工具。
+
+集成 Debug 应用的合成音频和真实 NAS 回归均通过打开推进、暂停恢复、跳转、设备切换与停止；共享生产播放器代码的受控测试覆盖正文阻塞时切歌、重复停止。打包脚本和第三方声明尚需随新 DLL 依赖更新。
+
 补充实验：FFmpeg `fflags=+fastseek` 将 MP3 首次尾部定位读取量从约 4.46 MB 降为 256 KiB，三次定位总读取约 1 MiB。但底层对 VBR 可能采用近似 TOC / 比例定位，仍需音频时间标记回归，不能仅依据播放时钟切换默认配置。阻塞响应正文时关闭输入的取消检查也已通过。实验参数与限制见 SeekProbe README。
 
-优先验证 FFmpegInteropX 的可随机访问流入口，复用现有 HttpRangeStream 与 MediaPlayer。当前 FFmpeg 子进程读取 pipe:0，输出端 -ss 必须解码并丢弃前缀；把 -ss 移到输入端不会让管道变成可随机访问文件。短曲 PCM 缓存继续保留，直到替代链路通过验收。
+采用 FFmpegInteropX 的可随机访问流入口，复用现有 HttpRangeStream 与 MediaPlayer。原 FFmpeg 子进程读取 pipe:0，输出端 -ss 必须解码并丢弃前缀；把 -ss 移到输入端不会让管道变成可随机访问文件。现已替换 App 中的该链路，CLI/PCM 类保留用于基础回归。
 
 FFmpegInteropX 官方声明支持 WinUI 3 Desktop，公开了 IRandomAccessStream → FFmpegMediaSource.CreateFromStreamAsync → CreateMediaPlaybackItem 的路径。源码 CreateMediaStreamSource(IRandomAccessStream) 将流桥接为 IStream，并在 avio_alloc_context 注册 FileStreamRead / FileStreamSeek；因此它具备通用容器定位所需的输入能力。实际速度仍取决于媒体索引、服务器 Range 响应和网络。
 

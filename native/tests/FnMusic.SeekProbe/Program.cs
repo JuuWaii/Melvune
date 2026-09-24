@@ -4,6 +4,7 @@ using Windows.Media.Playback;
 using FnMusic.Infrastructure;
 using System.Net;
 using System.Net.Http.Headers;
+using FnMusic.App.Services;
 
 // Synthetic input only: no user files, credentials or network access.
 const int sampleRate = 48000, seconds = 600;
@@ -80,6 +81,7 @@ try
     {
         await VerifyBlockedOpenCancellation(path, false);
         await VerifyBlockedOpenCancellation(path, true);
+        await VerifyPlayerLifecycle(path);
     }
 
     async Task AwaitOrFailure(Task operation)
@@ -100,6 +102,37 @@ try
     }
 }
 finally { File.Delete(path); if (path != wavePath) File.Delete(wavePath); }
+
+static async Task VerifyPlayerLifecycle(string path)
+{
+    using var audio = new NativeMusicPlayer();
+    audio.Player.IsMuted = true;
+    using var handler = new RangeHandler(path);
+    var blocked = await HttpRangeStream.OpenAsync(new HttpClient(handler, false), new Uri("https://seek.invalid/audio"), CancellationToken.None);
+    handler.BlockBody = true;
+    var oldOpen = audio.OpenAsync(blocked);
+    await handler.Blocked.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    await audio.OpenAsync(File.OpenRead(path)).WaitAsync(TimeSpan.FromSeconds(10));
+    try { await oldOpen.WaitAsync(TimeSpan.FromSeconds(3)); throw new InvalidOperationException("Replaced open succeeded."); }
+    catch (Exception error) when (error is not TimeoutException and not InvalidOperationException) { }
+    if (audio.Player.Source is null || !handler.Cancelled) throw new Exception("Replacement lost its source or failed to cancel.");
+    audio.Stop(); audio.Stop();
+    await audio.PendingCleanup.WaitAsync(TimeSpan.FromSeconds(3));
+    if (audio.Player.Source is not null) throw new Exception("Stopped player retained a source.");
+    Console.WriteLine("PASS production player replaces blocked input and completes repeated stop cleanup");
+    using var cancelledHandler = new RangeHandler(path);
+    var cancelledInput = await HttpRangeStream.OpenAsync(new HttpClient(cancelledHandler, false), new Uri("https://seek.invalid/audio"), CancellationToken.None);
+    cancelledHandler.BlockBody = true;
+    using var cancellation = new CancellationTokenSource();
+    var cancelledOpen = audio.OpenAsync(cancelledInput, cancellation.Token);
+    await cancelledHandler.Blocked.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    cancellation.Cancel();
+    try { await cancelledOpen.WaitAsync(TimeSpan.FromSeconds(3)); throw new InvalidOperationException("Cancelled open succeeded."); }
+    catch (Exception error) when (error is not TimeoutException and not InvalidOperationException) { }
+    await audio.PendingCleanup.WaitAsync(TimeSpan.FromSeconds(3));
+    if (audio.Player.Source is not null || !cancelledHandler.Cancelled) throw new Exception("Cancelled open retained its source.");
+    Console.WriteLine("PASS production player cancels opening via caller token");
+}
 
 static async Task VerifyBlockedOpenCancellation(string path, bool body)
 {

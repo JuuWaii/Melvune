@@ -129,8 +129,8 @@ public sealed partial class MainWindow
                 var timer = System.Diagnostics.Stopwatch.StartNew();
                 pendingSeek = target; CommitSeek();
                 for (int i = 0; i < 80 && (submittedSeek is not null || Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - target) > 2); i++) await Task.Delay(50);
-                timings["cached_seek_" + target + "_ms"] = timer.ElapsedMilliseconds;
-                Verify("cached_seek_" + target, submittedSeek is null && Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - target) < 2);
+                timings["repeated_seek_" + target + "_ms"] = timer.ElapsedMilliseconds;
+                Verify("repeated_seek_" + target, submittedSeek is null && Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - target) < 2);
             }
             Root.RequestedTheme = ElementTheme.Light;
             Verify("light_theme", Root.ActualTheme == ElementTheme.Light);

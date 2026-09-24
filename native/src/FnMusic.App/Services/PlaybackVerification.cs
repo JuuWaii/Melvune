@@ -34,10 +34,9 @@ internal static class PlaybackVerification
         try
         {
             Stream stream;
-            double duration;
             if (synthetic)
             {
-                stream = CreateWave(); duration = 60;
+                stream = CreateWave();
                 checks["synthetic_source"] = true;
             }
             else
@@ -50,10 +49,9 @@ internal static class PlaybackVerification
                 var track = page.Tracks.First(t => !t.IsCue && t.DurationSeconds > 40);
                 checks[stage] = true;
                 stream = await api.OpenTrackStreamAsync(track.Id, timeout.Token);
-                duration = track.DurationSeconds;
             }
             stage = "open_and_advance";
-            audio.Open(stream, duration);
+            await audio.OpenAsync(stream, timeout.Token);
             await Until(() => player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing && player.PlaybackSession.Position.TotalSeconds >= 2);
             checks[stage] = true;
             stage = "pause";
