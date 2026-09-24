@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <WindowsSdkPackageVersion>10.0.26100.57</WindowsSdkPackageVersion>
+    <CsWinRTWindowsMetadata>"$(NuGetPackageRoot)/microsoft.windows.sdk.net.ref/10.0.26100.57/winmd"</CsWinRTWindowsMetadata>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="FFmpegInteropX" Version="2.1.0.81200" />
+  </ItemGroup>
+</Project>
