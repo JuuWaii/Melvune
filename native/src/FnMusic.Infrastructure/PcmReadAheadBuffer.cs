@@ -12,6 +12,8 @@ public sealed class PcmReadAheadBuffer : IAsyncDisposable
     private readonly Task pump;
     private long length;
     private bool ended, limited;
+    private bool disposed;
+    private Task? disposal;
     private Exception? error;
     public long BufferedBytes { get { lock (sync) return length; } }
     private static TaskCompletionSource NewSignal() => new(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -26,18 +28,17 @@ public sealed class PcmReadAheadBuffer : IAsyncDisposable
                 {
                     byte[] chunk = new byte[Math.Min(ChunkSize, limit - (int)length)];
                     int count = 0;
+                    lock (sync) chunks.Add(chunk);
                     while (count < chunk.Length)
                     {
                         int read = await input.ReadAsync(chunk.AsMemory(count), lifetime.Token).ConfigureAwait(false);
-                        if (read == 0) break;
+                        if (read == 0) return;
                         count += read;
-                    }
-                    lock (sync)
-                    {
-                        if (count > 0) { chunks.Add(chunk); length += count; }
-                        if (count < chunk.Length) ended = true;
-                        var previous = changed; changed = NewSignal(); previous.TrySetResult();
-                        if (ended) return;
+                        lock (sync)
+                        {
+                            length += read;
+                            var previous = changed; changed = NewSignal(); previous.TrySetResult();
+                        }
                     }
                 }
                 lock (sync) limited = true;
@@ -56,7 +57,7 @@ public sealed class PcmReadAheadBuffer : IAsyncDisposable
             Task wait;
             lock (sync)
             {
-                if (lifetime.IsCancellationRequested) throw new ObjectDisposedException(nameof(PcmReadAheadBuffer));
+                if (disposed) throw new ObjectDisposedException(nameof(PcmReadAheadBuffer));
                 if (position < length)
                 {
                     int offset = (int)(position % ChunkSize);
@@ -72,11 +73,23 @@ public sealed class PcmReadAheadBuffer : IAsyncDisposable
             await wait.WaitAsync(ct).ConfigureAwait(false);
         }
     }
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
+    {
+        lock (sync)
+        {
+            if (disposal is not null) return new(disposal);
+            disposed = true;
+            changed.TrySetResult();
+            disposal = ReleaseAsync();
+            return new(disposal);
+        }
+    }
+    private async Task ReleaseAsync()
     {
         lifetime.Cancel();
         await pump.ConfigureAwait(false);
-        lock (sync) chunks.Clear();
+        lock (sync) { chunks.Clear(); length = 0; }
+        lifetime.Dispose();
     }
 }
 

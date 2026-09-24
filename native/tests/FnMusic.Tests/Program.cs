@@ -15,6 +15,25 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+await Test("PCM slow input publishes partial data and isolates cancelled seeks", async () =>
+{
+    using var input = new PausingPcmStream();
+    await using var cache = new PcmReadAheadBuffer(input);
+    await input.Paused.Task.WaitAsync(TimeSpan.FromSeconds(3));
+    byte[] sample = new byte[4];
+    Check(await cache.ReadAtAsync(0, sample, default).AsTask().WaitAsync(TimeSpan.FromSeconds(3)) == 4);
+    Check(sample.SequenceEqual(new byte[] { 1, 2, 3, 4 }));
+    using var cancelled = new CancellationTokenSource();
+    var pending = cache.ReadAtAsync(100, sample, cancelled.Token).AsTask();
+    cancelled.Cancel();
+    try { await pending; throw new Exception("Seek cancellation ignored"); } catch (OperationCanceledException) { }
+    Check(await cache.ReadAtAsync(0, sample, default) == 4);
+    var waiting = cache.ReadAtAsync(100, sample, default).AsTask();
+    await cache.DisposeAsync().AsTask().WaitAsync(TimeSpan.FromSeconds(3));
+    try { await waiting; throw new Exception("Disposed reader not released"); } catch (ObjectDisposedException) { }
+    await cache.DisposeAsync();
+    Check(cache.BufferedBytes == 0 && input.CanRead);
+});
 await Test("PCM read-ahead supports backward seeks and bounded memory", async () =>
 {
     byte[] bytes = Enumerable.Range(0, 180000).Select(i => (byte)(i % 251)).ToArray();
@@ -811,6 +830,18 @@ static HttpResponseMessage Json(string content) => new(HttpStatusCode.OK) { Cont
 sealed class FakeHandler(Func<HttpRequestMessage, HttpResponseMessage> response) : HttpMessageHandler
 {
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) => Task.FromResult(response(request));
+}
+sealed class PausingPcmStream : MemoryStream
+{
+    private bool sent;
+    public TaskCompletionSource Paused { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+    {
+        if (!sent) { sent = true; new byte[] { 1, 2, 3, 4 }.CopyTo(buffer); return 4; }
+        Paused.TrySetResult();
+        await Task.Delay(Timeout.Infinite, ct);
+        return 0;
+    }
 }
 sealed class AsyncFakeHandler(Func<HttpRequestMessage, Task<HttpResponseMessage>> response) : HttpMessageHandler
 {
