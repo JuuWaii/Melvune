@@ -1,10 +1,14 @@
 using FFmpegInteropX;
 using System.Diagnostics;
 using Windows.Media.Playback;
+using FnMusic.Infrastructure;
+using System.Net;
+using System.Net.Http.Headers;
 
 // Synthetic input only: no user files, credentials or network access.
 const int sampleRate = 48000, seconds = 600;
 var path = Path.Combine(Path.GetTempPath(), $"fnmusic-seek-{Guid.NewGuid():N}.wav");
+var wavePath = path;
 try
 {
     using (var file = File.Create(path))
@@ -19,7 +23,28 @@ try
         for (var i = 0; i < sampleRate * seconds; i++)
             writer.Write((short)(Math.Sin(i * 2 * Math.PI * 440 / sampleRate) * 1000));
     }
-    using var input = new MeasuredStream(path);
+    var format = args.FirstOrDefault(value => value.StartsWith("--format=", StringComparison.Ordinal))?[9..] ?? "wav";
+    if (format is not ("wav" or "flac" or "mp3" or "ogg")) throw new ArgumentException("Unsupported synthetic format.");
+    if (format != "wav")
+    {
+        path = Path.ChangeExtension(wavePath, format);
+        var start = new ProcessStartInfo(FfmpegPcmDecoder.FindExecutable())
+        { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
+        foreach (var argument in new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", wavePath, path })
+            start.ArgumentList.Add(argument);
+        using var encoder = Process.Start(start) ?? throw new Exception("Synthetic encoder did not start.");
+        var errors = encoder.StandardError.ReadToEndAsync();
+        try { await encoder.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(30)); }
+        catch { if (!encoder.HasExited) encoder.Kill(true); await encoder.WaitForExitAsync(); throw; }
+        await errors;
+        if (encoder.ExitCode != 0) throw new Exception("Synthetic encoding failed.");
+    }
+    var rangeMode = args.Contains("--range", StringComparer.Ordinal);
+    using var handler = new RangeHandler(path);
+    using Stream input = rangeMode
+        ? await HttpRangeStream.OpenAsync(new HttpClient(handler, false), new Uri("https://seek.invalid/audio"), CancellationToken.None)
+        : new MeasuredStream(path);
+    long ReadCount() => rangeMode ? handler.BytesRead : ((MeasuredStream)input).BytesRead;
     using var random = input.AsRandomAccessStream();
     using var source = await FFmpegMediaSource.CreateFromStreamAsync(random);
     using var player = new MediaPlayer { IsMuted = true, AutoPlay = false };
@@ -34,18 +59,22 @@ try
     foreach (var target in new[] { 570, 30, 450 })
     {
         player.Pause();
-        var before = input.BytesRead;
+        var before = ReadCount();
         var watch = Stopwatch.StartNew();
         player.PlaybackSession.Position = TimeSpan.FromSeconds(target);
         player.Play();
         await AwaitOrFailure(WaitForProgress(target));
         player.Pause();
-        var read = input.BytesRead - before;
-        if (read <= 0 || read > sampleRate * 2 * 60) throw new Exception("Seek read count outside expected bounds.");
-        Console.WriteLine($"PASS seek {target}s: {watch.ElapsedMilliseconds}ms, read {read} bytes");
+        var read = ReadCount() - before;
+        if (read < 0 || read > sampleRate * 2 * 60 || (format == "wav" && read == 0))
+            throw new Exception("Seek read count outside expected bounds.");
+        Console.WriteLine($"PASS {format} seek {target}s: {watch.ElapsedMilliseconds}ms, read {read} bytes");
+        if (read > input.Length / 2)
+            Console.WriteLine($"NOTICE {format}: this seek read over half the encoded file; network efficiency is not established.");
     }
     player.Source = null;
-    Console.WriteLine($"PASS native activation and random stream playback; total read {input.BytesRead} / {input.Length} bytes");
+    Console.WriteLine($"PASS {(rangeMode ? "controlled HTTP Range" : "local")} playback; total read {ReadCount()} / {input.Length} bytes");
+    if (rangeMode) await VerifyBlockedOpenCancellation(path);
 
     async Task AwaitOrFailure(Task operation)
     {
@@ -64,7 +93,60 @@ try
             await Task.Delay(25, lifetime.Token);
     }
 }
-finally { File.Delete(path); }
+finally { File.Delete(path); if (path != wavePath) File.Delete(wavePath); }
+
+static async Task VerifyBlockedOpenCancellation(string path)
+{
+    using var handler = new RangeHandler(path);
+    using var input = await HttpRangeStream.OpenAsync(new HttpClient(handler, false), new Uri("https://seek.invalid/audio"), CancellationToken.None);
+    handler.Block = true;
+    using var random = input.AsRandomAccessStream();
+    var opening = FFmpegMediaSource.CreateFromStreamAsync(random).AsTask();
+    await handler.Blocked.Task.WaitAsync(TimeSpan.FromSeconds(5));
+    var watch = Stopwatch.StartNew();
+    input.Dispose();
+    try
+    {
+        using var unexpected = await opening.WaitAsync(TimeSpan.FromSeconds(3));
+        throw new InvalidOperationException("Blocked input unexpectedly opened.");
+    }
+    catch (Exception error) when (error is not TimeoutException and not InvalidOperationException)
+    {
+        if (!handler.Cancelled) throw new Exception("HTTP request was not cancelled.");
+        Console.WriteLine($"PASS blocked native open cancels and exits in {watch.ElapsedMilliseconds}ms");
+    }
+}
+
+sealed class RangeHandler(string path) : HttpMessageHandler
+{
+    private long bytesRead;
+    public long BytesRead => Interlocked.Read(ref bytesRead);
+    public bool Block { get; set; }
+    public bool Cancelled { get; private set; }
+    public TaskCompletionSource Blocked { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
+    {
+        if (request.RequestUri?.Host != "seek.invalid") throw new Exception("Unexpected origin.");
+        if (Block)
+        {
+            Blocked.TrySetResult();
+            try { await Task.Delay(Timeout.Infinite, token); }
+            catch (OperationCanceledException) { Cancelled = true; throw; }
+        }
+        var range = request.Headers.Range?.Ranges.Single() ?? throw new Exception("Range required.");
+        var from = range.From ?? throw new Exception("Explicit start required.");
+        var to = range.To ?? throw new Exception("Explicit end required.");
+        using var file = File.OpenRead(path);
+        file.Position = from;
+        var bytes = new byte[checked((int)(to - from + 1))];
+        await file.ReadExactlyAsync(bytes, token);
+        Interlocked.Add(ref bytesRead, bytes.Length);
+        var response = new HttpResponseMessage(HttpStatusCode.PartialContent) { Content = new ByteArrayContent(bytes) };
+        response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
+        response.Content.Headers.ContentRange = new ContentRangeHeaderValue(from, to, file.Length);
+        return response;
+    }
+}
 
 sealed class MeasuredStream(string path) : FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read)
 {

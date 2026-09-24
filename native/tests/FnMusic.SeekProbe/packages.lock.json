@@ -29,6 +29,15 @@
         "type": "Transitive",
         "resolved": "2.2.0",
         "contentHash": "R8MDVawukHrKgYCFgYaoLfbAna/FrImEFRxDK9k8ITbrXv3KLE5uN6tRqrNV83H4MFdqJ/uiA/hg1cSsXkl0vw=="
+      },
+      "fnmusic.core": {
+        "type": "Project"
+      },
+      "fnmusic.infrastructure": {
+        "type": "Project",
+        "dependencies": {
+          "FnMusic.Core": "[1.0.0, )"
+        }
       }
     },
     "net10.0-windows10.0.26100/win-x64": {

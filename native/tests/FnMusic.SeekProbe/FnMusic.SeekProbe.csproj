@@ -8,6 +8,7 @@
     <CsWinRTWindowsMetadata>"$(NuGetPackageRoot)/microsoft.windows.sdk.net.ref/10.0.26100.57/winmd"</CsWinRTWindowsMetadata>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="../../src/FnMusic.Infrastructure/FnMusic.Infrastructure.csproj" />
     <PackageReference Include="FFmpegInteropX" Version="2.1.0.81200" />
   </ItemGroup>
 </Project>
