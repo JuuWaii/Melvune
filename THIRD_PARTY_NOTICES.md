@@ -87,8 +87,8 @@ SOFTWARE.
 
 > 各项目的完整许可文本以各项目仓库中的 LICENSE 文件为准。
 
-## FFmpeg（原生播放预览的外部依赖）
+## FFmpeg / FFmpegInteropX（原生播放预览）
 
-FFmpeg 项目：https://ffmpeg.org/ 。其许可取决于具体构建选项，主体采用 LGPL，启用 GPL 组件的构建另受 GPL 约束，不能套用上面的 MIT 条款。当前仅调用开发环境已有的外部可执行程序，仓库和预览包尚未捆绑 FFmpeg。发布前必须固定构建版本、审核配置并提供对应许可和源码材料；详见 [播放层说明](docs/FFMPEG_PLAYBACK.md) 和 [FFmpeg 官方许可说明](https://ffmpeg.org/legal.html)。
+preview.3 随附 FFmpegInteropX 2.1.0 桥接库和 FFmpeg 8.1.2 动态库，来自锁定的 NuGet 依赖。桥接库声明 Apache-2.0；FFmpeg 组件及附属依赖另有 LGPL、Zlib、MIT 等许可，不适用上面的 MIT 条款。预览目录内 `licenses/` 包含桥接库许可证和 FFmpeg 包提供的全部许可证。版本及源码标识见 `NATIVE_DECODER_DEPENDENCIES.md`（仓库中位于 docs）。开发回归仍可使用外部 FFmpeg 命令行程序，但不将该程序打入预览包。对外发布前仍需补齐对应源码和构建材料；参见 [FFmpeg 官方许可说明](https://ffmpeg.org/legal.html)。
 
 说明（2026-09-13）：Electron 与 electron-builder 已退出活动依赖，以下相关条目作为历史归属保留。

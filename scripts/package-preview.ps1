@@ -1,4 +1,4 @@
-param([string]$Name = ('FnMusic-0.2.0-preview.2-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss')))
+param([string]$Name = ('FnMusic-0.2.0-preview.3-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss')))
 $ErrorActionPreference = 'Stop'
 if ($Name -notmatch '^[a-zA-Z0-9._-]+$' -or $Name -in @('.', '..')) { throw 'Invalid package name' }
 $repo = Split-Path $PSScriptRoot -Parent
@@ -11,20 +11,21 @@ $sdk = Join-Path $repo '.tools/dotnet/dotnet.exe'
 if ($LASTEXITCODE -ne 0) { throw 'Restore failed' }
 & $sdk publish (Join-Path $repo 'native/src/FnMusic.App/FnMusic.App.csproj') -c Release --no-restore --nologo -p:DebugSymbols=false -p:DebugType=None -o $destination
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
-foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf')) {
+foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll')) {
     if (-not (Test-Path -LiteralPath (Join-Path $destination $required))) { throw "Missing preview file: $required" }
 }
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'THIRD_PARTY_NOTICES.md'), (Join-Path $repo 'docs/PREVIEW_VALIDATION.md') -Destination $destination
+$decoderLicenses = Join-Path $destination 'licenses'
+New-Item -ItemType Directory -Path $decoderLicenses | Out-Null
+Copy-Item -LiteralPath (Join-Path $repo 'licenses/FFmpegInteropX-Apache-2.0.txt') -Destination $decoderLicenses
+$ffmpegPackage = Join-Path $env:NUGET_PACKAGES 'ffmpeginteropx.desktop.ffmpeg/8.1.2'
+foreach ($licenseFile in (Get-ChildItem -LiteralPath (Join-Path $ffmpegPackage 'licenses') -File)) {
+    Copy-Item -LiteralPath $licenseFile.FullName -Destination $decoderLicenses
+}
+Copy-Item -LiteralPath (Join-Path $repo 'docs/NATIVE_DECODER_DEPENDENCIES.md') -Destination $destination
 @'
 @echo off
 cd /d "%~dp0"
-where ffmpeg.exe >nul 2>nul
-if errorlevel 1 (
-  echo FFmpeg is required. Install FFmpeg and add its bin folder to PATH.
-  echo See PREVIEW_VALIDATION.md for requirements.
-  pause
-  exit /b 1
-)
 start "" "%~dp0FnMusic.App.exe"
 '@ | Set-Content -LiteralPath (Join-Path $destination 'Start-FnMusic.cmd') -Encoding ascii
 $files = Get-ChildItem -LiteralPath $destination -Recurse -File
