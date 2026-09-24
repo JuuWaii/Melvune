@@ -128,6 +128,18 @@ public sealed partial class MainWindow
             Root.RequestedTheme = ElementTheme.Dark;
             Verify("dark_theme", Root.ActualTheme == ElementTheme.Dark);
             ApplySystemTheme();
+            UpdateAdaptiveLayout(800);
+            Verify("compact_player_rows", Microsoft.UI.Xaml.Controls.Grid.GetRow(TransportPanel) == 1 && Microsoft.UI.Xaml.Controls.Grid.GetColumnSpan(TransportPanel) == 3);
+            Verify("compact_lyrics_excludes_hidden_list", Microsoft.UI.Xaml.Controls.Grid.GetColumn(LyricsPanel) == 0 && !TrackList.IsEnabled && !CollectionList.IsEnabled);
+            UpdateCollectionView();
+            Verify("compact_navigation_reveals_browser", LyricsPanel.Visibility == Visibility.Collapsed && TrackList.IsEnabled);
+            LyricsPanel.Visibility = Visibility.Collapsed;
+            UpdateAdaptiveLayout(800);
+            Verify("compact_browse_restored", TrackList.IsEnabled && CollectionList.IsEnabled);
+            LyricsPanel.Visibility = Visibility.Visible;
+            UpdateAdaptiveLayout(1360);
+            Verify("wide_layout_restored", Microsoft.UI.Xaml.Controls.Grid.GetRow(TransportPanel) == 0 && Microsoft.UI.Xaml.Controls.Grid.GetColumn(LyricsPanel) == 1 && TrackList.IsEnabled);
+            UpdateAdaptiveLayout(Root.ActualWidth);
             var activeLocalAudio = music.Player.Source;
             var localItems = TrackList.ItemsSource;
             ResetLibrary();

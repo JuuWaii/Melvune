@@ -26,3 +26,11 @@
 - Debug 与 Release 编译通过。真实歌曲的不同歌词偏移方向、逐字歌词、更多编码、更多 DPI/窄窗口以及系统设置实际变更通知仍需扩展验收；代码监听已接入，自动测试验证的是窗口主题切换。
 
 复现入口：`scripts/native.ps1 test`、`scripts/native.ps1 build`。Debug 窗口参数为 `--preview-synthetic --preview-collections --verify-collection-window`；只读服务端检查为 `--verify-native-presentation`。可用 `--preview-synthetic --preview-light` 或 `--preview-dark` 检查主题，不变更 Windows 设置。
+
+## 2026-09-24：紧凑窗口布局
+
+窗口内容宽度低于 1100 DIP 时，底部播放控制移到第二行；左侧导航变窄并可垂直滚动，内容标题可换行，专辑列改用比例宽度。搜索与分页信息不再被右侧歌词栏压缩，详情导航超宽时可横向滚动。
+
+紧凑窗口中的歌词占用完整内容区，覆盖期间禁止下方列表接受输入。关闭歌词、切换分类或重新搜索/翻页会恢复列表；扩大窗口则恢复歌词与歌曲并排、播放器单行布局，不清空队列或重建音频。补充窗口关闭后的媒体加载保护，播放不可用来源时清空上一首的封面/歌词。
+
+已实际检查 820×820 浅色窗口、展开歌词和最大化后的布局恢复。窗口状态回归共 57 项通过，Release 构建与隐私扫描通过。新增窗口断言覆盖播放器换行、歌词覆盖时列表禁用、分类导航恢复、歌词关闭后恢复及宽窗口还原。更多 DPI、极小窗口与真实系统主题通知仍待验证。Debug 参数 `--preview-synthetic --preview-compact --preview-light` 可复现紧凑预览。

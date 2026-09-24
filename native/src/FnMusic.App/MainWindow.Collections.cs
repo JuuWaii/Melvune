@@ -14,6 +14,7 @@ public sealed partial class MainWindow
     private string CollectionLabel => collectionKind == CollectionKind.Album ? "专辑" : "歌手";
     private void UpdateCollectionView()
     {
+        RevealBrowseContent();
         bool listing = collectionKind is not null && collection is null;
         CollectionList.Visibility = CollectionOpen.Visibility = listing ? Visibility.Visible : Visibility.Collapsed;
         TrackList.Visibility = listing ? Visibility.Collapsed : Visibility.Visible;

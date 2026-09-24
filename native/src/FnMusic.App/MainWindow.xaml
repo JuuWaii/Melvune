@@ -58,8 +58,8 @@
   </ResourceDictionary>
  </ResourceDictionary.ThemeDictionaries>
   </ResourceDictionary></Grid.Resources>
-  <Grid.ColumnDefinitions><ColumnDefinition Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-  <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="24">
+  <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+  <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="16"><ScrollViewer HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
    <StackPanel Spacing="12">
     <FontIcon Glyph="&#xE8D6;" FontSize="36" HorizontalAlignment="Left" />
     <TextBlock Text="飞牛音乐" Style="{ThemeResource TitleTextBlockStyle}" />
@@ -74,8 +74,7 @@
     <Button Content="连接与账号" Click="Settings_Click" />
     <TextBlock Text="跟随系统 · 浅色 / 深色" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
    </StackPanel>
-  </Border>
-  <ScrollViewer x:Name="SettingsPanel" Grid.Column="1" HorizontalContentAlignment="Stretch" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
+  </ScrollViewer></Border><ScrollViewer x:Name="SettingsPanel" Grid.Column="1" HorizontalContentAlignment="Stretch" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
    <StackPanel Margin="32" Spacing="20">
     <TextBlock x:Uid="SettingsTitle" Style="{ThemeResource TitleTextBlockStyle}" />
     <TextBlock Text="连接 NAS，管理你的登录状态。" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -104,9 +103,8 @@
   </ScrollViewer>
   <Grid x:Name="LibraryPanel" Grid.Column="1" Margin="24" RowSpacing="16" Visibility="Collapsed">
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-   <StackPanel Spacing="12">
-    <TextBlock Text="音乐，陪伴每一个时刻" Style="{ThemeResource TitleTextBlockStyle}"/><TextBlock Text="浏览你的音乐资料库，或从本地文件夹开始聆听。" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-    <StackPanel Orientation="Horizontal" Spacing="8">
+   <StackPanel Grid.ColumnSpan="2" Spacing="12"><TextBlock Text="音乐，陪伴每一个时刻" TextWrapping="Wrap" Style="{ThemeResource TitleTextBlockStyle}"/><TextBlock Text="浏览你的音乐资料库，或从本地文件夹开始聆听。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled" VerticalScrollBarVisibility="Disabled"><StackPanel Orientation="Horizontal" Spacing="8">
      <Button Content="歌曲" Click="Songs_Click"/>
      <Button Content="收藏" Click="Favorites_Click"/>
      <Button Content="专辑" Click="Albums_Click"/>
@@ -114,7 +112,7 @@
      <Button x:Name="CollectionBack" Content="返回列表" Click="CollectionBack_Click" Visibility="Collapsed"/>
      <Button x:Name="CollectionOpen" Content="查看详情" Click="CollectionOpen_Click" Visibility="Collapsed"/>
      <Button x:Name="ArtistAlbums" Content="歌手专辑" Click="ArtistAlbums_Click" Visibility="Collapsed"/>
-    </StackPanel>
+    </StackPanel></ScrollViewer>
     <TextBlock x:Name="CollectionHeading" TextWrapping="Wrap" Visibility="Collapsed"/>
     <Grid ColumnSpacing="8">
      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -126,11 +124,11 @@
      <Button Content="刷新曲库" Click="Refresh_Click"/>
      <Button x:Name="PreviousPage" Content="上一页" Click="Previous_Click" IsEnabled="False"/>
      <Button x:Name="NextPage" Content="下一页" Click="Next_Click" IsEnabled="False"/>
-     <TextBlock x:Name="PageStatus" VerticalAlignment="Center"/><Button x:Name="FavoriteToggle" Content="收藏歌曲" IsEnabled="False" Click="Favorite_Click"/><TextBlock x:Name="FavoriteStatus" VerticalAlignment="Center"/>
-    </StackPanel>
+     <Button x:Name="FavoriteToggle" Content="收藏歌曲" IsEnabled="False" Click="Favorite_Click"/>
+    </StackPanel><TextBlock x:Name="PageStatus" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="FavoriteStatus" TextWrapping="Wrap"/>
    </StackPanel>
 
-   <Border x:Name="LyricsPanel" Grid.Row="1" Grid.Column="1" Width="300" Margin="16,0,0,0" Padding="16" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Visibility="Collapsed"><Grid RowSpacing="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><TextBlock Text="歌词" Style="{ThemeResource SubtitleTextBlockStyle}"/><TextBlock x:Name="LyricsStatus" Grid.Row="1" Text="播放歌曲后显示歌词。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><ListView x:Name="LyricsList" Grid.Row="2" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="Lyric_ItemClick"><ListView.ItemTemplate><DataTemplate><TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="17" Margin="4,12"/></DataTemplate></ListView.ItemTemplate></ListView></Grid></Border>
+   <Border x:Name="LyricsPanel" Grid.Row="1" Grid.Column="1" Width="300" Margin="16,0,0,0" Padding="16" CornerRadius="8" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Visibility="Collapsed"><Grid RowSpacing="12"><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><TextBlock Text="歌词" Style="{ThemeResource SubtitleTextBlockStyle}"/><TextBlock x:Name="LyricsStatus" Grid.Row="1" Text="播放歌曲后显示歌词。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><ListView x:Name="LyricsList" Grid.Row="2" SelectionMode="Single" IsItemClickEnabled="True" ItemClick="Lyric_ItemClick"><ListView.ItemTemplate><DataTemplate><TextBlock Text="{Binding Text}" TextWrapping="Wrap" FontSize="17" Margin="4,12"/></DataTemplate></ListView.ItemTemplate></ListView></Grid></Border>
    <ListView x:Name="CollectionList" Grid.Row="1" SelectionMode="Single" Visibility="Collapsed" IsItemClickEnabled="True" ItemClick="Collection_ItemClick">
     <ListView.ItemTemplate><DataTemplate>
      <Grid Padding="8" ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="72"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="72" Height="72" CornerRadius="8" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE93C;"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border><StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Summary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/></StackPanel></Grid>
@@ -139,23 +137,23 @@
    <ListView x:Name="TrackList" Grid.Row="1" SelectionMode="Single" SelectionChanged="TrackSelection_Changed">
     <ListView.ItemTemplate><DataTemplate>
      <Grid Padding="8" ColumnSpacing="16" Background="Transparent" DoubleTapped="Track_DoubleTapped">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="*"/><ColumnDefinition Width="140"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions><Border Width="44" Height="44" CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="20"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
-      <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Artist}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+      <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions><Border Width="44" Height="44" CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="20"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
+      <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Artist}" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
       <TextBlock Grid.Column="2" Text="{Binding Album}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding DisplayDuration}" HorizontalAlignment="Right"/>
      </Grid>
     </DataTemplate></ListView.ItemTemplate>
    </ListView>
   </Grid>
   <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="24,12">
-   <Grid ColumnSpacing="20" RowSpacing="6">
-    <Grid.ColumnDefinitions><ColumnDefinition Width="270"/><ColumnDefinition Width="*"/><ColumnDefinition Width="230"/></Grid.ColumnDefinitions>
+   <Grid x:Name="PlayerLayout" ColumnSpacing="20" RowSpacing="6">
+    <Grid.ColumnDefinitions><ColumnDefinition x:Name="NowPlayingColumn" Width="270"/><ColumnDefinition Width="*"/><ColumnDefinition Width="230"/></Grid.ColumnDefinitions>
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
-    <Grid ColumnSpacing="12">
+    <Grid x:Name="NowPlayingDetails" ColumnSpacing="12">
      <Grid.ColumnDefinitions><ColumnDefinition Width="64"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <Border CornerRadius="8" Background="{ThemeResource ControlFillColorSecondaryBrush}" Width="64" Height="64"><Grid><FontIcon Glyph="&#xE8D6;"/><Image x:Name="NowCover" Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
      <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4"><TextBlock x:Name="NowPlaying" Text="选择歌曲，开始聆听" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="NowAlbum" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/><Button Content="歌词 / 正在播放" Click="Lyrics_Click" Padding="8,3"/></StackPanel>
     </Grid>
-    <StackPanel Grid.Column="1" Spacing="6" HorizontalAlignment="Stretch">
+    <StackPanel x:Name="TransportPanel" Grid.Column="1" Spacing="6" HorizontalAlignment="Stretch">
      <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
       <Button Content="上一首" Click="PreviousTrack_Click"/>
       <Button Content="播放所选" Click="PlaySelected_Click"/>
@@ -173,7 +171,7 @@
     </StackPanel>
     <TextBlock x:Name="PlaybackStatus" Grid.Row="1" Grid.ColumnSpan="2" Text="选择本地音乐或连接飞牛开始播放。" FontSize="12" TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite"/>
     <TextBlock x:Name="QueueStatus" Grid.Row="2" Grid.ColumnSpan="2" Text="播放队列为空" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
-    <Button Grid.Row="1" Grid.RowSpan="2" Grid.Column="2" Content="音频输出设备" HorizontalAlignment="Right">
+    <Button x:Name="OutputDeviceButton" Grid.Row="1" Grid.RowSpan="2" Grid.Column="2" Content="音频输出设备" HorizontalAlignment="Right">
      <Button.Flyout><Flyout><StackPanel Spacing="8"><ComboBox x:Name="OutputDevices" Header="音频输出设备" MinWidth="240" DisplayMemberPath="Name" SelectionChanged="Output_Changed"/><Button Content="刷新设备" Click="Devices_Click"/></StackPanel></Flyout></Button.Flyout>
     </Button>
    </Grid>

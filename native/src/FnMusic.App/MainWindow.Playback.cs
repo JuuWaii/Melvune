@@ -119,6 +119,7 @@ public sealed partial class MainWindow
     private async Task LoadPageAsync(int requestedPage)
     {
         if (closed) return;
+        RevealBrowseContent();
         if (localView) { await LoadLocalPageAsync(requestedPage); return; }
         libraryWork.Cancel();
         var api = ViewModel.AuthenticatedClient;
@@ -239,7 +240,7 @@ public sealed partial class MainWindow
         CancelWork(); music.Stop(); mediaReady = false;
         UpdateQueueStatus();
         if (!IsSyntheticPreview && !ViewModel.PlaybackRouter.CanPlay(track.Reference))
-        { NowPlaying.Text = ""; PlaybackStatus.Text = "歌曲来源未连接或不支持播放。"; return; }
+        { ClearPresentation(); NowPlaying.Text = ""; PlaybackStatus.Text = "歌曲来源未连接或不支持播放。"; return; }
         _ = LoadLyricsAsync(track);
         var ct = work.Token;
         PlaybackStatus.Text = "正在加载音频…";

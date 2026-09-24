@@ -21,6 +21,8 @@ public sealed partial class MainWindow
     {
         ApplySystemTheme();
         systemTheme.ColorValuesChanged += SystemThemeChanged;
+        Root.SizeChanged += (_, e) => UpdateAdaptiveLayout(e.NewSize.Width);
+        Root.ActualThemeChanged += (_, _) => UpdateAdaptiveLayout(Root.ActualWidth);
     }
     private void SystemThemeChanged(UISettings sender, object args) => DispatcherQueue.TryEnqueue(() => { if (!closed) ApplySystemTheme(); });
     private void ApplySystemTheme()
@@ -35,6 +37,7 @@ public sealed partial class MainWindow
     private void Lyrics_Click(object sender, RoutedEventArgs e)
     {
         ShowBrowsePanel(); LyricsPanel.Visibility = LyricsPanel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
+        UpdateAdaptiveLayout(Root.ActualWidth);
         if (LyricsPanel.Visibility == Visibility.Visible && activeLyric >= 0) LyricsList.ScrollIntoView(currentLyrics.Lines[activeLyric]);
     }
 
@@ -44,6 +47,7 @@ public sealed partial class MainWindow
     { if (sender is Image image && image.Tag is CancellationTokenSource work) { work.Cancel(); image.Tag = null; } }
     private async Task LoadArtworkAsync(Image image)
     {
+        if (closed) return;
         if (image.Tag is CancellationTokenSource old) old.Cancel();
         image.Source = null;
         object context = image.DataContext;
@@ -100,6 +104,7 @@ public sealed partial class MainWindow
     }
     private async Task LoadLyricsAsync(MusicTrack track)
     {
+        if (closed) return;
         ClearPresentation(); NowCover.DataContext = track; NowAlbum.Text = track.Album;
         var ct = lyricsWork.Token; LyricsStatus.Text = "正在加载歌词…";
         try
