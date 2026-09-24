@@ -10,6 +10,8 @@
 
 ## 结论
 
+补充实验：FFmpeg `fflags=+fastseek` 将 MP3 首次尾部定位读取量从约 4.46 MB 降为 256 KiB，三次定位总读取约 1 MiB。但底层对 VBR 可能采用近似 TOC / 比例定位，仍需音频时间标记回归，不能仅依据播放时钟切换默认配置。阻塞响应正文时关闭输入的取消检查也已通过。实验参数与限制见 SeekProbe README。
+
 优先验证 FFmpegInteropX 的可随机访问流入口，复用现有 HttpRangeStream 与 MediaPlayer。当前 FFmpeg 子进程读取 pipe:0，输出端 -ss 必须解码并丢弃前缀；把 -ss 移到输入端不会让管道变成可随机访问文件。短曲 PCM 缓存继续保留，直到替代链路通过验收。
 
 FFmpegInteropX 官方声明支持 WinUI 3 Desktop，公开了 IRandomAccessStream → FFmpegMediaSource.CreateFromStreamAsync → CreateMediaPlaybackItem 的路径。源码 CreateMediaStreamSource(IRandomAccessStream) 将流桥接为 IStream，并在 avio_alloc_context 注册 FileStreamRead / FileStreamSeek；因此它具备通用容器定位所需的输入能力。实际速度仍取决于媒体索引、服务器 Range 响应和网络。

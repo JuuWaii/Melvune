@@ -46,7 +46,9 @@ try
         : new MeasuredStream(path);
     long ReadCount() => rangeMode ? handler.BytesRead : ((MeasuredStream)input).BytesRead;
     using var random = input.AsRandomAccessStream();
-    using var source = await FFmpegMediaSource.CreateFromStreamAsync(random);
+    var config = new MediaSourceConfig();
+    if (args.Contains("--fast-seek", StringComparer.Ordinal)) config.FFmpegOptions.Add("fflags", "+fastseek");
+    using var source = await FFmpegMediaSource.CreateFromStreamAsync(random, config);
     using var player = new MediaPlayer { IsMuted = true, AutoPlay = false };
     using var lifetime = new CancellationTokenSource(TimeSpan.FromSeconds(60));
     var failed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -74,7 +76,11 @@ try
     }
     player.Source = null;
     Console.WriteLine($"PASS {(rangeMode ? "controlled HTTP Range" : "local")} playback; total read {ReadCount()} / {input.Length} bytes");
-    if (rangeMode) await VerifyBlockedOpenCancellation(path);
+    if (rangeMode)
+    {
+        await VerifyBlockedOpenCancellation(path, false);
+        await VerifyBlockedOpenCancellation(path, true);
+    }
 
     async Task AwaitOrFailure(Task operation)
     {
@@ -95,11 +101,12 @@ try
 }
 finally { File.Delete(path); if (path != wavePath) File.Delete(wavePath); }
 
-static async Task VerifyBlockedOpenCancellation(string path)
+static async Task VerifyBlockedOpenCancellation(string path, bool body)
 {
     using var handler = new RangeHandler(path);
     using var input = await HttpRangeStream.OpenAsync(new HttpClient(handler, false), new Uri("https://seek.invalid/audio"), CancellationToken.None);
-    handler.Block = true;
+    handler.Block = !body;
+    handler.BlockBody = body;
     using var random = input.AsRandomAccessStream();
     var opening = FFmpegMediaSource.CreateFromStreamAsync(random).AsTask();
     await handler.Blocked.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -113,7 +120,7 @@ static async Task VerifyBlockedOpenCancellation(string path)
     catch (Exception error) when (error is not TimeoutException and not InvalidOperationException)
     {
         if (!handler.Cancelled) throw new Exception("HTTP request was not cancelled.");
-        Console.WriteLine($"PASS blocked native open cancels and exits in {watch.ElapsedMilliseconds}ms");
+        Console.WriteLine($"PASS blocked {(body ? "body" : "headers")} native open cancels and exits in {watch.ElapsedMilliseconds}ms");
     }
 }
 
@@ -122,6 +129,7 @@ sealed class RangeHandler(string path) : HttpMessageHandler
     private long bytesRead;
     public long BytesRead => Interlocked.Read(ref bytesRead);
     public bool Block { get; set; }
+    public bool BlockBody { get; set; }
     public bool Cancelled { get; private set; }
     public TaskCompletionSource Blocked { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
@@ -129,9 +137,7 @@ sealed class RangeHandler(string path) : HttpMessageHandler
         if (request.RequestUri?.Host != "seek.invalid") throw new Exception("Unexpected origin.");
         if (Block)
         {
-            Blocked.TrySetResult();
-            try { await Task.Delay(Timeout.Infinite, token); }
-            catch (OperationCanceledException) { Cancelled = true; throw; }
+            await WaitBlocked(token);
         }
         var range = request.Headers.Range?.Ranges.Single() ?? throw new Exception("Range required.");
         var from = range.From ?? throw new Exception("Explicit start required.");
@@ -141,10 +147,29 @@ sealed class RangeHandler(string path) : HttpMessageHandler
         var bytes = new byte[checked((int)(to - from + 1))];
         await file.ReadExactlyAsync(bytes, token);
         Interlocked.Add(ref bytesRead, bytes.Length);
-        var response = new HttpResponseMessage(HttpStatusCode.PartialContent) { Content = new ByteArrayContent(bytes) };
+        var response = new HttpResponseMessage(HttpStatusCode.PartialContent)
+        { Content = BlockBody ? new StreamContent(new BlockedBody(WaitBlocked)) : new ByteArrayContent(bytes) };
         response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         response.Content.Headers.ContentRange = new ContentRangeHeaderValue(from, to, file.Length);
         return response;
+    }
+    private async Task WaitBlocked(CancellationToken token)
+    {
+        Blocked.TrySetResult();
+        try { await Task.Delay(Timeout.Infinite, token); }
+        catch (OperationCanceledException) { Cancelled = true; throw; }
+    }
+}
+
+sealed class BlockedBody(Func<CancellationToken, Task> wait) : MemoryStream
+{
+    public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+    {
+        await wait(cancellationToken); return 0;
+    }
+    public override async Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+    {
+        await wait(cancellationToken); return 0;
     }
 }
 

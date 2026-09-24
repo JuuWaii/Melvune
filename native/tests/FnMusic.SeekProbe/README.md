@@ -25,7 +25,7 @@ $env:NUGET_PACKAGES = Join-Path (Get-Location).Path '.tools/nuget'
 ./.tools/dotnet/dotnet.exe run --project native/tests/FnMusic.SeekProbe/FnMusic.SeekProbe.csproj --no-restore -- --range --format=mp3
 ```
 
-Range 模式额外验证打开媒体时阻塞 HTTP 响应、随后关闭输入流：请求必须收到取消，原生打开任务必须在 3 秒内失败。此项尚不覆盖响应正文中断、播放中停止或连续拖动。
+Range 模式额外验证打开媒体时分别阻塞 HTTP 响应头和响应正文、随后关闭输入流：请求必须收到取消，原生打开任务必须在 3 秒内失败。此项尚不覆盖播放中停止或连续拖动。
 
 压缩格式可能完全命中内部缓冲，允许定位期间新增读取量为零；统一读取上限只是防止异常读取，不能证明网络高效。单次读取超过文件一半时输出 NOTICE。2026-09-24 样本如下（字节数为 Range 响应总量，包含重复读取）：
 
@@ -37,3 +37,9 @@ Range 模式额外验证打开媒体时阻塞 HTTP 响应、随后关闭输入�
 | OGG | 1,953,102 | 118,094 | 262,144 | 1,572,864 |
 
 四种格式均完成播放位置推进与打开取消检查（取消约 12–16 毫秒）。MP3 首次尾部定位、OGG 部分定位读取量偏高，下一步调查索引及定位策略，不能据本地低延迟将它们视为慢网问题已解决。
+
+## 快速定位对照（实验选项）
+
+追加 `--fast-seek` 将 FFmpeg `fflags` 设为 `+fastseek`。MP3 同一样本三次定位均只读取 262,144 字节，总读取 1,048,577 字节；响应头/正文阻塞后的退出分别约 12 / 0 毫秒。
+
+该选项没有进入正式播放器，也不默认启用。FFmpeg 的 [MP3 解复用源码](https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/mp3dec.c) 表明快速模式使用 TOC 或文件比例定位，VBR 可能不精确。当前恒定频率样本只验证位置推进，不能验证实际音频与目标时间一致。下一步须用带可识别时间标记的 CBR/VBR 样本检查内容误差后，才能决定产品定位策略。此选项不同于 FFmpegInteropX 为视频关键帧提供的 General.FastSeek。
