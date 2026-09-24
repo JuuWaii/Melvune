@@ -11,6 +11,7 @@ public sealed partial class MainWindow
     private async Task VerifyCollectionWindowAsync()
     {
         var checks = new Dictionary<string, bool>();
+        var timings = new Dictionary<string, long>();
         string stage = "setup", error = "";
         void Verify(string name, bool value)
         { stage = name; checks[name] = value; if (!value) throw new InvalidOperationException(); }
@@ -123,10 +124,31 @@ public sealed partial class MainWindow
             Verify("local_seek", music.Player.PlaybackSession.CanSeek && submittedSeek is null && Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - 20) < 2);
             UpdateLyricsPosition();
             Verify("lyrics_follow_seek", activeLyric >= 1 && LyricsList.SelectedIndex == activeLyric);
+            foreach (int target in new[] { 5, 45, 10 })
+            {
+                var timer = System.Diagnostics.Stopwatch.StartNew();
+                pendingSeek = target; CommitSeek();
+                for (int i = 0; i < 80 && (submittedSeek is not null || Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - target) > 2); i++) await Task.Delay(50);
+                timings["cached_seek_" + target + "_ms"] = timer.ElapsedMilliseconds;
+                Verify("cached_seek_" + target, submittedSeek is null && Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - target) < 2);
+            }
             Root.RequestedTheme = ElementTheme.Light;
             Verify("light_theme", Root.ActualTheme == ElementTheme.Light);
             Root.RequestedTheme = ElementTheme.Dark;
             Verify("dark_theme", Root.ActualTheme == ElementTheme.Dark);
+            ApplySystemTheme();
+            var originalSize = AppWindow.Size;
+            AppWindow.Resize(new global::Windows.Graphics.SizeInt32(980, 780));
+            var resized = AppWindow.Size;
+            await ShowLibraryAsync();
+            Verify("library_navigation_preserves_window_size", AppWindow.Size.Width == resized.Width && AppWindow.Size.Height == resized.Height);
+            AppWindow.Resize(originalSize);
+            await ShowLocalMusicAsync();
+            SearchInput.Text = "000-playback"; await SearchAsync();
+            Root.RequestedTheme = ElementTheme.Dark; UpdateTitleBarTheme();
+            Verify("dark_titlebar", AppWindow.TitleBar.BackgroundColor?.R == 32 && AppWindow.TitleBar.ButtonForegroundColor?.R == 255);
+            Root.RequestedTheme = ElementTheme.Light; UpdateTitleBarTheme();
+            Verify("light_titlebar", AppWindow.TitleBar.BackgroundColor?.R == 243 && AppWindow.TitleBar.ButtonForegroundColor?.R == 0);
             ApplySystemTheme();
             UpdateAdaptiveLayout(800);
             Verify("compact_player_rows", Microsoft.UI.Xaml.Controls.Grid.GetRow(TransportPanel) == 1 && Microsoft.UI.Xaml.Controls.Grid.GetColumnSpan(TransportPanel) == 3);
@@ -173,7 +195,7 @@ public sealed partial class MainWindow
         }
         catch (Exception ex) { error = ex.GetType().Name; }
         await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "collection-window-verification.json"),
-            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks }));
+            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, timings }));
     }
 }
 #endif

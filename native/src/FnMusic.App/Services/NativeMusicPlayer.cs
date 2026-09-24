@@ -45,6 +45,8 @@ public sealed class NativeMusicPlayer : IDisposable
         private readonly SemaphoreSlim gate = new(1);
         private readonly CancellationTokenSource lifetime = new();
         private FfmpegPcmDecoder? decoder;
+        private PcmReadAheadBuffer? readAhead;
+        private bool allowReadAhead;
         private long bytes;
         private TimeSpan offset;
         private bool disposed;
@@ -53,6 +55,7 @@ public sealed class NativeMusicPlayer : IDisposable
         public PcmSource(Stream encoded, double duration)
         {
             this.encoded = encoded;
+            allowReadAhead = duration > 0 && duration <= 480;
             Source = new MediaStreamSource(new AudioStreamDescriptor(AudioEncodingProperties.CreatePcm(48000, 2, 16)))
             { CanSeek = encoded.CanSeek && duration > 0, Duration = TimeSpan.FromSeconds(Math.Clamp(duration, 0, 864000)), BufferTime = TimeSpan.FromSeconds(1) };
             Source.Starting += Starting;
@@ -69,10 +72,14 @@ public sealed class NativeMusicPlayer : IDisposable
                     if (disposed) return;
                     if (decoder is null || args.Request.StartPosition is not null)
                     {
-                        if (decoder is not null) await decoder.DisposeAsync().ConfigureAwait(false);
-                        encoded.Seek(0, SeekOrigin.Begin);
                         offset = args.Request.StartPosition ?? TimeSpan.Zero; bytes = 0;
-                        decoder = new FfmpegPcmDecoder(encoded, offset);
+                        if (readAhead is null)
+                        {
+                            if (decoder is not null) await decoder.DisposeAsync().ConfigureAwait(false);
+                            encoded.Seek(0, SeekOrigin.Begin);
+                            decoder = new FfmpegPcmDecoder(encoded, allowReadAhead ? TimeSpan.Zero : offset);
+                            if (allowReadAhead) readAhead = new PcmReadAheadBuffer(decoder.Output);
+                        }
                     }
                     args.Request.SetActualStartPosition(offset + TimeSpan.FromSeconds((double)bytes / FfmpegPcmDecoder.BytesPerSecond));
                 }
@@ -97,7 +104,22 @@ public sealed class NativeMusicPlayer : IDisposable
                     timeout.CancelAfter(TimeSpan.FromSeconds(30));
                     while (count < pcm.Length)
                     {
-                        int read = await decoder.Output.ReadAsync(pcm.AsMemory(count), timeout.Token).ConfigureAwait(false);
+                        int read;
+                        try
+                        {
+                            long position = (long)(offset.TotalSeconds * FfmpegPcmDecoder.SampleRate) * FfmpegPcmDecoder.BytesPerFrame + bytes + count;
+                            read = readAhead is null ? await decoder.Output.ReadAsync(pcm.AsMemory(count), timeout.Token).ConfigureAwait(false)
+                                : await readAhead.ReadAtAsync(position, pcm.AsMemory(count), timeout.Token).ConfigureAwait(false);
+                        }
+                        catch (PcmCacheLimitException)
+                        {
+                            await readAhead!.DisposeAsync().ConfigureAwait(false); readAhead = null; allowReadAhead = false;
+                            await decoder.DisposeAsync().ConfigureAwait(false);
+                            encoded.Seek(0, SeekOrigin.Begin);
+                            offset += TimeSpan.FromSeconds((double)bytes / FfmpegPcmDecoder.BytesPerSecond); bytes = 0; count = 0;
+                            decoder = new FfmpegPcmDecoder(encoded, offset);
+                            continue;
+                        }
                         if (read == 0) { await decoder.CheckCompletionAsync(timeout.Token).ConfigureAwait(false); break; }
                         count += read;
                     }
@@ -124,7 +146,7 @@ public sealed class NativeMusicPlayer : IDisposable
         private async Task ReleaseAsync()
         {
             await gate.WaitAsync().ConfigureAwait(false);
-            try { if (decoder is not null) await decoder.DisposeAsync().ConfigureAwait(false); }
+            try { if (readAhead is not null) await readAhead.DisposeAsync().ConfigureAwait(false); if (decoder is not null) await decoder.DisposeAsync().ConfigureAwait(false); }
             catch (Exception) { /* 关闭窗口后的后台清理不得产生未观察异常或输出私人媒体信息。 */ }
             finally { encoded.Dispose(); lifetime.Dispose(); gate.Release(); }
         }

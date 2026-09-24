@@ -22,7 +22,19 @@ public sealed partial class MainWindow
         ApplySystemTheme();
         systemTheme.ColorValuesChanged += SystemThemeChanged;
         Root.SizeChanged += (_, e) => UpdateAdaptiveLayout(e.NewSize.Width);
-        Root.ActualThemeChanged += (_, _) => UpdateAdaptiveLayout(Root.ActualWidth);
+        Root.ActualThemeChanged += (_, _) => { UpdateAdaptiveLayout(Root.ActualWidth); UpdateTitleBarTheme(); };
+        UpdateTitleBarTheme();
+    }
+    private void UpdateTitleBarTheme()
+    {
+        bool dark = Root.ActualTheme == ElementTheme.Dark;
+        var background = global::Windows.UI.Color.FromArgb(255, dark ? (byte)32 : (byte)243, dark ? (byte)32 : (byte)243, dark ? (byte)32 : (byte)243);
+        var foreground = dark ? global::Microsoft.UI.Colors.White : global::Microsoft.UI.Colors.Black;
+        var bar = AppWindow.TitleBar;
+        bar.BackgroundColor = bar.ButtonBackgroundColor = bar.InactiveBackgroundColor = bar.ButtonInactiveBackgroundColor = background;
+        bar.ForegroundColor = bar.ButtonForegroundColor = bar.InactiveForegroundColor = bar.ButtonInactiveForegroundColor = foreground;
+        bar.ButtonHoverBackgroundColor = global::Windows.UI.Color.FromArgb(255, 128, 128, 128);
+        bar.ButtonHoverForegroundColor = global::Microsoft.UI.Colors.White;
     }
     private void SystemThemeChanged(UISettings sender, object args) => DispatcherQueue.TryEnqueue(() => { if (!closed) ApplySystemTheme(); });
     private void ApplySystemTheme()

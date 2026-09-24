@@ -15,6 +15,19 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+await Test("PCM read-ahead supports backward seeks and bounded memory", async () =>
+{
+    byte[] bytes = Enumerable.Range(0, 180000).Select(i => (byte)(i % 251)).ToArray();
+    using var input = new MemoryStream(bytes);
+    await using var cache = new PcmReadAheadBuffer(input, 150000);
+    byte[] output = new byte[128];
+    Check(await cache.ReadAtAsync(140000, output, default) == 128 && output.SequenceEqual(bytes.Skip(140000).Take(128)));
+    Check(await cache.ReadAtAsync(10, output, default) == 128 && output.SequenceEqual(bytes.Skip(10).Take(128)));
+    try { await cache.ReadAtAsync(150000, output, default); throw new Exception("Limit ignored"); } catch (PcmCacheLimitException) { }
+    Check(cache.BufferedBytes == 150000);
+    using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+    try { await cache.ReadAtAsync(0, output, cancelled.Token); throw new Exception("Cancellation ignored"); } catch (OperationCanceledException) { }
+});
 await Test("lyrics timestamps translations offsets and seeking", () =>
 {
     var lyrics = Lyrics.Parse("[ar:Artist]\n[offset:100]\n[00:20.25]later\n[00:01.00][00:03.000]first\n[00:01.00]translation", 200);
@@ -572,6 +585,16 @@ if (args.Contains("--ffmpeg"))
             await encoder.StandardOutput.BaseStream.CopyToAsync(encoded);
             await encoder.WaitForExitAsync(); await errors;
             Check(encoder.ExitCode == 0 && encoded.Length > 0);
+            encoded.Position = 0;
+            await using (var bufferedDecoder = new FfmpegPcmDecoder(encoded, TimeSpan.Zero))
+            await using (var cache = new PcmReadAheadBuffer(bufferedDecoder.Output))
+            {
+                byte[] sample = new byte[4096];
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+                Check(await cache.ReadAtAsync(FfmpegPcmDecoder.BytesPerSecond, sample, timeout.Token) > 0);
+                Check(await cache.ReadAtAsync(0, sample, timeout.Token) > 0);
+                Check(sample.Any(b => b != 0));
+            }
             foreach (int start in new[] { 0, 1 })
             {
                 encoded.Position = 0;

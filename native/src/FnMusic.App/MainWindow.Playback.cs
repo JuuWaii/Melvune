@@ -85,7 +85,7 @@ public sealed partial class MainWindow
     {
         localView = false;
 #if DEBUG
-        if (IsSyntheticPreview) { await ShowSyntheticPreviewAsync(); return; }
+        if (IsSyntheticPreview) { SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible; await SwitchCollectionAsync(null); return; }
 #endif
         SettingsPanel.Visibility = Visibility.Collapsed;
         LibraryPanel.Visibility = Visibility.Visible;
