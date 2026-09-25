@@ -72,7 +72,10 @@
     <TextBlock x:Name="LocalScanStatus" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
     <Button x:Name="CancelLocalScan" Content="取消扫描" Visibility="Collapsed" Click="CancelLocalScan_Click" />
     <Button Content="连接与账号" Click="Settings_Click" />
-    <TextBlock Text="跟随系统 · 浅色 / 深色" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+    <ComboBox x:Name="ThemePicker" Header="外观" AutomationProperties.Name="外观模式" HorizontalAlignment="Stretch" SelectionChanged="Theme_Changed">
+     <ComboBoxItem Content="跟随系统"/><ComboBoxItem Content="浅色"/><ComboBoxItem Content="深色"/>
+    </ComboBox>
+    <TextBlock x:Name="ThemeStatus" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
    </StackPanel>
   </ScrollViewer></Border><ScrollViewer x:Name="SettingsPanel" Grid.Column="1" HorizontalContentAlignment="Stretch" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
    <StackPanel Margin="32" Spacing="20">

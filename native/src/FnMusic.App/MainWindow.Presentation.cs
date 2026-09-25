@@ -19,6 +19,7 @@ public sealed partial class MainWindow
     private int activeLyric = -1;
     private void InitializePresentation()
     {
+        InitializeThemeChoice();
         ApplySystemTheme();
         systemTheme.ColorValuesChanged += SystemThemeChanged;
         Root.SizeChanged += (_, e) => UpdateAdaptiveLayout(e.NewSize.Width);
@@ -40,7 +41,12 @@ public sealed partial class MainWindow
     private void ApplySystemTheme()
     {
         var foreground = systemTheme.GetColorValue(UIColorType.Foreground);
-        Root.RequestedTheme = foreground.R + foreground.G + foreground.B > 384 ? ElementTheme.Dark : ElementTheme.Light;
+        Root.RequestedTheme = themePreference switch
+        {
+            FnMusic.Infrastructure.ThemePreference.Light => ElementTheme.Light,
+            FnMusic.Infrastructure.ThemePreference.Dark => ElementTheme.Dark,
+            _ => foreground.R + foreground.G + foreground.B > 384 ? ElementTheme.Dark : ElementTheme.Light
+        };
     }
     private async void SidebarFavorites_Click(object sender, RoutedEventArgs e) { ShowBrowsePanel(); await ShowFavoritesAsync(); }
     private async void SidebarAlbums_Click(object sender, RoutedEventArgs e) { ShowBrowsePanel(); await SwitchCollectionAsync(CollectionKind.Album); }

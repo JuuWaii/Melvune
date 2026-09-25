@@ -29,7 +29,7 @@ cd /d "%~dp0"
 start "" "%~dp0FnMusic.App.exe"
 '@ | Set-Content -LiteralPath (Join-Path $destination 'Start-FnMusic.cmd') -Encoding ascii
 $files = Get-ChildItem -LiteralPath $destination -Recurse -File
-if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music)\.json$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Unexpected development or personal artifact in preview' }
+if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|appearance)\.json$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Unexpected development or personal artifact in preview' }
 $manifest = $files | Sort-Object FullName | ForEach-Object {
     [ordered]@{ path = [IO.Path]::GetRelativePath($destination, $_.FullName); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
 }

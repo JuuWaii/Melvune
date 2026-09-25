@@ -15,6 +15,41 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+await Test("theme settings persist all modes and reject corrupt or unknown preferences", () =>
+{
+    string directory = Path.Combine(Path.GetTempPath(), "fnmusic-theme-" + Guid.NewGuid().ToString("N"));
+    var store = new ThemeSettingsStore(directory);
+    Check(store.Load() == ThemePreference.System);
+    try
+    {
+        foreach (var preference in Enum.GetValues<ThemePreference>())
+        {
+            store.Save(preference);
+            Check(new ThemeSettingsStore(directory).Load() == preference);
+        }
+        try { store.Save((ThemePreference)99); throw new Exception("Invalid preference saved"); }
+        catch (ArgumentOutOfRangeException) { }
+        Check(store.Load() == ThemePreference.Dark);
+        foreach (var invalid in new[] { "null", "{}", "{\"Theme\":\"invalid\"}", new string(' ', 4097) })
+        {
+            File.WriteAllText(Path.Combine(directory, "appearance.json"), invalid);
+            try { store.Load(); throw new Exception("Corrupt preference accepted"); }
+            catch (InvalidDataException) { }
+        }
+        store.Save(ThemePreference.System);
+        Check(store.Load() == ThemePreference.System);
+        Check(Directory.GetFiles(directory, "*.tmp").Length == 0);
+    }
+    finally
+    {
+        if (Directory.Exists(directory))
+        {
+            foreach (var file in Directory.GetFiles(directory)) File.Delete(file);
+            Directory.Delete(directory);
+        }
+    }
+    return Task.CompletedTask;
+});
 await Test("PCM slow input publishes partial data and isolates cancelled seeks", async () =>
 {
     using var input = new PausingPcmStream();
