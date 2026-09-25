@@ -42,10 +42,11 @@ public sealed class NativeMusicPlayer : IDisposable
     public void Stop()
     {
         var previous = seekable; seekable = null;
-        // Cancel IO before any media-pipeline operation that may wait for the decoder.
-        if (previous is not null) TrackCleanup(previous.Stop());
         Player.Pause();
         Player.Source = null;
+        // Detach before invalidating the old input, so its shutdown is not reported
+        // as a failure of the next MediaPlaybackItem.
+        if (previous is not null) TrackCleanup(previous.Stop());
     }
 
     public void Dispose() { Stop(); Player.Dispose(); }

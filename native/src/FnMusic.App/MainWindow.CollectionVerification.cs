@@ -137,6 +137,11 @@ public sealed partial class MainWindow
             Root.RequestedTheme = ElementTheme.Dark;
             Verify("dark_theme", Root.ActualTheme == ElementTheme.Dark);
             ApplySystemTheme();
+            var systemRequestedTheme = Root.RequestedTheme;
+            Root.RequestedTheme = systemRequestedTheme == ElementTheme.Dark ? ElementTheme.Light : ElementTheme.Dark;
+            SystemThemeChanged(systemTheme, new object());
+            await Task.Delay(100);
+            Verify("system_theme_notification_restores_preference", Root.RequestedTheme == systemRequestedTheme);
             var originalSize = AppWindow.Size;
             AppWindow.Resize(new global::Windows.Graphics.SizeInt32(980, 780));
             var resized = AppWindow.Size;

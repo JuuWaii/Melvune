@@ -132,6 +132,58 @@ static async Task VerifyPlayerLifecycle(string path)
     await audio.PendingCleanup.WaitAsync(TimeSpan.FromSeconds(3));
     if (audio.Player.Source is not null || !cancelledHandler.Cancelled) throw new Exception("Cancelled open retained its source.");
     Console.WriteLine("PASS production player cancels opening via caller token");
+    using (var activeHandler = new RangeHandler(path))
+    using (var activeInput = await HttpRangeStream.OpenAsync(new HttpClient(activeHandler, false), new Uri("https://seek.invalid/audio"), CancellationToken.None))
+    {
+        var opened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void OnOpened(MediaPlayer sender, object args) => opened.TrySetResult();
+        audio.Player.MediaOpened += OnOpened;
+        try
+        {
+            await audio.OpenAsync(activeInput).WaitAsync(TimeSpan.FromSeconds(10));
+            await opened.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            activeHandler.BlockBody = true;
+            audio.Player.PlaybackSession.Position = TimeSpan.FromSeconds(570);
+            await activeHandler.Blocked.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            try { await Task.Run(audio.Stop).WaitAsync(TimeSpan.FromSeconds(3)); }
+            catch { activeInput.Dispose(); throw; }
+            await audio.PendingCleanup.WaitAsync(TimeSpan.FromSeconds(3));
+            if (!activeHandler.Cancelled || audio.Player.Source is not null) throw new Exception("Active seek was not stopped.");
+            Console.WriteLine("PASS stop cancels a blocked active seek without blocking the caller");
+        }
+        finally { audio.Player.MediaOpened -= OnOpened; }
+    }
+    long memoryAfterWarmup = 0;
+    for (int iteration = 0; iteration < 60; iteration++)
+    {
+        var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Opened(MediaPlayer sender, object args) => ready.TrySetResult();
+        void Failed(MediaPlayer sender, MediaPlayerFailedEventArgs args) => ready.TrySetException(new IOException($"Stress media open failed at cycle {iteration}: {args.Error}, {args.ExtendedErrorCode?.HResult:X8}."));
+        audio.Player.MediaOpened += Opened;
+        audio.Player.MediaFailed += Failed;
+        try
+        {
+            await audio.OpenAsync(File.OpenRead(path)).WaitAsync(TimeSpan.FromSeconds(10));
+            await ready.Task.WaitAsync(TimeSpan.FromSeconds(10));
+        }
+        finally { audio.Player.MediaOpened -= Opened; audio.Player.MediaFailed -= Failed; }
+        using var stepTimeout = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        while (!audio.Player.PlaybackSession.CanSeek) await Task.Delay(25, stepTimeout.Token);
+        foreach (var position in new[] { 500, 20, 300, 100 })
+            audio.Player.PlaybackSession.Position = TimeSpan.FromSeconds(position);
+        while (audio.Player.PlaybackSession.Position.TotalSeconds is < 100.25 or > 105 ||
+               audio.Player.PlaybackSession.PlaybackState != MediaPlaybackState.Playing)
+            await Task.Delay(25, stepTimeout.Token);
+        audio.Stop();
+        await audio.PendingCleanup.WaitAsync(TimeSpan.FromSeconds(3));
+        if (audio.Player.Source is not null) throw new Exception("Stress stop retained its source.");
+        if (iteration == 19) memoryAfterWarmup = Process.GetCurrentProcess().PrivateMemorySize64;
+        if (iteration is 19 or 39 or 59)
+            Console.WriteLine($"INFO playback cycle {iteration + 1}: private memory {Process.GetCurrentProcess().PrivateMemorySize64 / 1024} KiB");
+    }
+    var growth = Process.GetCurrentProcess().PrivateMemorySize64 - memoryAfterWarmup;
+    if (growth > 96L * 1024 * 1024) throw new Exception("Repeated playback exceeded memory growth allowance.");
+    Console.WriteLine($"PASS 60 production opens, rapid seeks and cleanup; private memory delta {growth / 1024} KiB after warmup");
 }
 
 static async Task VerifyBlockedOpenCancellation(string path, bool body)

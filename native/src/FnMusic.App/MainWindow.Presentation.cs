@@ -140,6 +140,7 @@ public sealed partial class MainWindow
     }
     private void UpdateLyricsPosition()
     {
+        if (!mediaReady) return;
         int index = currentLyrics.FindLine(music.Player.PlaybackSession.Position.TotalSeconds);
         if (index == activeLyric) return;
         activeLyric = index; LyricsList.SelectedIndex = index;

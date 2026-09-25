@@ -331,6 +331,13 @@ public sealed partial class MainWindow
     private void UpdateProgress()
     {
         if (closed) return;
+        if (!mediaReady)
+        {
+            updatingProgress = true;
+            try { SeekSlider.IsEnabled = false; SeekSlider.Value = 0; PlaybackTime.Text = "00:00 / 00:00"; }
+            finally { updatingProgress = false; }
+            return;
+        }
         UpdateLyricsPosition();
         var session = music.Player.PlaybackSession;
         double duration = session.NaturalDuration.TotalSeconds;
