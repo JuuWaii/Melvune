@@ -50,6 +50,63 @@ await Test("theme settings persist all modes and reject corrupt or unknown prefe
     }
     return Task.CompletedTask;
 });
+await Test("local playlists retain cross-source references, ordering and reject stale writes", async () =>
+{
+    string directory = Path.Combine(Path.GetTempPath(), "fnmusic-playlists-" + Guid.NewGuid().ToString("N"));
+    var store = new LocalPlaylistStore(directory);
+    try
+    {
+        var empty = await store.LoadAsync();
+        Check(empty.Revision == 0 && empty.Playlists.Count == 0);
+        var first = LocalPlaylistEntry.FromTrack(new MusicTrack("same-id", "第一首", "Artist", 20, false) { SourceInstanceId = Guid.NewGuid() }, "library-a");
+        var second = LocalPlaylistEntry.FromTrack(new MusicTrack("same-id", "第二首", "Artist", 30, false) { SourceInstanceId = Guid.NewGuid() }, "library-b");
+        var playlist = new LocalPlaylist(Guid.NewGuid(), "跨库歌单", [first, second]);
+        var saved = await store.SaveAsync(empty with { Playlists = [playlist] });
+        var reloaded = await new LocalPlaylistStore(directory).LoadAsync();
+        Check(reloaded.Revision == 1 && reloaded.Playlists[0].Entries.SequenceEqual(playlist.Entries));
+        Check(reloaded.Playlists[0].Entries[1].ToTrack().Reference == second.Track);
+        var reordered = saved with { Playlists = [playlist with { Entries = [second, first] }] };
+        var updated = await store.SaveAsync(reordered);
+        try { await store.SaveAsync(saved); throw new Exception("Stale write accepted"); }
+        catch (PlaylistConflictException) { }
+        Check((await store.LoadAsync()).Playlists[0].Entries[0].Id == second.Id);
+        // No provider is connected: references and snapshot metadata must remain intact.
+        Check((await store.LoadAsync()).Playlists[0].Entries.Count == 2);
+        var stale = updated;
+        var concurrent = new[] { new LocalPlaylistStore(directory), new LocalPlaylistStore(directory) };
+        int successes = 0, conflicts = 0;
+        await Task.WhenAll(concurrent.Select(async writer =>
+        {
+            try { await writer.SaveAsync(stale); Interlocked.Increment(ref successes); }
+            catch (PlaylistConflictException) { Interlocked.Increment(ref conflicts); }
+        }));
+        Check(successes == 1 && conflicts == 1);
+        var beforeInvalid = await store.LoadAsync();
+        try
+        {
+            await store.SaveAsync(beforeInvalid with { Playlists = [playlist with { Entries = [first, first] }] });
+            throw new Exception("Duplicate reference accepted");
+        }
+        catch (InvalidDataException) { }
+        Check((await store.LoadAsync()).Revision == beforeInvalid.Revision);
+        using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+        try { await store.SaveAsync(beforeInvalid, cancelled.Token); throw new Exception("Cancellation ignored"); }
+        catch (OperationCanceledException) { }
+        Check(Directory.GetFiles(directory, "*.tmp").Length == 0);
+        File.WriteAllText(Path.Combine(directory, "local-playlists.json"), "{\"Version\":99}");
+        try { await store.SaveAsync(beforeInvalid); throw new Exception("Corrupt store overwritten"); }
+        catch (InvalidDataException) { }
+        Check(File.ReadAllText(Path.Combine(directory, "local-playlists.json")).Contains("99"));
+    }
+    finally
+    {
+        if (Directory.Exists(directory))
+        {
+            foreach (var file in Directory.GetFiles(directory)) File.Delete(file);
+            Directory.Delete(directory);
+        }
+    }
+});
 await Test("PCM slow input publishes partial data and isolates cancelled seeks", async () =>
 {
     using var input = new PausingPcmStream();
