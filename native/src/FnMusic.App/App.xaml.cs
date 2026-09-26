@@ -9,6 +9,10 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-native-settings-write"))
+        { RunSettingsWriteVerification(); return; }
+        if (Environment.GetCommandLineArgs().Contains("--verify-native-settings"))
+        { RunSettingsVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-playlist-write"))
         { RunPlaylistWriteVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-playlists"))
@@ -31,6 +35,10 @@ public partial class App : Application
         window.Activate();
     }
 #if DEBUG
+    private async void RunSettingsWriteVerification()
+    { await Services.SettingsWriteVerification.RunAsync(); Exit(); }
+    private async void RunSettingsVerification()
+    { await Services.SettingsVerification.RunAsync(); Exit(); }
     private async void RunPlaylistWriteVerification()
     { await Services.PlaylistWriteVerification.RunAsync(); Exit(); }
     private async void RunPlaylistVerification()

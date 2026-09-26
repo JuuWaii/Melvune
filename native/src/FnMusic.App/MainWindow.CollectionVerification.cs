@@ -215,6 +215,7 @@ public sealed partial class MainWindow
             await VerifyLocalPlaylistWindowAsync(Verify, TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
             await VerifyMultiLibraryWindowAsync(Verify);
             await VerifyNasPlaylistWindowAsync(Verify);
+            await VerifyNasSettingsWindowAsync(Verify);
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; }

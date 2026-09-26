@@ -214,6 +214,60 @@ await Test("cover retrieval rejects redirects and non-images", async () =>
     }));
     Check((await image.GetCoverAsync("a&b", default))!.SequenceEqual(new byte[] { 1, 2, 3 }));
 });
+await Test("NAS settings preserve language, scope writes and detect remote changes", async () =>
+{
+    Guid source = Guid.NewGuid(); bool admin = true, autoLyric = false; string server = "original", metadata = "local_only", mode = "none";
+    string[] accessIds = []; int writes = 0;
+    object Library() => new { guid = "lib&a", name = "library", path = "/music/library", autoDownloadLyric = autoLyric, metadataPreference = metadata };
+    using var api = new NasApiClient(endpoint, new FakeHandler(request =>
+    {
+        string path = request.RequestUri!.AbsolutePath; object? data;
+        if (request.Method == HttpMethod.Post)
+        {
+            writes++;
+            using var body = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            var root = body.RootElement;
+            if (path.EndsWith("settings/server")) { Check(root.GetProperty("lang").GetString() == "zh-CN"); server = root.GetProperty("name").GetString()!; }
+            if (path.EndsWith("shared-library/edit"))
+            {
+                Check(root.GetProperty("guid").GetString() == "lib&a" && root.GetProperty("path").GetString() == "/music/library");
+                autoLyric = root.GetProperty("autoDownloadLyric").GetBoolean(); metadata = root.GetProperty("metadataPreference").GetString()!;
+            }
+            if (path.EndsWith("settings/user"))
+            {
+                var access = root.GetProperty("defaultSharedLibraryAccess"); mode = access.GetProperty("mode").GetString()!;
+                accessIds = access.GetProperty("guids").EnumerateArray().Select(value => value.GetString()!).ToArray();
+            }
+            data = null;
+        }
+        else if (path.EndsWith("user/me")) data = new { role = admin ? "admin" : "member" };
+        else if (path.EndsWith("settings/server")) data = new { name = server, lang = "zh-CN" };
+        else if (path.EndsWith("settings/user")) data = new { defaultSharedLibraryAccess = new { mode, sharedLibraries = accessIds.Select(id => new { guid = id }) } };
+        else if (path.EndsWith("shared-library/detail")) { Check(request.RequestUri.Query == "?guid=lib%26a"); data = Library(); }
+        else data = new { list = new[] { Library() } };
+        return Json(JsonSerializer.Serialize(new { code = 0, data }));
+    }), source);
+    var original = await api.GetServerSettingsAsync(default);
+    var updated = await api.RenameServerAsync(original, "renamed", default); Check(updated.Name == "renamed" && updated.Language == "zh-CN");
+    int beforeConflict = writes;
+    try { await api.RenameServerAsync(original, "stale", default); throw new Exception("Stale settings accepted"); } catch (RemoteSettingsConflictException) { }
+    Check(writes == beforeConflict);
+    var library = (await api.ListSharedLibrariesAsync(default)).Single();
+    var changed = await api.UpdateSharedLibraryAsync(library, true, "local_preferred", default);
+    Check(changed.AutoDownloadLyric && changed.MetadataPreference == "local_preferred" && changed.Path == library.Path);
+    try { await api.UpdateSharedLibraryAsync(library, false, "local_only", default); throw new Exception("Stale library accepted"); } catch (RemoteSettingsConflictException) { }
+    var access = await api.GetDefaultLibraryAccessAsync(default);
+    var partial = await api.UpdateDefaultLibraryAccessAsync(access, "partial", [library.Library], default);
+    Check(partial.Mode == "partial" && partial.LibraryIds.Single() == library.Library.Id);
+    var all = await api.UpdateDefaultLibraryAccessAsync(partial, "all", [library.Library], default);
+    Check(all.Mode == "all" && accessIds.Length == 0);
+    beforeConflict = writes;
+    await Fails(MusicFailure.Rejected, () => api.UpdateSharedLibraryAsync(changed with { Library = library.Library with { SourceInstanceId = Guid.NewGuid() } }, false, "local_only", default));
+    admin = false;
+    await Fails(MusicFailure.Rejected, () => api.RenameServerAsync(updated, "forbidden", default));
+    Check(writes == beforeConflict);
+});
+
 await Test("NAS playlist mutations verify readback and reject foreign sources and stale snapshots", async () =>
 {
     Guid source = Guid.NewGuid(); string name = "initial"; long version = 1; bool exists = true, ignoreWrites = false;

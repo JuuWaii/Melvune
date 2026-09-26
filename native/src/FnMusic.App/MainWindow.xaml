@@ -75,6 +75,7 @@
     <TextBlock x:Name="LocalScanStatus" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
     <Button x:Name="CancelLocalScan" Content="取消扫描" Visibility="Collapsed" Click="CancelLocalScan_Click" />
     <Button Content="连接与账号" Click="Settings_Click" />
+    <Button Content="飞牛素材库与设置" Click="NasSettings_Click" />
     <ComboBox x:Name="ThemePicker" Header="外观" AutomationProperties.Name="外观模式" HorizontalAlignment="Stretch" SelectionChanged="Theme_Changed">
      <ComboBoxItem Content="跟随系统"/><ComboBoxItem Content="浅色"/><ComboBoxItem Content="深色"/>
     </ComboBox>
