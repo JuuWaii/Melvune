@@ -70,6 +70,7 @@
     <Button Content="本地音乐" Click="LocalMusic_Click" />
     <Button Content="本地歌单" Click="LocalPlaylists_Click" />
     <Button Content="导入文件夹" Click="ImportLocal_Click" />
+    <Button Content="音乐库管理" Click="ManageLocalLibraries_Click" />
     <TextBlock x:Name="LocalScanStatus" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
     <Button x:Name="CancelLocalScan" Content="取消扫描" Visibility="Collapsed" Click="CancelLocalScan_Click" />
     <Button Content="连接与账号" Click="Settings_Click" />
@@ -117,6 +118,7 @@
      <Button x:Name="CollectionOpen" Content="查看详情" Click="CollectionOpen_Click" Visibility="Collapsed"/>
      <Button x:Name="ArtistAlbums" Content="歌手专辑" Click="ArtistAlbums_Click" Visibility="Collapsed"/>
     </StackPanel></ScrollViewer>
+    <Grid x:Name="LocalLibraryFilters" Visibility="Collapsed" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="LocalGroupFilter" Header="分组" HorizontalAlignment="Stretch" SelectionChanged="LocalFilter_Changed"/><ComboBox x:Name="LocalLibraryFilter" Grid.Column="1" Header="音乐库" DisplayMemberPath="Name" HorizontalAlignment="Stretch" SelectionChanged="LocalFilter_Changed"/></Grid>
     <TextBlock x:Name="CollectionHeading" TextWrapping="Wrap" Visibility="Collapsed"/>
     <Grid ColumnSpacing="8">
      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
@@ -142,7 +144,7 @@
     <ListView.ItemTemplate><DataTemplate>
      <Grid Padding="8" ColumnSpacing="16" Background="Transparent" DoubleTapped="Track_DoubleTapped">
       <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions><Border Width="44" Height="44" CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="20"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
-      <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Artist}" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+      <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding BrowseArtist}" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
       <TextBlock Grid.Column="2" Text="{Binding Album}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding DisplayDuration}" HorizontalAlignment="Right"/>
      </Grid>
     </DataTemplate></ListView.ItemTemplate>

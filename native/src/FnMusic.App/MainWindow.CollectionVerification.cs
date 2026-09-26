@@ -213,6 +213,7 @@ public sealed partial class MainWindow
                 && LocalScanStatus.Text.Contains("已取消") && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));
             SearchInput.Text = "000-playback"; await SearchAsync();
             await VerifyLocalPlaylistWindowAsync(Verify, TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
+            await VerifyMultiLibraryWindowAsync(Verify);
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; }

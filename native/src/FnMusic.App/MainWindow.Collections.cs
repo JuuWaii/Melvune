@@ -15,6 +15,7 @@ public sealed partial class MainWindow
     private void UpdateCollectionView()
     {
         RevealBrowseContent();
+        LocalLibraryFilters.Visibility = localView ? Visibility.Visible : Visibility.Collapsed;
         bool listing = collectionKind is not null && collection is null;
         CollectionList.Visibility = CollectionOpen.Visibility = listing ? Visibility.Visible : Visibility.Collapsed;
         TrackList.Visibility = listing ? Visibility.Collapsed : Visibility.Visible;

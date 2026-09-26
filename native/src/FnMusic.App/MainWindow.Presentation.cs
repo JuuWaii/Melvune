@@ -72,7 +72,7 @@ public sealed partial class MainWindow
         using var request = CancellationTokenSource.CreateLinkedTokenSource(localLifetime.Token);
         image.Tag = request; request.CancelAfter(TimeSpan.FromSeconds(15)); var ct = request.Token;
         var api = ViewModel.AuthenticatedClient;
-        var source = localSource;
+        var source = context is MusicTrack localContext ? localSources.GetValueOrDefault(localContext.SourceInstanceId) : null;
         string? coverId = context is MusicTrack track ? track.CoverId : context is MusicCollection album ? album.CoverId : null;
         string? key = context is MusicTrack song && source?.Source.Id == song.SourceInstanceId ? "local:" + song.Reference
             : api is not null && !string.IsNullOrEmpty(coverId) && (context is not MusicTrack remote || remote.SourceInstanceId == api.SourceInstanceId)
@@ -133,7 +133,7 @@ public sealed partial class MainWindow
                 result = Lyrics.Parse("[00:00.00]合成歌词验证\n[00:10.00]播放进度同步\n[00:20.00]点击歌词可跳转");
             else
 #endif
-            if (localSource?.Source.Id == track.SourceInstanceId) result = await localSource.GetLyricsAsync(track.Reference, ct);
+            if (localSources.TryGetValue(track.SourceInstanceId, out var source)) result = await source.GetLyricsAsync(track.Reference, ct);
             else if (ViewModel.AuthenticatedClient is { } api && api.SourceInstanceId == track.SourceInstanceId) result = await api.GetLyricsAsync(track.Reference, ct);
             else result = Lyrics.Empty;
             if (ct.IsCancellationRequested || closed) return;

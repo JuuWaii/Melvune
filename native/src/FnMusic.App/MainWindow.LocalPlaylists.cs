@@ -17,8 +17,8 @@ public sealed partial class MainWindow
     private bool PlaylistTrackAvailable(LocalPlaylistEntry entry)
     {
         if (entry.IsCue || !ViewModel.PlaybackRouter.CanPlay(entry.Track)) return false;
-        if (localSource?.Source.Id != entry.Track.SourceInstanceId) return true;
-        try { return File.Exists(localSource.GetFilePath(entry.Track)); }
+        if (!localSources.TryGetValue(entry.Track.SourceInstanceId, out var source)) return true;
+        try { return File.Exists(source.GetFilePath(entry.Track)); }
         catch (Exception) { return false; }
     }
 
@@ -26,7 +26,7 @@ public sealed partial class MainWindow
     {
         if (playlistDialogOpen || closed) return;
         playlistDialogOpen = true;
-        try { await ShowLocalPlaylistsAsync(); }
+        try { await RestoreLocalSourcesAsync(localLifetime.Token); await ShowLocalPlaylistsAsync(); }
         catch (OperationCanceledException) { }
         catch (Exception) { if (!closed) PlaybackStatus.Text = "本地歌单无法读取，原文件已保留。"; }
         finally { playlistDialogOpen = false; }
@@ -137,7 +137,8 @@ public sealed partial class MainWindow
         {
             if (Selected() is not { } current || pickedTrack is null || pickedTrack.SourceInstanceId == Guid.Empty) return;
             if (current.Entries.Any(entry => entry.Track == pickedTrack.Reference)) { status.Text = "该歌曲已在歌单中。"; return; }
-            var entry = LocalPlaylistEntry.FromTrack(pickedTrack);
+            var entry = LocalPlaylistEntry.FromTrack(pickedTrack,
+                localCatalog.Libraries.Any(item => item.SourceId == pickedTrack.SourceInstanceId) ? pickedTrack.SourceInstanceId.ToString("N") : null);
             await Replace(current, current.Entries.Append(entry).ToArray(), entry.Id);
         };
         remove.Click += async (_, _) =>

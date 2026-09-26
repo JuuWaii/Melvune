@@ -1,0 +1,65 @@
+#if DEBUG
+using FnMusic.Core;
+using FnMusic.Infrastructure;
+using Microsoft.UI.Xaml;
+
+namespace FnMusic.App;
+public sealed partial class MainWindow
+{
+    private async Task VerifyMultiLibraryWindowAsync(Action<string, bool> verify)
+    {
+        var libraries = new List<LocalLibrary>();
+        for (int i = 0; i < 2; i++)
+        {
+            string root = Path.Combine(AppContext.BaseDirectory, "multi-library-fixture", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(root);
+            using (var wave = Services.PlaybackVerification.CreateWave())
+            using (var file = File.Create(Path.Combine(root, "same.wav"))) await wave.CopyToAsync(file);
+            await File.WriteAllTextAsync(Path.Combine(root, "same.lrc"), "[00:00]音乐库" + i);
+            libraries.Add(new(Guid.NewGuid(), root, "音乐库" + i, "分组" + i));
+        }
+        var saved = await localLibraryStore.LoadAsync();
+        saved = await localLibraryStore.SaveAsync(saved with { Libraries = libraries });
+        ApplyLocalCatalog(saved);
+        selectedLocalLibrary = null; selectedLocalGroup = null;
+        await ShowLocalMusicAsync();
+        var tracks = ((IEnumerable<MusicTrack>)TrackList.ItemsSource).ToArray();
+        verify("multiple_libraries_same_id_isolated", total == 2 && tracks[0].Id == tracks[1].Id && tracks[0].Reference != tracks[1].Reference);
+        verify("multiple_library_source_labels", tracks.All(track => !string.IsNullOrWhiteSpace(track.SourceLabel)));
+        LocalGroupFilter.SelectedIndex = 2;
+        for (int i = 0; i < 60 && total != 1; i++) await Task.Delay(50);
+        verify("library_group_filter", total == 1 && ((MusicTrack)TrackList.SelectedItem).SourceInstanceId == libraries[1].SourceId);
+        LocalGroupFilter.SelectedIndex = 0;
+        for (int i = 0; i < 60 && total != 2; i++) await Task.Delay(50);
+        verify("library_all_groups_restored", total == 2);
+        var entries = tracks.Select(track => LocalPlaylistEntry.FromTrack(track, track.SourceInstanceId.ToString("N"))).ToArray();
+        var playlist = new LocalPlaylist(Guid.NewGuid(), "跨库窗口夹具", entries);
+        var catalog = await playlistStore.LoadAsync();
+        await playlistStore.SaveAsync(catalog with { Playlists = [playlist] });
+        await PlayLocalPlaylistAsync(playlist, entries[0]);
+        for (int i = 0; i < 80 && !mediaReady; i++) await Task.Delay(100);
+        var audio = music.Player.Source;
+        ResetLibrary();
+        verify("nas_reset_preserves_multi_library_queue", queue.Count == 2 && mediaReady && ReferenceEquals(audio, music.Player.Source));
+        await PlayTrackAsync(queue.Next(false) ?? throw new InvalidOperationException());
+        for (int i = 0; i < 80 && !mediaReady; i++) await Task.Delay(100);
+        verify("cross_library_next_lyrics", mediaReady && currentLyrics.Lines.Count == 1 && currentLyrics.Lines[0].Text == "音乐库1");
+        Stop_Click(this, new RoutedEventArgs());
+        // Recreate registrations from disk, as after restart. Stable IDs keep playlist references usable.
+        foreach (var id in localSources.Keys.ToArray()) ViewModel.PlaybackRouter.Unregister(id);
+        localSources.Clear(); localCatalogLoaded = false;
+        await RestoreLocalSourcesAsync(default);
+        var reloaded = (await playlistStore.LoadAsync()).Playlists.Single();
+        verify("multi_library_playlist_restart_restore", reloaded.Entries.All(PlaylistTrackAvailable) && localSources.Count == 2);
+        var unavailable = libraries[1] with { Directory = Path.Combine(libraries[1].Directory, "missing") };
+        ApplyLocalCatalog(saved with { Libraries = [libraries[0], unavailable] });
+        await RestoreLocalSourcesAsync(default);
+        verify("missing_library_keeps_playlist_reference", !PlaylistTrackAvailable(entries[1]) && (await playlistStore.LoadAsync()).Playlists.Single().Entries.Count == 2);
+        ApplyLocalCatalog(saved);
+        await RestoreLocalSourcesAsync(default);
+        verify("library_reassociated_same_identity", PlaylistTrackAvailable(entries[1]));
+        ApplyLocalCatalog(saved with { Libraries = [libraries[0]] });
+        verify("library_remove_preserves_other_source", localSources.Count == 1 && PlaylistTrackAvailable(entries[0]) && !PlaylistTrackAvailable(entries[1]) && (await playlistStore.LoadAsync()).Playlists.Single().Entries.Count == 2);
+    }
+}
+#endif

@@ -14,6 +14,7 @@ public sealed record LocalMusicMetadata(string Title, string Artist, double Dura
 public sealed class LocalMusicSource : IMusicPlaybackSource
 {
     private readonly Dictionary<string, string> files;
+    private readonly Dictionary<string, (long Size, long Modified, LocalMusicMetadata Metadata)> metadataCache = [];
     public MusicSource Source { get; }
     public IReadOnlyList<MusicTrack> Tracks { get; }
     public LocalMusicSettings Settings { get; }
@@ -27,7 +28,8 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
     }
 
     public static Task<LocalMusicSource> ScanAsync(LocalMusicSettings settings, CancellationToken ct,
-        Func<string, CancellationToken, Task<LocalMusicMetadata>>? readMetadata = null, IProgress<int>? progress = null) => Task.Run(async () =>
+        Func<string, CancellationToken, Task<LocalMusicMetadata>>? readMetadata = null, IProgress<int>? progress = null,
+        LocalMusicSource? previous = null) => Task.Run(async () =>
     {
         if (settings.SourceId == Guid.Empty || !Path.IsPathFullyQualified(settings.Directory)) throw new ArgumentException("Invalid local library");
         string root = Path.GetFullPath(settings.Directory);
@@ -35,6 +37,9 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
         EnsureRegularPath(root);
         var files = new Dictionary<string, string>();
         var tracks = new List<MusicTrack>();
+        var cache = new Dictionary<string, (long Size, long Modified, LocalMusicMetadata Metadata)>();
+        bool reuse = previous is not null && previous.Source.Id == settings.SourceId && string.Equals(
+            LocalLibraryStore.NormalizePath(previous.Settings.Directory), LocalLibraryStore.NormalizePath(root), StringComparison.OrdinalIgnoreCase);
         progress?.Report(0);
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
         foreach (string file in Directory.EnumerateFiles(root, "*", options))
@@ -51,11 +56,16 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
                 try
                 {
                     EnsureRegularPath(file);
-                    var metadata = await readMetadata(file, ct).ConfigureAwait(false);
+                    var info = new FileInfo(file);
+                    long size = info.Length, modified = info.LastWriteTimeUtc.Ticks;
+                    var metadata = reuse && previous!.metadataCache.TryGetValue(id, out var cached) && cached.Size == size && cached.Modified == modified
+                        ? cached.Metadata : await readMetadata(file, ct).ConfigureAwait(false);
                     if (!string.IsNullOrWhiteSpace(metadata.Title)) title = metadata.Title;
                     if (!string.IsNullOrWhiteSpace(metadata.Artist)) artist = metadata.Artist;
                     album = metadata.Album;
                     if (double.IsFinite(metadata.DurationSeconds) && metadata.DurationSeconds > 0) duration = Math.Min(metadata.DurationSeconds, 864000);
+                    info.Refresh();
+                    if (info.Exists && info.Length == size && info.LastWriteTimeUtc.Ticks == modified) cache[id] = (size, modified, metadata);
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception) { /* 不支持的标签不能阻止文件被浏览和播放。 */ }
@@ -67,7 +77,9 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
         ct.ThrowIfCancellationRequested();
         progress?.Report(tracks.Count);
         tracks.Sort((a, b) => { int title = StringComparer.OrdinalIgnoreCase.Compare(a.Title, b.Title); return title != 0 ? title : StringComparer.Ordinal.Compare(a.Id, b.Id); });
-        return new LocalMusicSource(settings with { Directory = root }, files, tracks);
+        var result = new LocalMusicSource(settings with { Directory = root }, files, tracks);
+        foreach (var entry in cache) result.metadataCache.Add(entry.Key, entry.Value);
+        return result;
     }, ct);
 
     public Task<Stream> OpenAsync(TrackReference track, CancellationToken ct)

@@ -384,8 +384,8 @@ public sealed partial class MainWindow
         favoriteWork.Cancel(); favoriteWork.Dispose(); favoriteWork = new();
         favoritesView = false; FavoriteStatus.Text = "";
         // 当前队列全部来自仍连接的本地库时，飞牛会话变化不应打断它。
-        bool preserveLocalQueue = localSource is not null && queue.Count > 0
-            && queue.Tracks.All(track => track.SourceInstanceId == localSource.Source.Id)
+        bool preserveLocalQueue = queue.Count > 0
+            && queue.Tracks.All(track => localSources.ContainsKey(track.SourceInstanceId) && ViewModel.PlaybackRouter.CanPlay(track.Reference))
             && ViewModel.PlaybackRouter.CanPlay(queue.Tracks[0].Reference);
         if (!preserveLocalQueue)
         {
@@ -403,5 +403,5 @@ public sealed partial class MainWindow
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
     }
     private void ClosePlayback()
-    { closed = true; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); if (localSource is not null) ViewModel.PlaybackRouter.Unregister(localSource.Source.Id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { closed = true; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

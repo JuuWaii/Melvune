@@ -108,6 +108,44 @@ await Test("local playlists retain cross-source references, ordering and reject 
         }
     }
 });
+await Test("local library catalog migrates identities and preserves libraries across conflicts and corruption", async () =>
+{
+    string directory = Path.Combine(Path.GetTempPath(), "fnmusic-libraries-" + Guid.NewGuid().ToString("N"));
+    var store = new LocalLibraryStore(directory);
+    try
+    {
+        var legacy = new LocalMusicSettings(Guid.NewGuid(), Path.Combine(directory, "old-music"));
+        await new LocalMusicSettingsStore(directory).SaveAsync(legacy, default);
+        var migrated = await store.LoadAsync();
+        Check(migrated.Revision == 0 && migrated.Libraries.Single().SourceId == legacy.SourceId);
+        var added = new LocalLibrary(Guid.NewGuid(), Path.Combine(directory, "second"), "第二库", "收藏");
+        var saved = await store.SaveAsync(migrated with { Libraries = migrated.Libraries.Append(added).ToArray() });
+        var restored = await new LocalLibraryStore(directory).LoadAsync();
+        Check(restored.Libraries.SequenceEqual(saved.Libraries) && restored.Libraries[0].SourceId == legacy.SourceId);
+        var updated = await store.SaveAsync(restored with { Libraries = [restored.Libraries[0] with { Name = "改名", Group = "无损" }, added] });
+        Check(updated.Libraries[0].Settings == legacy);
+        try { await store.SaveAsync(restored); throw new Exception("Stale catalog accepted"); } catch (LocalLibraryConflictException) { }
+        try { await store.SaveAsync(updated with { Libraries = [added, added with { SourceId = Guid.NewGuid(), Directory = added.Directory + Path.DirectorySeparatorChar }] }); throw new Exception("Duplicate path accepted"); } catch (InvalidDataException) { }
+        Check((await store.LoadAsync()).Revision == updated.Revision);
+        var removed = await store.SaveAsync(updated with { Libraries = [] });
+        Check((await store.LoadAsync()).Libraries.Count == 0); // Legacy file must not resurrect removed libraries.
+        using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
+        try { await store.SaveAsync(removed, cancelled.Token); throw new Exception("Cancel ignored"); } catch (OperationCanceledException) { }
+        File.WriteAllText(Path.Combine(directory, "local-libraries.json"), "{\"Version\":99}");
+        try { await store.SaveAsync(removed); throw new Exception("Corrupt catalog overwritten"); } catch (InvalidDataException) { }
+        Check(File.ReadAllText(Path.Combine(directory, "local-libraries.json")).Contains("99"));
+        Check(File.Exists(Path.Combine(directory, "local-music.json")) && Directory.GetFiles(directory, "*.tmp").Length == 0);
+    }
+    finally
+    {
+        if (Directory.Exists(directory))
+        {
+            foreach (var file in Directory.GetFiles(directory)) File.Delete(file);
+            Directory.Delete(directory);
+        }
+    }
+});
+
 await Test("PCM slow input publishes partial data and isolates cancelled seeks", async () =>
 {
     using var input = new PausingPcmStream();
@@ -500,6 +538,39 @@ await Test("local music scans nested audio files with stable identities and open
     Check(missing);
     router.Unregister(settings.SourceId);
 });
+await Test("local incremental scans read changed metadata and retain unchanged identities", async () =>
+{
+    string root = Path.Combine(Path.GetTempPath(), "fnmusic-incremental-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    try
+    {
+        string first = Path.Combine(root, "first.wav"), second = Path.Combine(root, "second.wav");
+        await File.WriteAllBytesAsync(first, [1]); await File.WriteAllBytesAsync(second, [2]);
+        var settings = new LocalMusicSettings(Guid.NewGuid(), root);
+        int reads = 0;
+        Task<LocalMusicMetadata> Read(string path, CancellationToken ct)
+        { reads++; return Task.FromResult(new LocalMusicMetadata(Path.GetFileNameWithoutExtension(path), "artist", 10)); }
+        var initial = await LocalMusicSource.ScanAsync(settings, default, Read);
+        Check(reads == 2);
+        var unchanged = await LocalMusicSource.ScanAsync(settings, default, Read, previous: initial);
+        Check(reads == 2 && unchanged.Tracks.Select(t => t.Reference).SequenceEqual(initial.Tracks.Select(t => t.Reference)));
+        await File.AppendAllTextAsync(first, "changed");
+        var changed = await LocalMusicSource.ScanAsync(settings, default, Read, previous: unchanged);
+        Check(reads == 3 && changed.Tracks.Count == 2);
+        File.Delete(second); await File.WriteAllBytesAsync(Path.Combine(root, "third.wav"), [3]);
+        var refreshed = await LocalMusicSource.ScanAsync(settings, default, Read, previous: changed);
+        Check(reads == 4 && refreshed.Tracks.Count == 2 && refreshed.Tracks.All(t => t.Title != "second"));
+        Check(refreshed.Tracks.Single(t => t.Title == "first").Reference == initial.Tracks.Single(t => t.Title == "first").Reference);
+        await LocalMusicSource.ScanAsync(settings with { SourceId = Guid.NewGuid() }, default, Read, previous: refreshed);
+        Check(reads == 6);
+    }
+    finally
+    {
+        foreach (var file in Directory.GetFiles(root)) File.Delete(file);
+        Directory.Delete(root);
+    }
+});
+
 await Test("local metadata enriches tracks without changing references and falls back on invalid tags", async () =>
 {
     string directory = Path.Combine(testDirectory, "metadata"); Directory.CreateDirectory(directory);
