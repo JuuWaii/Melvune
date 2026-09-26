@@ -58,12 +58,13 @@ await Test("local playlists retain cross-source references, ordering and reject 
     {
         var empty = await store.LoadAsync();
         Check(empty.Revision == 0 && empty.Playlists.Count == 0);
-        var first = LocalPlaylistEntry.FromTrack(new MusicTrack("same-id", "第一首", "Artist", 20, false) { SourceInstanceId = Guid.NewGuid() }, "library-a");
+        var first = LocalPlaylistEntry.FromTrack(new MusicTrack("same-id", "第一首", "Artist", 20, false) { SourceInstanceId = Guid.NewGuid(), CoverId = "cover-a" }, "library-a");
         var second = LocalPlaylistEntry.FromTrack(new MusicTrack("same-id", "第二首", "Artist", 30, false) { SourceInstanceId = Guid.NewGuid() }, "library-b");
         var playlist = new LocalPlaylist(Guid.NewGuid(), "跨库歌单", [first, second]);
         var saved = await store.SaveAsync(empty with { Playlists = [playlist] });
         var reloaded = await new LocalPlaylistStore(directory).LoadAsync();
         Check(reloaded.Revision == 1 && reloaded.Playlists[0].Entries.SequenceEqual(playlist.Entries));
+        Check(reloaded.Playlists[0].Entries[0].ToTrack().CoverId == "cover-a");
         Check(reloaded.Playlists[0].Entries[1].ToTrack().Reference == second.Track);
         var reordered = saved with { Playlists = [playlist with { Entries = [second, first] }] };
         var updated = await store.SaveAsync(reordered);

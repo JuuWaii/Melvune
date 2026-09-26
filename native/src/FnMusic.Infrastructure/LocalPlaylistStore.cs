@@ -76,6 +76,7 @@ public sealed class LocalPlaylistStore(string directory)
                     entry.Track.SourceInstanceId == Guid.Empty || string.IsNullOrWhiteSpace(entry.Track.TrackId) || entry.Track.TrackId.Length > 4096 ||
                     !tracks.Add(entry.Track) || !TextValid(entry.Title) || !TextValid(entry.Artist) || !TextValid(entry.Album) ||
                     (entry.LibraryId is not null && entry.LibraryId.Length > 4096) ||
+                    (entry.CoverId is not null && entry.CoverId.Length > 4096) ||
                     !double.IsFinite(entry.DurationSeconds) || entry.DurationSeconds is < 0 or > 864000)
                     throw new InvalidDataException("Invalid playlist entry.");
             }

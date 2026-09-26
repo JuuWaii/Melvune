@@ -211,6 +211,8 @@ public sealed partial class MainWindow
             try { await pendingScan; throw new InvalidOperationException(); } catch (OperationCanceledException) { }
             Verify("local_scan_cancel_preserves_source", ReferenceEquals(localSource, local) && CancelLocalScan.Visibility == Visibility.Collapsed
                 && LocalScanStatus.Text.Contains("已取消") && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));
+            SearchInput.Text = "000-playback"; await SearchAsync();
+            await VerifyLocalPlaylistWindowAsync(Verify, TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; }
