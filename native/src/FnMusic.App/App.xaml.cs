@@ -9,6 +9,10 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-native-playlist-write"))
+        { RunPlaylistWriteVerification(); return; }
+        if (Environment.GetCommandLineArgs().Contains("--verify-native-playlists"))
+        { RunPlaylistVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-presentation"))
         { RunPresentationVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-favorites"))
@@ -27,6 +31,10 @@ public partial class App : Application
         window.Activate();
     }
 #if DEBUG
+    private async void RunPlaylistWriteVerification()
+    { await Services.PlaylistWriteVerification.RunAsync(); Exit(); }
+    private async void RunPlaylistVerification()
+    { await Services.PlaylistVerification.RunAsync(); Exit(); }
     private async void RunPresentationVerification()
     { await Services.PresentationVerification.RunAsync(); Exit(); }
     private async void RunFavoriteVerification()

@@ -69,6 +69,7 @@
     <Button Content="所有音乐" Click="Library_Click" HorizontalAlignment="Stretch"/><Button Content="收藏" Click="SidebarFavorites_Click" HorizontalAlignment="Stretch"/><Button Content="专辑" Click="SidebarAlbums_Click" HorizontalAlignment="Stretch"/><Button Content="歌手" Click="SidebarArtists_Click" HorizontalAlignment="Stretch"/>
     <Button Content="本地音乐" Click="LocalMusic_Click" />
     <Button Content="本地歌单" Click="LocalPlaylists_Click" />
+    <Button Content="飞牛歌单" Click="NasPlaylists_Click" />
     <Button Content="导入文件夹" Click="ImportLocal_Click" />
     <Button Content="音乐库管理" Click="ManageLocalLibraries_Click" />
     <TextBlock x:Name="LocalScanStatus" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />

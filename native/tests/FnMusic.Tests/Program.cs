@@ -214,6 +214,82 @@ await Test("cover retrieval rejects redirects and non-images", async () =>
     }));
     Check((await image.GetCoverAsync("a&b", default))!.SequenceEqual(new byte[] { 1, 2, 3 }));
 });
+await Test("NAS playlist mutations verify readback and reject foreign sources and stale snapshots", async () =>
+{
+    Guid source = Guid.NewGuid(); string name = "initial"; long version = 1; bool exists = true, ignoreWrites = false;
+    var members = new List<string> { "track-a" }; int writes = 0, calls = 0;
+    object Summary() => new { guid = "p&a", name, coverId = (string?)null, updatedAt = version };
+    using var api = new NasApiClient(endpoint, new FakeHandler(request =>
+    {
+        calls++; string route = request.RequestUri!.AbsolutePath.Split('/').Last();
+        if (request.Method == HttpMethod.Post)
+        {
+            writes++;
+            using var body = JsonDocument.Parse(request.Content!.ReadAsStringAsync().GetAwaiter().GetResult());
+            var root = body.RootElement;
+            if (route == "create") { Check(root.GetProperty("coverId").ValueKind == JsonValueKind.Null); name = root.GetProperty("name").GetString()!; exists = true; return Json(JsonSerializer.Serialize(new { code = 0, data = Summary() })); }
+            Check(root.GetProperty("guid").GetString() == "p&a");
+            if (!ignoreWrites)
+            {
+                if (route == "edit") name = root.GetProperty("name").GetString()!;
+                if (route == "delete") exists = false;
+                if (route is "add-track" or "remove-track")
+                    foreach (var id in root.GetProperty("trackGUIDs").EnumerateArray().Select(value => value.GetString()!))
+                        if (route == "add-track") members.Add(id); else members.Remove(id);
+                version++;
+            }
+            return Json("{\"code\":0,\"data\":null}");
+        }
+        if (route == "detail") { Check(request.RequestUri.Query == "?guid=p%26a"); return Json(JsonSerializer.Serialize(new { code = 0, data = Summary() })); }
+        if (request.RequestUri.AbsolutePath.Contains("track/playlist-detail/"))
+        {
+            Check(request.RequestUri.Query == "?playlistGUID=p%26a&page=1&size=100&sort=trackAddedAt%2Casc");
+            return Json(JsonSerializer.Serialize(new { code = 0, data = new { total = members.Count, list = members.Select(id => new { guid = id, title = id, duration = 1000 }) } }));
+        }
+        return Json(JsonSerializer.Serialize(new { code = 0, data = new { list = exists ? new[] { Summary() } : [] } }));
+    }), source);
+    var reference = new PlaylistReference(source, "p&a");
+    var list = await api.ListPlaylistsAsync(default); Check(list.Single().Reference == reference);
+    var snapshot = await api.ReadPlaylistSnapshotAsync(reference, default);
+    Check(snapshot.Tracks.Single().SourceInstanceId == source);
+    int previousCalls = calls;
+    await Fails(MusicFailure.Rejected, () => api.GetPlaylistAsync(new(Guid.NewGuid(), "p&a"), default));
+    await Fails(MusicFailure.Rejected, () => api.ChangePlaylistTracksAsync(snapshot, [new(Guid.NewGuid(), "track-b")], true, default));
+    Check(calls == previousCalls);
+    var renamed = await api.RenamePlaylistAsync(snapshot.Playlist, "改名", default); Check(renamed.Name == "改名");
+    int beforeConflict = writes;
+    try { await api.RenamePlaylistAsync(snapshot.Playlist, "stale", default); throw new Exception("Stale rename accepted"); } catch (RemotePlaylistConflictException) { }
+    Check(writes == beforeConflict);
+    snapshot = await api.ReadPlaylistSnapshotAsync(reference, default);
+    var added = await api.ChangePlaylistTracksAsync(snapshot, [new(source, "track-b")], true, default); Check(added.Tracks.Count == 2);
+    var removed = await api.ChangePlaylistTracksAsync(added, [new(source, "track-a")], false, default); Check(removed.Tracks.Single().Id == "track-b");
+    members.Add("web-added"); // Same timestamp still detects changed membership.
+    beforeConflict = writes;
+    try { await api.DeletePlaylistAsync(removed, default); throw new Exception("Stale delete accepted"); } catch (RemotePlaylistConflictException) { }
+    Check(writes == beforeConflict && exists);
+    ignoreWrites = true;
+    try { await api.RenamePlaylistAsync(removed.Playlist, "not-applied", default); throw new Exception("Missing readback accepted"); } catch (RemotePlaylistConflictException) { }
+    ignoreWrites = false;
+    await api.DeletePlaylistAsync(await api.ReadPlaylistSnapshotAsync(reference, default), default); Check(!exists);
+    Check((await api.CreatePlaylistAsync("新歌单", default)).Name == "新歌单");
+    beforeConflict = calls;
+    try { await api.CreatePlaylistAsync(new string('x', 33), default); throw new Exception("Invalid name accepted"); } catch (ArgumentException) { }
+    Check(calls == beforeConflict);
+});
+await Test("NAS playlist parsing rejects malformed shapes and incomplete pages", async () =>
+{
+    Guid source = Guid.NewGuid();
+    foreach (string payload in new[] { "{\"guid\":\"p\",\"name\":\"n\",\"updatedAt\":\"wrong\"}", "{\"guid\":\"other\",\"name\":\"n\"}", "{\"guid\":\"p\",\"name\":\"n\",\"coverId\":42}" })
+    {
+        using var api = new NasApiClient(endpoint, new FakeHandler(_ => Json("{\"code\":0,\"data\":" + payload + "}")), source);
+        await Fails(MusicFailure.InvalidResponse, () => api.GetPlaylistAsync(new(source, "p"), default));
+    }
+    using var incomplete = new NasApiClient(endpoint, new FakeHandler(request => Json(request.RequestUri!.AbsolutePath.Contains("playlist-detail")
+        ? "{\"code\":0,\"data\":{\"list\":[],\"total\":101}}"
+        : "{\"code\":0,\"data\":{\"guid\":\"p\",\"name\":\"n\"}}")), source);
+    await Fails(MusicFailure.InvalidResponse, () => incomplete.ReadPlaylistSnapshotAsync(new(source, "p"), default));
+});
+
 await Test("favorite list maps state and mutations use explicit scoped bodies", async () =>
 {
     int calls = 0;

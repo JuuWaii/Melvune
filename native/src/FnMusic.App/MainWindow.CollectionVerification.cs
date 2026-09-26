@@ -214,6 +214,7 @@ public sealed partial class MainWindow
             SearchInput.Text = "000-playback"; await SearchAsync();
             await VerifyLocalPlaylistWindowAsync(Verify, TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
             await VerifyMultiLibraryWindowAsync(Verify);
+            await VerifyNasPlaylistWindowAsync(Verify);
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; }
