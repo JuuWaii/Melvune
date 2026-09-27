@@ -67,15 +67,15 @@
     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
     <TextBlock Text="音乐导航" FontWeight="SemiBold" />
     <Button Content="所有音乐" Click="Library_Click" HorizontalAlignment="Stretch"/><Button Content="收藏" Click="SidebarFavorites_Click" HorizontalAlignment="Stretch"/><Button Content="专辑" Click="SidebarAlbums_Click" HorizontalAlignment="Stretch"/><Button Content="歌手" Click="SidebarArtists_Click" HorizontalAlignment="Stretch"/>
-    <Button Content="本地音乐" Click="LocalMusic_Click" />
-    <Button Content="本地歌单" Click="LocalPlaylists_Click" />
-    <Button Content="飞牛歌单" Click="NasPlaylists_Click" />
-    <Button Content="导入文件夹" Click="ImportLocal_Click" />
-    <Button Content="音乐库管理" Click="ManageLocalLibraries_Click" />
+    <Button Content="本地音乐" Click="LocalMusic_Click" HorizontalAlignment="Stretch" />
+    <Button Content="本地歌单" Click="LocalPlaylists_Click" HorizontalAlignment="Stretch" />
+    <Button Content="飞牛歌单" Click="NasPlaylists_Click" HorizontalAlignment="Stretch" />
+    <Button Content="导入文件夹" Click="ImportLocal_Click" HorizontalAlignment="Stretch" />
+    <Button Content="音乐库管理" Click="ManageLocalLibraries_Click" HorizontalAlignment="Stretch" />
     <TextBlock x:Name="LocalScanStatus" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
     <Button x:Name="CancelLocalScan" Content="取消扫描" Visibility="Collapsed" Click="CancelLocalScan_Click" />
-    <Button Content="连接与账号" Click="Settings_Click" />
-    <Button Content="飞牛素材库与设置" Click="NasSettings_Click" />
+    <Button Content="连接与账号" Click="Settings_Click" HorizontalAlignment="Stretch" />
+    <Button Click="NasSettings_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="飞牛素材库与设置"><TextBlock Text="飞牛素材库与设置" TextWrapping="Wrap" TextAlignment="Center" /></Button>
     <ComboBox x:Name="ThemePicker" Header="外观" AutomationProperties.Name="外观模式" HorizontalAlignment="Stretch" SelectionChanged="Theme_Changed">
      <ComboBoxItem Content="跟随系统"/><ComboBoxItem Content="浅色"/><ComboBoxItem Content="深色"/>
     </ComboBox>

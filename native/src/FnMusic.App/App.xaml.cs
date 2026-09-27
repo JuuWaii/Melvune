@@ -9,6 +9,8 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-native-favorites-write"))
+        { RunFavoriteWriteVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-settings-write"))
         { RunSettingsWriteVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-settings"))
@@ -35,6 +37,8 @@ public partial class App : Application
         window.Activate();
     }
 #if DEBUG
+    private async void RunFavoriteWriteVerification()
+    { await Services.FavoriteWriteVerification.RunAsync(); Exit(); }
     private async void RunSettingsWriteVerification()
     { await Services.SettingsWriteVerification.RunAsync(); Exit(); }
     private async void RunSettingsVerification()
