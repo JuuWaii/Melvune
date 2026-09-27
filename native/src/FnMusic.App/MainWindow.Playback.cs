@@ -89,7 +89,7 @@ public sealed partial class MainWindow
 #endif
         SettingsPanel.Visibility = Visibility.Collapsed;
         LibraryPanel.Visibility = Visibility.Visible;
-        await LoadPageAsync(1);
+        await SwitchCollectionAsync(null);
         await LoadDevicesAsync();
     }
     private async void Library_Click(object sender, RoutedEventArgs e) => await ShowLibraryAsync();
@@ -383,16 +383,18 @@ public sealed partial class MainWindow
         coverCache.Clear();
         favoriteWork.Cancel(); favoriteWork.Dispose(); favoriteWork = new();
         favoritesView = false; FavoriteStatus.Text = "";
-        // 当前队列全部来自仍连接的本地库时，飞牛会话变化不应打断它。
-        bool preserveLocalQueue = queue.Count > 0
-            && queue.Tracks.All(track => localSources.ContainsKey(track.SourceInstanceId) && ViewModel.PlaybackRouter.CanPlay(track.Reference))
-            && ViewModel.PlaybackRouter.CanPlay(queue.Tracks[0].Reference);
+        // 只移除旧飞牛来源；混合队列中的本地条目及正在播放的本地流仍可保留。
+        bool preserveLocalQueue = queue.Current is { } current && localSources.ContainsKey(current.SourceInstanceId)
+            && ViewModel.PlaybackRouter.CanPlay(current.Reference);
+        foreach (var track in queue.Tracks.Where(track => !localSources.ContainsKey(track.SourceInstanceId)
+            || !ViewModel.PlaybackRouter.CanPlay(track.Reference)).ToArray()) queue.Remove(track.Reference);
         if (!preserveLocalQueue)
         {
             ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false;
-            queue.Clear(); QueueStatus.Text = "播放队列为空"; NowPlaying.Text = "";
-            PlaybackStatus.Text = localView ? "本地音乐可直接播放。" : "登录后刷新曲库。";
+            NowPlaying.Text = "";
+            PlaybackStatus.Text = queue.Count > 0 ? "旧飞牛播放已停止，本地条目保留在队列中。" : localView ? "本地音乐可直接播放。" : "登录后刷新曲库。";
         }
+        UpdateQueueStatus();
         // 浏览来源与播放来源可以不同；保留本地筛选、分页及正在进行的扫描。
         if (localView) { UpdateFavoriteButton(); return; }
         libraryWork.Cancel();

@@ -40,8 +40,12 @@ public sealed partial class MainWindow
                 await Click("上移");
                 verify("playlist_move_persisted", (await playlistStore.LoadAsync()).Playlists[0].Entries[0].Id == offline.Id);
                 await Click("下移");
+                list.SelectedIndex = 0;
                 await Click("移除歌曲");
                 verify("playlist_remove_persisted", (await playlistStore.LoadAsync()).Playlists[0].Entries.Count == 1);
+                await Click("将所选条目重新关联到列表歌曲");
+                var relinked = (await playlistStore.LoadAsync()).Playlists[0].Entries.Single();
+                verify("playlist_relink_keeps_entry_identity", relinked.Id == offline.Id && relinked.Track == available.Track && dialog.IsPrimaryButtonEnabled);
                 name.Text = "已改名"; await Click("改名");
                 verify("playlist_rename_persisted", (await playlistStore.LoadAsync()).Playlists[0].Name == "已改名");
                 name.Text = "新建夹具"; await Click("新建");

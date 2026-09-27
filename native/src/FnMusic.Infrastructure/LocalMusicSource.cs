@@ -100,9 +100,8 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
         string sidecar = Path.ChangeExtension(GetFilePath(track), ".lrc");
         var bytes = await ReadSidecarAsync(sidecar, 512000, ct);
         if (bytes is null) return Lyrics.Empty;
-        using var stream = new MemoryStream(bytes);
-        using var reader = new StreamReader(stream, new UTF8Encoding(false, true), true);
-        return Lyrics.Parse(await reader.ReadToEndAsync(ct));
+        ct.ThrowIfCancellationRequested();
+        return Lyrics.Parse(LyricsTextDecoder.Decode(bytes));
     }
     public async Task<byte[]?> GetSidecarCoverAsync(TrackReference track, CancellationToken ct)
     {

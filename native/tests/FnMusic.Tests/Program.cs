@@ -650,6 +650,8 @@ await Test("local music scans nested audio files with stable identities and open
     await File.WriteAllTextAsync(Path.Combine(directory, "song.lrc"), "[00:01.50]本地歌词");
     await File.WriteAllBytesAsync(Path.Combine(directory, "song.png"), [7, 8]);
     Check((await source.GetLyricsAsync(sidecarTrack.Reference, default)).Lines.Single() == new LyricLine(1.5, "本地歌词"));
+    await File.WriteAllBytesAsync(Path.Combine(directory, "song.lrc"), CodePagesEncodingProvider.Instance.GetEncoding(54936)!.GetBytes("[00:02]传统编码歌词"));
+    Check((await source.GetLyricsAsync(sidecarTrack.Reference, default)).Lines.Single() == new LyricLine(2, "传统编码歌词"));
     Check((await source.GetSidecarCoverAsync(sidecarTrack.Reference, default))!.SequenceEqual(new byte[] { 7, 8 }));
     await Fails(MusicFailure.Rejected, () => source.GetLyricsAsync(new(Guid.NewGuid(), sidecarTrack.Id), default));
     var router = new MusicPlaybackRouter(); router.Register(source);
@@ -668,6 +670,25 @@ await Test("local music scans nested audio files with stable identities and open
     Check(missing);
     router.Unregister(settings.SourceId);
 });
+await Test("local lyrics decode Unicode and legacy Chinese encodings without replacement characters", () =>
+{
+    const string content = "[00:01.25]中文歌词与翻译\n[00:03]第二句";
+    var legacy = CodePagesEncodingProvider.Instance.GetEncoding(54936)!;
+    foreach (var encoding in new Encoding[] { new UTF8Encoding(false, true), new UTF8Encoding(true, true), new UnicodeEncoding(false, true, true), new UnicodeEncoding(true, true, true), new UTF32Encoding(false, true, true), new UTF32Encoding(true, true, true), legacy })
+    {
+        byte[] bytes = encoding.GetPreamble().Concat(encoding.GetBytes(content)).ToArray();
+        string decoded = LyricsTextDecoder.Decode(bytes);
+        Check(decoded == content && Lyrics.Parse(decoded).Lines.Count == 2 && Lyrics.Parse(decoded).Lines[0].Seconds == 1.25);
+    }
+    foreach (byte[] invalid in new byte[][] { [0xFF], [0xEF, 0xBB, 0xBF, 0xFF], [0xFF, 0xFE, 0], [0], new byte[512001] })
+    {
+        try { LyricsTextDecoder.Decode(invalid); throw new Exception("Invalid lyrics accepted"); }
+        catch (DecoderFallbackException) { }
+        catch (InvalidDataException) { }
+    }
+    return Task.CompletedTask;
+});
+
 await Test("local incremental scans read changed metadata and retain unchanged identities", async () =>
 {
     string root = Path.Combine(Path.GetTempPath(), "fnmusic-incremental-" + Guid.NewGuid().ToString("N"));

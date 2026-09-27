@@ -39,12 +39,19 @@ public sealed partial class MainWindow
         await PlayLocalPlaylistAsync(playlist, entries[0]);
         for (int i = 0; i < 80 && !mediaReady; i++) await Task.Delay(100);
         var audio = music.Player.Source;
+        var remote = new MusicTrack("remote", "断开的飞牛条目", "夹具", 1, false) { SourceInstanceId = Guid.NewGuid() };
+        queue.Replace([tracks[0], remote, tracks[1]], tracks[0].Reference);
         ResetLibrary();
-        verify("nas_reset_preserves_multi_library_queue", queue.Count == 2 && mediaReady && ReferenceEquals(audio, music.Player.Source));
+        verify("nas_reset_preserves_multi_library_queue", queue.Count == 2 && mediaReady && ReferenceEquals(audio, music.Player.Source)
+            && queue.Tracks.All(track => localSources.ContainsKey(track.SourceInstanceId)));
         await PlayTrackAsync(queue.Next(false) ?? throw new InvalidOperationException());
         for (int i = 0; i < 80 && !mediaReady; i++) await Task.Delay(100);
         verify("cross_library_next_lyrics", mediaReady && currentLyrics.Lines.Count == 1 && currentLyrics.Lines[0].Text == "音乐库1");
         Stop_Click(this, new RoutedEventArgs());
+        queue.Replace([remote, tracks[0]], remote.Reference);
+        ResetLibrary();
+        verify("nas_reset_stops_remote_keeps_local_entries", queue.Count == 1 && queue.Current is null && !mediaReady
+            && queue.Tracks[0].Reference == tracks[0].Reference);
         // Recreate registrations from disk, as after restart. Stable IDs keep playlist references usable.
         foreach (var id in localSources.Keys.ToArray()) ViewModel.PlaybackRouter.Unregister(id);
         localSources.Clear(); localCatalogLoaded = false;

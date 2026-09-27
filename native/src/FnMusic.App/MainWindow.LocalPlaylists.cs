@@ -22,6 +22,13 @@ public sealed partial class MainWindow
         catch (Exception) { return false; }
     }
 
+    private string PlaylistSourceLabel(LocalPlaylistEntry entry)
+    {
+        var library = localCatalog.Libraries.FirstOrDefault(item => item.SourceId == entry.Track.SourceInstanceId);
+        return library is not null ? (library.Group.Length > 0 ? library.Group + " / " : "") + library.Name
+            : ViewModel.AuthenticatedClient?.SourceInstanceId == entry.Track.SourceInstanceId ? "飞牛音乐" : "离线来源";
+    }
+
     private async void LocalPlaylists_Click(object sender, RoutedEventArgs e)
     {
         if (playlistDialogOpen || closed) return;
@@ -53,8 +60,12 @@ public sealed partial class MainWindow
         var refresh = new Button { Content = "刷新" };
         foreach (var button in new[] { create, rename, delete, refresh }) catalogButtons.Children.Add(button);
         panel.Children.Add(catalogButtons); panel.Children.Add(confirmDelete);
+        panel.Children.Add(new TextBlock { Text = pickedTrack is null ? "曲目列表尚未选择歌曲。" : "列表中所选歌曲：" + pickedTrack.Title + " · " + pickedTrack.Artist, TextWrapping = TextWrapping.Wrap });
         var add = new Button { Content = "加入列表中所选歌曲", IsEnabled = pickedTrack is { SourceInstanceId: var sourceId } && sourceId != Guid.Empty };
+        var relink = new Button { Content = "将所选条目重新关联到列表歌曲" };
         panel.Children.Add(add); panel.Children.Add(list);
+        panel.Children.Add(relink);
+        panel.Children.Add(new TextBlock { Text = "文件移动或改名后，先在曲目列表选中新歌曲，再重新关联歌单条目；保留条目的顺序。", TextWrapping = TextWrapping.Wrap });
         var entryButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var up = new Button { Content = "上移" }; var down = new Button { Content = "下移" }; var remove = new Button { Content = "移除歌曲" };
         foreach (var button in new[] { up, down, remove }) entryButtons.Children.Add(button);
@@ -77,12 +88,13 @@ public sealed partial class MainWindow
             down.IsEnabled = row is not null && list.SelectedIndex < list.Items.Count - 1;
             dialog.IsPrimaryButtonEnabled = !busy && row is not null && PlaylistTrackAvailable(row.Entry);
             add.IsEnabled = current is not null && pickedTrack is not null && pickedTrack.SourceInstanceId != Guid.Empty;
+            relink.IsEnabled = row is not null && add.IsEnabled;
         }
         void ShowEntries()
         {
             var current = Selected(); name.Text = current?.Name ?? ""; confirmDelete.IsChecked = false;
             list.ItemsSource = current?.Entries.Select(entry => new PlaylistRow(entry,
-                $"{(PlaylistTrackAvailable(entry) ? "" : "[离线/不可用] ")}{entry.Title} · {entry.Artist}")).ToArray();
+                $"{(PlaylistTrackAvailable(entry) ? "" : "[离线/不可用] ")}{entry.Title} · {entry.Artist} · {PlaylistSourceLabel(entry)}")).ToArray();
             list.SelectedIndex = list.Items.Count > 0 ? 0 : -1; UpdateButtons();
         }
         void Render(Guid? playlistId = null, Guid? entryId = null)
@@ -145,6 +157,15 @@ public sealed partial class MainWindow
         {
             if (Selected() is { } current && list.SelectedItem is PlaylistRow row)
                 await Replace(current, current.Entries.Where(entry => entry.Id != row.Entry.Id).ToArray());
+        };
+        relink.Click += async (_, _) =>
+        {
+            if (Selected() is not { } current || list.SelectedItem is not PlaylistRow row || pickedTrack is null || pickedTrack.SourceInstanceId == Guid.Empty) return;
+            if (current.Entries.Any(entry => entry.Id != row.Entry.Id && entry.Track == pickedTrack.Reference))
+            { status.Text = "目标歌曲已在此歌单中，请先处理重复条目。"; return; }
+            var replacement = LocalPlaylistEntry.FromTrack(pickedTrack,
+                localCatalog.Libraries.Any(item => item.SourceId == pickedTrack.SourceInstanceId) ? pickedTrack.SourceInstanceId.ToString("N") : null) with { Id = row.Entry.Id };
+            await Replace(current, current.Entries.Select(entry => entry.Id == row.Entry.Id ? replacement : entry).ToArray(), replacement.Id);
         };
         async Task Move(int delta)
         {
