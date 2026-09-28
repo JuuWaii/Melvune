@@ -17,6 +17,7 @@ public sealed partial class MainWindow
         public string ServerName = "服务器夹具", Mode = "none";
         public string[] AccessIds = [];
         public int Writes;
+        public bool TaskExists = true, TaskDone, TaskCancelling;
         public readonly Dictionary<string, (string Path, bool Lyric, string Metadata)> Libraries = new() { ["initial"] = ("/music/initial", false, "cloud_preferred") };
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
@@ -39,12 +40,16 @@ public sealed partial class MainWindow
                     data = Library(id);
                 }
                 if (path.EndsWith("shared-library/delete")) Libraries.Remove(root.GetProperty("guid").GetString()!);
+                if (path.EndsWith("task/cancel")) TaskCancelling = true;
+                if (path.EndsWith("task/retry")) { TaskDone = false; TaskCancelling = false; }
+                if (path.EndsWith("task/delete")) TaskExists = false;
             }
             else if (path.EndsWith("user/me")) data = new { role = Admin ? "admin" : "member" };
             else if (path.EndsWith("settings/server")) data = new { name = ServerName, lang = "zh-CN" };
             else if (path.EndsWith("settings/user")) data = new { defaultSharedLibraryAccess = new { mode = Mode, sharedLibraries = AccessIds.Select(id => new { guid = id }) } };
             else if (path.EndsWith("shared-library/detail")) data = Library(Uri.UnescapeDataString(request.RequestUri.Query[6..]));
             else if (path.EndsWith("shared-library/list")) data = new { list = Libraries.Keys.Select(Library).ToArray() };
+            else if (path.EndsWith("task/list")) data = new { list = TaskExists ? new[] { new { id = "task-1", type = "fileScan", name = "扫描夹具", total = 10, successCount = 3, failCount = 1, canceledCount = 0, done = TaskDone, cancelling = TaskCancelling, canceled = false, retryable = true, createdAt = 1 } } : [] };
             else data = new { list = new[] { new { path = "/music/new" } } };
             return new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { code = 0, data }), Encoding.UTF8, "application/json") };
         }
@@ -62,9 +67,9 @@ public sealed partial class MainWindow
                 var editor = (ScrollViewer)dialog.Content; var panel = (StackPanel)editor.Content;
                 var tabs = panel.Children.OfType<Pivot>().Single();
                 StackPanel Tab(int index) => (StackPanel)((PivotItem)tabs.Items[index]).Content;
-                var library = Tab(0); var server = Tab(1); var access = Tab(2);
+                var library = Tab(0); var server = Tab(1); var access = Tab(2); var tasks = Tab(3);
                 var status = panel.Children.OfType<TextBlock>().Last();
-                var buttons = panel.Children.OfType<Button>().Concat(new[] { library, server, access }.SelectMany(p => p.Children.OfType<Button>())).ToArray();
+                var buttons = panel.Children.OfType<Button>().Concat(new[] { library, server, access, tasks }.SelectMany(p => p.Children.OfType<Button>())).ToArray();
                 async Task Click(string label)
                 {
                     var button = buttons.Single(item => item.Content.ToString() == label);
@@ -100,6 +105,21 @@ public sealed partial class MainWindow
                 var choices = access.Children.OfType<ListView>().Single(); choices.SelectedItems.Add(choices.Items[0]);
                 await Click("保存默认访问范围");
                 verify("nas_settings_default_access", handler.Mode == "partial" && handler.AccessIds.SequenceEqual(new[] { "initial" }));
+                tabs.SelectedIndex = 3; await Task.Delay(150);
+                await Click("刷新后台任务");
+                var taskDetails = tasks.Children.OfType<TextBlock>().First();
+                verify("nas_tasks_running_state", taskDetails.Text.Contains("进行中") && !buttons.Single(button => button.Content.ToString() == "删除任务记录").IsEnabled);
+                ((IToggleProvider)new CheckBoxAutomationPeer(tasks.Children.OfType<CheckBox>().Single()).GetPattern(PatternInterface.Toggle)).Toggle();
+                await Click("取消所选任务");
+                verify("nas_tasks_cancel_pending", taskDetails.Text.Contains("正在取消") && !buttons.Single(button => button.Content.ToString() == "取消所选任务").IsEnabled);
+                handler.TaskDone = true; handler.TaskCancelling = false; await Click("刷新后台任务");
+                verify("nas_tasks_failure_visible", taskDetails.Text.Contains("有失败项"));
+                await Click("重试所选任务");
+                verify("nas_tasks_retry_request", !handler.TaskDone && taskDetails.Text.Contains("进行中"));
+                handler.TaskDone = true; await Click("刷新后台任务");
+                ((IToggleProvider)new CheckBoxAutomationPeer(tasks.Children.OfType<CheckBox>().Single()).GetPattern(PatternInterface.Toggle)).Toggle();
+                await Click("删除任务记录");
+                verify("nas_tasks_delete_record", !handler.TaskExists && taskDetails.Text.Contains("不代表之前的扫描已成功完成"));
                 handler.Admin = false; await Click("刷新飞牛设置");
                 verify("nas_settings_member_readonly", !buttons.Single(button => button.Content.ToString() == "保存默认访问范围").IsEnabled
                     && !buttons.Single(button => button.Content.ToString() == "保存素材库设置").IsEnabled);

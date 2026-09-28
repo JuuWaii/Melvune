@@ -78,6 +78,10 @@ public sealed partial class MainWindow
         panel.Children.Add(role); panel.Children.Add(tabs); panel.Children.Add(refresh); panel.Children.Add(status);
         var editor = new ScrollViewer { Content = panel, MaxHeight = 530 };
         var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "飞牛素材库与设置", Content = editor, CloseButtonText = "关闭" };
+        Action updateTaskButtons = () => { };
+        var tasks = CreateNasTasksPanel(api, ct, () => admin, operation => Run(operation));
+        updateTaskButtons = tasks.UpdateButtons;
+        tabs.Items.Add(new PivotItem { Header = "后台任务", Content = tasks.Panel });
         void UpdateButtons()
         {
             bool known = preference.SelectedIndex >= 0;
@@ -89,6 +93,7 @@ public sealed partial class MainWindow
             serverName.IsEnabled = saveServer.IsEnabled = admin && server is not null;
             mode.IsEnabled = saveAccess.IsEnabled = admin && access is not null;
             accessLibraries.IsEnabled = admin && access is not null && mode.SelectedIndex == 1;
+            updateTaskButtons();
         }
         void RenderSelected()
         {
@@ -126,7 +131,7 @@ public sealed partial class MainWindow
         {
             if (busy || ct.IsCancellationRequested) return;
             busy = true; editor.IsEnabled = false; status.Text = "正在与飞牛同步…";
-            try { await operation(); ct.ThrowIfCancellationRequested(); status.Text = scanRequest ? "扫描请求已提交，请稍后刷新曲库查看结果。" : "已保存或刷新，并与服务器核对。"; }
+            try { await operation(); ct.ThrowIfCancellationRequested(); status.Text = scanRequest ? "扫描请求已提交，请在后台任务页刷新查看状态，完成后刷新曲库。" : "操作已返回；具体结果以当前页面回读状态为准。"; }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
             catch (RemoteSettingsConflictException)
             { selected = null; server = null; access = null; status.Text = "服务端设置已变化或回读不一致，请刷新核对后重试。"; }

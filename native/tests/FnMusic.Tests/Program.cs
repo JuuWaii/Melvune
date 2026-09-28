@@ -15,6 +15,59 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+await Test("NAS tasks validate states, source identity and guarded background actions", async () =>
+{
+    Guid source = Guid.NewGuid(); bool admin = true, done = false, cancelling = false, exists = true;
+    long created = 1; int writes = 0; string? malformed = null;
+    using var api = new NasApiClient(endpoint, new AsyncFakeHandler(async request =>
+    {
+        string path = request.RequestUri!.AbsolutePath;
+        if (request.Method == HttpMethod.Post)
+        {
+            writes++;
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            Check(body.RootElement.EnumerateObject().Count() == 1 && body.RootElement.GetProperty("taskId").GetString() == "scan-1");
+            if (path.EndsWith("task/cancel")) cancelling = true;
+            else if (path.EndsWith("task/retry")) { done = false; cancelling = false; }
+            else if (path.EndsWith("task/delete")) exists = false;
+            else throw new Exception("Unexpected task write");
+        }
+        if (path.EndsWith("task/list") && malformed is not null)
+            return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent("{\"code\":0,\"data\":" + malformed + "}") };
+        object data = path.EndsWith("user/me") ? new { role = admin ? "admin" : "member" } :
+            new { list = exists ? new[] { new { id = "scan-1", type = "fileScan", name = "fixture", total = 10, successCount = 3,
+                failCount = 1, canceledCount = 0, done, cancelling, canceled = false, retryable = true, createdAt = created } } : [] };
+        return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { code = 0, data })) };
+    }), source);
+    var task = (await api.ListBackgroundTasksAsync(default)).Single();
+    Check(task.CanCancel && !task.CanDelete && !task.CanRetry && task.FailCount == 1);
+    await Fails(MusicFailure.Rejected, () => api.ChangeBackgroundTaskAsync(task with { SourceInstanceId = Guid.NewGuid() }, NasTaskAction.Cancel, default));
+    Check(writes == 0);
+    created = 2;
+    try { await api.ChangeBackgroundTaskAsync(task, NasTaskAction.Cancel, default); throw new Exception("Reused task identity accepted"); }
+    catch (RemoteSettingsConflictException) { }
+    Check(writes == 0); created = 1;
+    var canceled = (await api.ChangeBackgroundTaskAsync(task, NasTaskAction.Cancel, default)).Single();
+    Check(canceled.Cancelling && !canceled.CanCancel && !canceled.CanDelete && writes == 1);
+    try { await api.ChangeBackgroundTaskAsync(task, NasTaskAction.Cancel, default); throw new Exception("Duplicate cancel accepted"); }
+    catch (RemoteSettingsConflictException) { }
+    done = true; cancelling = false;
+    task = (await api.ListBackgroundTasksAsync(default)).Single();
+    Check(task.CanRetry && task.CanDelete);
+    admin = false;
+    await Fails(MusicFailure.Rejected, () => api.ChangeBackgroundTaskAsync(task, NasTaskAction.Delete, default));
+    Check(writes == 1); admin = true;
+    Check(!(await api.ChangeBackgroundTaskAsync(task, NasTaskAction.Retry, default)).Single().Done && writes == 2);
+    try { await api.ChangeBackgroundTaskAsync(task, NasTaskAction.Delete, default); throw new Exception("Running task deleted"); }
+    catch (RemoteSettingsConflictException) { }
+    done = true;
+    Check((await api.ChangeBackgroundTaskAsync(task, NasTaskAction.Delete, default)).Count == 0 && writes == 3);
+    foreach (string invalid in new[] { "{}", "[null]", "[{\"id\":\"x\"}]", "{\"list\":false}" })
+    {
+        malformed = invalid;
+        await Fails(MusicFailure.InvalidResponse, () => api.ListBackgroundTasksAsync(default));
+    }
+});
 await Test("theme settings persist all modes and reject corrupt or unknown preferences", () =>
 {
     string directory = Path.Combine(Path.GetTempPath(), "fnmusic-theme-" + Guid.NewGuid().ToString("N"));

@@ -17,6 +17,7 @@ internal static class SettingsVerification
             var api = connection.AuthenticatedClient ?? throw new InvalidOperationException(); checks[stage] = true;
             stage = "account_role"; bool admin = await api.IsAdministratorAsync(timeout.Token); checks[stage] = true;
             stage = "shared_library_list"; var libraries = await api.ListSharedLibrariesAsync(timeout.Token); checks[stage] = true;
+            stage = "background_task_list"; await api.ListBackgroundTasksAsync(timeout.Token); checks[stage] = true;
             if (libraries.Count > 0)
             {
                 stage = "shared_library_detail";
