@@ -32,7 +32,7 @@ public sealed partial class MainWindow
             confirm.Click += (_, _) => dialog.IsSecondaryButtonEnabled = confirm.IsChecked == true && picker.SelectedItem is LocalLibrary;
             picker.SelectedItem = catalog.Libraries.FirstOrDefault(item => item.SourceId == selectedLocalLibrary) ?? catalog.Libraries.FirstOrDefault();
             Select();
-            var result = await dialog.ShowAsync();
+            var result = await ShowThemedDialogAsync(dialog);
             if (closed || result == ContentDialogResult.None || picker.SelectedItem is not LocalLibrary selected) return;
             LocalMusicSource? rescanned = null;
             LocalLibraryCatalog next;

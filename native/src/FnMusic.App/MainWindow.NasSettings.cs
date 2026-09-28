@@ -183,7 +183,7 @@ public sealed partial class MainWindow
 #if DEBUG
             dialog.Opened += (_, _) => settingsDialogOpened?.Invoke(dialog);
 #endif
-            showing = true; await dialog.ShowAsync(); showing = false;
+            showing = true; await ShowThemedDialogAsync(dialog); showing = false;
         }
         finally { ViewModel.SessionChanging -= SessionChanged; lifetime.Cancel(); }
     }

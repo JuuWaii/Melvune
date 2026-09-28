@@ -157,6 +157,7 @@ public sealed partial class MainWindow
             SystemThemeChanged(systemTheme, new object());
             await Task.Delay(100);
             Verify("system_theme_notification_restores_preference", Root.RequestedTheme == systemRequestedTheme);
+            await VerifyDialogThemeAsync(Verify);
             var originalSize = AppWindow.Size;
             AppWindow.Resize(new global::Windows.Graphics.SizeInt32(980, 780));
             var resized = AppWindow.Size;

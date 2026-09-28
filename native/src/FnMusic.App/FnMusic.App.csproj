@@ -25,7 +25,7 @@
   </ItemGroup>
   <Target Name="PublishNativeXamlResources" AfterTargets="Publish">
     <ItemGroup>
-      <NativeXamlResource Include="$(TargetDir)App.xbf;$(TargetDir)MainWindow.xbf;$(TargetDir)$(AssemblyName).pri" />
+      <NativeXamlResource Include="$(TargetDir)App.xbf;$(TargetDir)MainWindow.xbf;$(TargetDir)MonochromeResources.xbf;$(TargetDir)$(AssemblyName).pri" />
     </ItemGroup>
     <Error Condition="!Exists('%(NativeXamlResource.Identity)')" Text="Required WinUI resource is missing: %(NativeXamlResource.Identity)" />
     <Copy SourceFiles="@(NativeXamlResource)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />

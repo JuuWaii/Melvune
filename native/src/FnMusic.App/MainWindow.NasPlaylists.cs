@@ -142,7 +142,7 @@ public sealed partial class MainWindow
             dialog.Opened += (_, _) => nasPlaylistDialogOpened?.Invoke(dialog);
 #endif
             showing = true;
-            var result = await dialog.ShowAsync();
+            var result = await ShowThemedDialogAsync(dialog);
             showing = false;
             if (result == ContentDialogResult.Primary && !ct.IsCancellationRequested && !closed && snapshot is { } selected && list.SelectedItem is MusicTrack start)
             {

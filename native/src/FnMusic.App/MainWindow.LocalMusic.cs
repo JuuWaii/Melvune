@@ -44,7 +44,7 @@ public sealed partial class MainWindow
             panel.Children.Add(browse);
             panel.Children.Add(new TextBlock { Text = "保留已有音乐库。包含子文件夹，每库最多 10000 首；跳过链接和无权限目录。", TextWrapping = TextWrapping.Wrap });
             var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "导入本地音乐库", Content = panel, PrimaryButtonText = "导入", CloseButtonText = "取消" };
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary || closed) return;
+            if (await ShowThemedDialogAsync(dialog) != ContentDialogResult.Primary || closed) return;
             if (!Path.IsPathFullyQualified(input.Text.Trim())) throw new ArgumentException();
             string path = LocalLibraryStore.NormalizePath(input.Text.Trim());
             var saved = await localLibraryStore.LoadAsync(localLifetime.Token);

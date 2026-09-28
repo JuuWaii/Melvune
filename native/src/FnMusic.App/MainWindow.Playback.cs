@@ -293,7 +293,7 @@ public sealed partial class MainWindow
             clear.IsEnabled = false;
             UpdateQueueStatus();
         };
-        if (await dialog.ShowAsync() == ContentDialogResult.Primary && list.SelectedItem is MusicTrack track && queue.Select(track.Reference) is { } selectedTrack)
+        if (await ShowThemedDialogAsync(dialog) == ContentDialogResult.Primary && list.SelectedItem is MusicTrack track && queue.Select(track.Reference) is { } selectedTrack)
             await PlayTrackAsync(selectedTrack);
     }
     private void Resume_Click(object sender, RoutedEventArgs e) { if (mediaReady) { music.Player.Play(); PlaybackStatus.Text = "正在播放"; } }

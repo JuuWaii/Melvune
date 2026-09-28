@@ -11,7 +11,7 @@ $sdk = Join-Path $repo '.tools/dotnet/dotnet.exe'
 if ($LASTEXITCODE -ne 0) { throw 'Restore failed' }
 & $sdk publish (Join-Path $repo 'native/src/FnMusic.App/FnMusic.App.csproj') -c Release --no-restore --nologo -p:DebugSymbols=false -p:DebugType=None -o $destination
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
-foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll')) {
+foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll')) {
     if (-not (Test-Path -LiteralPath (Join-Path $destination $required))) { throw "Missing preview file: $required" }
 }
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'THIRD_PARTY_NOTICES.md'), (Join-Path $repo 'docs/PREVIEW_VALIDATION.md') -Destination $destination

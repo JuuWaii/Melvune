@@ -187,7 +187,7 @@ public sealed partial class MainWindow
 #if DEBUG
         dialog.Opened += (_, _) => playlistDialogOpened?.Invoke(dialog);
 #endif
-        var result = await dialog.ShowAsync();
+        var result = await ShowThemedDialogAsync(dialog);
         lifetime.Cancel();
         if (result != ContentDialogResult.Primary || closed || Selected() is not { } chosen || list.SelectedItem is not PlaylistRow start) return;
         await PlayLocalPlaylistAsync(chosen, start.Entry);

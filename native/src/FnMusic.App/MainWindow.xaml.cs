@@ -9,6 +9,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ApplyMonochromeResources(Root);
         Title = "飞牛音乐 · 原生预览";
         AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1360, 900));
         InitializePlayback();
