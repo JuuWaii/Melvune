@@ -79,9 +79,15 @@ public sealed partial class MainWindow
         var editor = new ScrollViewer { Content = panel, MaxHeight = 530 };
         var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "飞牛素材库与设置", Content = editor, CloseButtonText = "关闭" };
         Action updateTaskButtons = () => { };
+        Action refreshReconnectSelection = () => { };
+        Action updateReconnectButtons = () => { };
         var tasks = CreateNasTasksPanel(api, ct, () => admin, operation => Run(operation));
         updateTaskButtons = tasks.UpdateButtons;
         tabs.Items.Add(new PivotItem { Header = "后台任务", Content = tasks.Panel });
+        var reconnect = CreateNasReconnectPanel(api, ct, () => admin, () => selected, operation => Run(operation), id => Refresh(id));
+        refreshReconnectSelection = reconnect.RefreshSelection;
+        updateReconnectButtons = reconnect.UpdateButtons;
+        tabs.Items.Add(new PivotItem { Header = "重新关联", Content = reconnect.Panel });
         void UpdateButtons()
         {
             bool known = preference.SelectedIndex >= 0;
@@ -94,6 +100,7 @@ public sealed partial class MainWindow
             mode.IsEnabled = saveAccess.IsEnabled = admin && access is not null;
             accessLibraries.IsEnabled = admin && access is not null && mode.SelectedIndex == 1;
             updateTaskButtons();
+            updateReconnectButtons();
         }
         void RenderSelected()
         {
@@ -101,6 +108,7 @@ public sealed partial class MainWindow
             currentPath.Text = selected?.Path ?? "尚无素材库。";
             preference.SelectedIndex = selected is null ? 1 : Array.IndexOf(preferences, selected.MetadataPreference);
             autoLyric.IsChecked = selected?.AutoDownloadLyric ?? false; confirmDelete.IsChecked = false;
+            refreshReconnectSelection();
             UpdateButtons();
         }
         async Task Refresh(string? selectedId = null)
@@ -151,6 +159,7 @@ public sealed partial class MainWindow
                 currentPath.Text = selected?.Path ?? "尚无素材库。";
                 preference.SelectedIndex = selected is null ? 1 : Array.IndexOf(preferences, selected.MetadataPreference);
                 autoLyric.IsChecked = selected?.AutoDownloadLyric ?? false; confirmDelete.IsChecked = false;
+                refreshReconnectSelection();
             });
         };
         preference.SelectionChanged += (_, _) => UpdateButtons(); mode.SelectionChanged += (_, _) => UpdateButtons(); confirmDelete.Click += (_, _) => UpdateButtons();

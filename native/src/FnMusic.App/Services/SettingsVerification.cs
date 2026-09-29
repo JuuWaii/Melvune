@@ -31,6 +31,11 @@ internal static class SettingsVerification
                 stage = "server_settings"; await api.GetServerSettingsAsync(timeout.Token); checks[stage] = true;
                 stage = "default_library_access"; await api.GetDefaultLibraryAccessAsync(timeout.Token); checks[stage] = true;
                 stage = "authorized_directories"; await api.ListAuthorizedDirectoriesAsync(timeout.Token); checks[stage] = true;
+                if (libraries.Count > 0)
+                {
+                    stage = "reconnect_preflight_only";
+                    await api.CheckLibraryReconnectAsync(libraries[0], libraries[0].Path, timeout.Token); checks[stage] = true;
+                }
             }
             else skipped.Add("administrator_only_settings");
             stage = checks.Values.All(value => value) ? skipped.Count == 0 ? "complete" : "complete_with_skips" : "contract_mismatch";

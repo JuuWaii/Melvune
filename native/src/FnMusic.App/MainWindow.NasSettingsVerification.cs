@@ -18,6 +18,7 @@ public sealed partial class MainWindow
         public string[] AccessIds = [];
         public int Writes;
         public bool TaskExists = true, TaskDone, TaskCancelling;
+        public bool ReconnectMatch = true;
         public readonly Dictionary<string, (string Path, bool Lyric, string Metadata)> Libraries = new() { ["initial"] = ("/music/initial", false, "cloud_preferred") };
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
@@ -43,6 +44,13 @@ public sealed partial class MainWindow
                 if (path.EndsWith("task/cancel")) TaskCancelling = true;
                 if (path.EndsWith("task/retry")) { TaskDone = false; TaskCancelling = false; }
                 if (path.EndsWith("task/delete")) TaskExists = false;
+                if (path.EndsWith("shared-library/reconnect/check")) data = new { matchAccepted = ReconnectMatch, requiresConfirmation = !ReconnectMatch };
+                if (path.EndsWith("shared-library/reconnect"))
+                {
+                    string id = root.GetProperty("guid").GetString()!; var old = Libraries[id];
+                    Libraries[id] = (root.GetProperty("path").GetString()!, old.Lyric, old.Metadata);
+                    data = new { reconnected = true, scanStarted = true };
+                }
             }
             else if (path.EndsWith("user/me")) data = new { role = Admin ? "admin" : "member" };
             else if (path.EndsWith("settings/server")) data = new { name = ServerName, lang = "zh-CN" };
@@ -67,9 +75,9 @@ public sealed partial class MainWindow
                 var editor = (ScrollViewer)dialog.Content; var panel = (StackPanel)editor.Content;
                 var tabs = panel.Children.OfType<Pivot>().Single();
                 StackPanel Tab(int index) => (StackPanel)((PivotItem)tabs.Items[index]).Content;
-                var library = Tab(0); var server = Tab(1); var access = Tab(2); var tasks = Tab(3);
+                var library = Tab(0); var server = Tab(1); var access = Tab(2); var tasks = Tab(3); var reconnect = Tab(4);
                 var status = panel.Children.OfType<TextBlock>().Last();
-                var buttons = panel.Children.OfType<Button>().Concat(new[] { library, server, access, tasks }.SelectMany(p => p.Children.OfType<Button>())).ToArray();
+                var buttons = panel.Children.OfType<Button>().Concat(new[] { library, server, access, tasks, reconnect }.SelectMany(p => p.Children.OfType<Button>())).ToArray();
                 async Task Click(string label)
                 {
                     var button = buttons.Single(item => item.Content.ToString() == label);
@@ -120,6 +128,21 @@ public sealed partial class MainWindow
                 ((IToggleProvider)new CheckBoxAutomationPeer(tasks.Children.OfType<CheckBox>().Single()).GetPattern(PatternInterface.Toggle)).Toggle();
                 await Click("删除任务记录");
                 verify("nas_tasks_delete_record", !handler.TaskExists && taskDetails.Text.Contains("不代表之前的扫描已成功完成"));
+                tabs.SelectedIndex = 4; await Task.Delay(150);
+                var reconnectPath = reconnect.Children.OfType<TextBox>().Single();
+                var reconnectButton = buttons.Single(button => button.Content.ToString() == "重新关联素材库");
+                reconnectPath.Text = "/music/moved"; await Task.Delay(100);
+                await Click("检查目录匹配");
+                verify("nas_reconnect_matching_preflight", reconnectButton.IsEnabled && handler.Libraries["initial"].Path == "/music/initial");
+                handler.ReconnectMatch = false;
+                await Click("重新关联素材库");
+                verify("nas_reconnect_changed_match_rejected", status.Text.Contains("变化") && handler.Libraries["initial"].Path == "/music/initial");
+                await Click("刷新飞牛设置");
+                await Click("检查目录匹配");
+                verify("nas_reconnect_mismatch_confirmation", !reconnectButton.IsEnabled && reconnect.Children.OfType<CheckBox>().Single().Visibility == Microsoft.UI.Xaml.Visibility.Visible);
+                ((IToggleProvider)new CheckBoxAutomationPeer(reconnect.Children.OfType<CheckBox>().Single()).GetPattern(PatternInterface.Toggle)).Toggle();
+                await Click("重新关联素材库");
+                verify("nas_reconnect_path_readback", handler.Libraries["initial"].Path == "/music/moved" && reconnect.Children.OfType<TextBlock>().Any(text => text.Text.Contains("已回读确认")));
                 handler.Admin = false; await Click("刷新飞牛设置");
                 verify("nas_settings_member_readonly", !buttons.Single(button => button.Content.ToString() == "保存默认访问范围").IsEnabled
                     && !buttons.Single(button => button.Content.ToString() == "保存素材库设置").IsEnabled);

@@ -15,6 +15,51 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+await Test("NAS library reconnect rechecks matching and requires current explicit confirmation", async () =>
+{
+    Guid source = Guid.NewGuid(); string directory = "/music/original";
+    bool match = true, confirmation = false, admin = true, malformed = false; int reconnects = 0;
+    using var api = new NasApiClient(endpoint, new AsyncFakeHandler(async request =>
+    {
+        string route = request.RequestUri!.AbsolutePath; object data;
+        if (route.EndsWith("user/me")) data = new { role = admin ? "admin" : "member" };
+        else if (route.EndsWith("shared-library/detail")) data = new { guid = "library", name = "fixture", path = directory, autoDownloadLyric = true, metadataPreference = "local_only" };
+        else
+        {
+            Check(request.Method == HttpMethod.Post);
+            using var body = JsonDocument.Parse(await request.Content!.ReadAsStringAsync());
+            Check(body.RootElement.GetProperty("guid").GetString() == "library" && body.RootElement.EnumerateObject().Count() == 2);
+            if (route.EndsWith("reconnect/check")) data = malformed ? new { invalid = true } : (object)new { matchAccepted = match, requiresConfirmation = confirmation };
+            else
+            {
+                Check(route.EndsWith("shared-library/reconnect")); reconnects++;
+                directory = body.RootElement.GetProperty("path").GetString()!;
+                data = new { reconnected = true, scanStarted = true };
+            }
+        }
+        return new HttpResponseMessage(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { code = 0, data })) };
+    }), source);
+    var library = await api.GetSharedLibraryAsync(new(source, "library", "fixture"), default);
+    var preflight = await api.CheckLibraryReconnectAsync(library, "/music/moved", default);
+    Check(!preflight.NeedsConfirmation && reconnects == 0);
+    match = false; confirmation = true;
+    try { await api.ReconnectLibraryAsync(preflight, true, default); throw new Exception("Changed preflight accepted"); }
+    catch (RemoteSettingsConflictException) { }
+    Check(reconnects == 0);
+    preflight = await api.CheckLibraryReconnectAsync(library, "/music/moved", default);
+    await Fails(MusicFailure.Rejected, () => api.ReconnectLibraryAsync(preflight, false, default));
+    Check(reconnects == 0);
+    var result = await api.ReconnectLibraryAsync(preflight, true, default);
+    Check(result.ScanStarted && result.Library.Path == "/music/moved" && result.Library.Library.Id == "library" && result.Library.AutoDownloadLyric && result.Library.MetadataPreference == "local_only" && reconnects == 1);
+    try { await api.ReconnectLibraryAsync(preflight, true, default); throw new Exception("Stale library accepted"); }
+    catch (RemoteSettingsConflictException) { }
+    await Fails(MusicFailure.Rejected, () => api.CheckLibraryReconnectAsync(result.Library with { Library = result.Library.Library with { SourceInstanceId = Guid.NewGuid() } }, "/music/other", default));
+    admin = false;
+    await Fails(MusicFailure.Rejected, () => api.CheckLibraryReconnectAsync(result.Library, "/music/other", default));
+    admin = true; malformed = true;
+    await Fails(MusicFailure.InvalidResponse, () => api.CheckLibraryReconnectAsync(result.Library, "/music/other", default));
+    Check(reconnects == 1);
+});
 await Test("NAS tasks validate states, source identity and guarded background actions", async () =>
 {
     Guid source = Guid.NewGuid(); bool admin = true, done = false, cancelling = false, exists = true;
