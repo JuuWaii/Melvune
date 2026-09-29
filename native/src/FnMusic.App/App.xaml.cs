@@ -9,6 +9,10 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-account-restore"))
+        { RunAccountRestoreVerification(); return; }
+        if (Environment.GetCommandLineArgs().Contains("--verify-native-accounts"))
+        { RunAccountVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-favorites-write"))
         { RunFavoriteWriteVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-settings-write"))
@@ -37,6 +41,10 @@ public partial class App : Application
         window.Activate();
     }
 #if DEBUG
+    private async void RunAccountRestoreVerification()
+    { await Services.AccountVerification.RestoreAsync(); Exit(); }
+    private async void RunAccountVerification()
+    { await Services.AccountVerification.RunAsync(); Exit(); }
     private async void RunFavoriteWriteVerification()
     { await Services.FavoriteWriteVerification.RunAsync(); Exit(); }
     private async void RunSettingsWriteVerification()

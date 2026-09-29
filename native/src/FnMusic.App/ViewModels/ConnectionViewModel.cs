@@ -28,9 +28,9 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
     public string Account { get => account; private set { account = value; Changed(); } }
     public bool IsReady => !busy;
     public bool IsBusy => busy;
-    public ConnectionViewModel()
+    public ConnectionViewModel() : this(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FnMusic.Native")) { }
+    internal ConnectionViewModel(string data)
     {
-        string data = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FnMusic.Native");
         settingsStore = new ConnectionSettingsStore(data);
         sourceRegistry = new MusicSourceRegistry(data);
         vault = new DpapiSessionVault(Path.Combine(data, "sessions"));
