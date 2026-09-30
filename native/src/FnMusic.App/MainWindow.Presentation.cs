@@ -3,8 +3,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using System.Runtime.InteropServices.WindowsRuntime;
-using Windows.Storage;
-using Windows.Storage.FileProperties;
 using Windows.UI.ViewManagement;
 
 namespace FnMusic.App;
@@ -95,12 +93,9 @@ public sealed partial class MainWindow
                     }
                     if (bitmap is null)
                     {
-                        var file = await StorageFile.GetFileFromPathAsync(source.GetFilePath(local.Reference)).AsTask(ct);
-                        using var thumbnail = await file.GetThumbnailAsync(ThumbnailMode.MusicView, 256, ThumbnailOptions.UseCurrentScale).AsTask(ct);
-                        if (thumbnail is null || thumbnail.Type != ThumbnailType.Image || thumbnail.Size > 4 * 1024 * 1024) return;
-                        using var stream = thumbnail.AsStreamForRead(); using var memory = new MemoryStream();
-                        await stream.CopyToAsync(memory, ct);
-                        bitmap = await DecodeArtworkAsync(memory.ToArray(), ct);
+                        var thumbnail = await Services.LocalArtworkReader.ReadThumbnailAsync(source.GetFilePath(local.Reference), ct);
+                        if (thumbnail is null) return;
+                        bitmap = await DecodeArtworkAsync(thumbnail, ct);
                     }
                 }
                 else
