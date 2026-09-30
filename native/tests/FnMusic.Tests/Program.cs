@@ -820,6 +820,74 @@ await Test("local incremental scans read changed metadata and retain unchanged i
     }
 });
 
+await Test("local library at 10000 files retains its snapshot across overflow and canceled refresh", async () =>
+{
+    string root = Path.Combine(testDirectory, "large-library-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    var createdFiles = new List<string>();
+    var createdDirectories = new List<string>();
+    try
+    {
+        // Real directory enumeration; tag reads are controlled, not codec acceptance.
+        for (int folder = 0; folder < 100; folder++)
+        {
+            string directory = Path.Combine(root, folder.ToString("D3"));
+            Directory.CreateDirectory(directory); createdDirectories.Add(directory);
+            for (int song = 0; song < 100; song++)
+            {
+                string path = Path.Combine(directory, $"song-{song:D3}.wav");
+                createdFiles.Add(path);
+                await File.WriteAllBytesAsync(path, [1]);
+            }
+        }
+        int reads = 0;
+        Task<LocalMusicMetadata> Read(string path, CancellationToken ct)
+        { reads++; return Task.FromResult(new LocalMusicMetadata(Path.GetFileNameWithoutExtension(path), "fixture", 1)); }
+        var settings = new LocalMusicSettings(Guid.NewGuid(), root);
+        var progress = new List<int>();
+        var initial = await LocalMusicSource.ScanAsync(settings, default, Read, new InlineProgress<int>(progress.Add));
+        Check(initial.Tracks.Count == 10000 && reads == 10000);
+        Check(initial.Tracks.Select(t => t.Reference).Distinct().Count() == 10000);
+        Check(progress.First() == 0 && progress.Last() == 10000 && progress.SequenceEqual(progress.Order()));
+        var originalReferences = initial.Tracks.Select(t => t.Reference).ToArray();
+        var unchanged = await LocalMusicSource.ScanAsync(settings, default, Read, previous: initial);
+        Check(reads == 10000 && unchanged.Tracks.Select(t => t.Reference).SequenceEqual(originalReferences));
+        await File.AppendAllTextAsync(createdFiles[0], "changed");
+        var changed = await LocalMusicSource.ScanAsync(settings, default, Read, previous: unchanged);
+        Check(reads == 10001 && changed.Tracks.Select(t => t.Reference).SequenceEqual(originalReferences));
+        string extra = Path.Combine(root, "overflow.wav"); createdFiles.Add(extra);
+        await File.WriteAllBytesAsync(extra, [2]);
+        try
+        {
+            await LocalMusicSource.ScanAsync(settings, default, Read, previous: changed);
+            throw new Exception("Oversized library accepted");
+        }
+        catch (InvalidDataException) { }
+        Check(changed.Tracks.Select(t => t.Reference).SequenceEqual(originalReferences));
+        File.Delete(extra);
+        using var cancel = new CancellationTokenSource();
+        try
+        {
+            await LocalMusicSource.ScanAsync(settings, cancel.Token, Read,
+                new InlineProgress<int>(count => { if (count >= 5000) cancel.Cancel(); }), previous: changed);
+            throw new Exception("Canceled refresh accepted");
+        }
+        catch (OperationCanceledException) when (cancel.IsCancellationRequested) { }
+        Check(changed.Tracks.Select(t => t.Reference).SequenceEqual(originalReferences));
+        var recovered = await LocalMusicSource.ScanAsync(settings, default, Read, previous: changed);
+        Check(recovered.Tracks.Select(t => t.Reference).SequenceEqual(originalReferences));
+        using var stream = await recovered.OpenAsync(recovered.Tracks[0].Reference, default);
+        Check(stream.ReadByte() == 1);
+    }
+    finally
+    {
+        // Delete only fixture paths recorded above; never recursively delete a computed root.
+        foreach (string file in createdFiles) File.Delete(file);
+        foreach (string directory in createdDirectories) Directory.Delete(directory);
+        Directory.Delete(root);
+    }
+});
+
 await Test("local metadata enriches tracks without changing references and falls back on invalid tags", async () =>
 {
     string directory = Path.Combine(testDirectory, "metadata"); Directory.CreateDirectory(directory);
