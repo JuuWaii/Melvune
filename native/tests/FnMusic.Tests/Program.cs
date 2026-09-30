@@ -751,6 +751,14 @@ await Test("local music scans nested audio files with stable identities and open
     await File.WriteAllBytesAsync(Path.Combine(directory, "song.lrc"), CodePagesEncodingProvider.Instance.GetEncoding(54936)!.GetBytes("[00:02]传统编码歌词"));
     Check((await source.GetLyricsAsync(sidecarTrack.Reference, default)).Lines.Single() == new LyricLine(2, "传统编码歌词"));
     Check((await source.GetSidecarCoverAsync(sidecarTrack.Reference, default))!.SequenceEqual(new byte[] { 7, 8 }));
+    await File.WriteAllBytesAsync(Path.Combine(directory, "song.jpg"), new byte[4 * 1024 * 1024 + 1]);
+    Check((await source.GetSidecarCoverAsync(sidecarTrack.Reference, default))!.SequenceEqual(new byte[] { 7, 8 }));
+    using (var canceledCover = new CancellationTokenSource())
+    {
+        canceledCover.Cancel();
+        try { await source.GetSidecarCoverAsync(sidecarTrack.Reference, canceledCover.Token); throw new Exception("Canceled cover accepted"); }
+        catch (OperationCanceledException) { }
+    }
     await Fails(MusicFailure.Rejected, () => source.GetLyricsAsync(new(Guid.NewGuid(), sidecarTrack.Id), default));
     var router = new MusicPlaybackRouter(); router.Register(source);
     using (var stream = await router.OpenAsync(source.Tracks.First().Reference, default)) Check(stream.CanSeek && stream.ReadByte() is 1 or 4);

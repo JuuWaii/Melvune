@@ -84,24 +84,31 @@ public sealed partial class MainWindow
             await coverSlots.WaitAsync(ct);
             try
             {
-                byte[]? bytes;
+                BitmapImage? bitmap = null;
                 if (context is MusicTrack local && source?.Source.Id == local.SourceInstanceId)
                 {
-                    bytes = await source.GetSidecarCoverAsync(local.Reference, ct);
-                    if (bytes is null)
+                    await foreach (var candidate in source.GetSidecarCoversAsync(local.Reference, ct))
+                    {
+                        try { bitmap = await DecodeArtworkAsync(candidate, ct); break; }
+                        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                        catch (Exception) { /* Invalid sidecars must not hide later or embedded covers. */ }
+                    }
+                    if (bitmap is null)
                     {
                         var file = await StorageFile.GetFileFromPathAsync(source.GetFilePath(local.Reference)).AsTask(ct);
                         using var thumbnail = await file.GetThumbnailAsync(ThumbnailMode.MusicView, 256, ThumbnailOptions.UseCurrentScale).AsTask(ct);
                         if (thumbnail is null || thumbnail.Type != ThumbnailType.Image || thumbnail.Size > 4 * 1024 * 1024) return;
                         using var stream = thumbnail.AsStreamForRead(); using var memory = new MemoryStream();
-                        await stream.CopyToAsync(memory, ct); bytes = memory.ToArray();
+                        await stream.CopyToAsync(memory, ct);
+                        bitmap = await DecodeArtworkAsync(memory.ToArray(), ct);
                     }
                 }
-                else bytes = await api!.GetCoverAsync(coverId!, ct);
-                ct.ThrowIfCancellationRequested();
-                if (bytes is null || bytes.Length == 0 || closed || !ReferenceEquals(image.DataContext, context)) return;
-                var bitmap = new BitmapImage { DecodePixelWidth = 256 };
-                using var input = new MemoryStream(bytes); await bitmap.SetSourceAsync(input.AsRandomAccessStream());
+                else
+                {
+                    var bytes = await api!.GetCoverAsync(coverId!, ct);
+                    if (bytes is null || bytes.Length == 0) return;
+                    bitmap = await DecodeArtworkAsync(bytes, ct);
+                }
                 if (ct.IsCancellationRequested || closed || !ReferenceEquals(image.DataContext, context)) return;
                 if (context is not MusicTrack localTrack || localTrack.SourceInstanceId != source?.Source.Id)
                     if (!ReferenceEquals(api, ViewModel.AuthenticatedClient)) return;
@@ -112,6 +119,16 @@ public sealed partial class MainWindow
         }
         catch (Exception) { /* 封面失败保留占位，不影响播放或暴露地址。 */ }
         finally { if (ReferenceEquals(image.Tag, request)) image.Tag = null; }
+    }
+
+    private static async Task<BitmapImage> DecodeArtworkAsync(byte[] bytes, CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
+        var bitmap = new BitmapImage { DecodePixelWidth = 256 };
+        using var input = new MemoryStream(bytes);
+        await bitmap.SetSourceAsync(input.AsRandomAccessStream()).AsTask(ct);
+        ct.ThrowIfCancellationRequested();
+        return bitmap;
     }
 
     private void ClearPresentation()

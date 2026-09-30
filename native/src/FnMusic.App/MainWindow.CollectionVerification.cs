@@ -116,6 +116,12 @@ public sealed partial class MainWindow
             Verify("local_file_playback", mediaReady && music.Player.PlaybackSession.Position.TotalSeconds > 0 && queue.Current?.SourceInstanceId == local.Source.Id);
             await LoadArtworkAsync(NowCover);
             Verify("local_cover_decoded", NowCover.Source is not null);
+            await File.WriteAllBytesAsync(Path.Combine(localDirectory, "000-playback.jpg"), [1, 2, 3]);
+            coverCache.Clear(); await LoadArtworkAsync(NowCover);
+            Verify("local_corrupt_cover_falls_back", NowCover.Source is not null);
+            await File.WriteAllBytesAsync(Path.Combine(localDirectory, "000-playback.jpg"), new byte[4 * 1024 * 1024 + 1]);
+            coverCache.Clear(); await LoadArtworkAsync(NowCover);
+            Verify("local_oversized_cover_falls_back", NowCover.Source is not null);
             Verify("local_lyrics_loaded", currentLyrics.IsTimed && currentLyrics.Lines.Count == 3);
             LyricsPanel.Visibility = Visibility.Visible;
             music.Player.Pause();

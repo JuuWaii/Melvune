@@ -105,13 +105,24 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
     }
     public async Task<byte[]?> GetSidecarCoverAsync(TrackReference track, CancellationToken ct)
     {
+        await foreach (var bytes in GetSidecarCoversAsync(track, ct)) return bytes;
+        return null;
+    }
+    public async IAsyncEnumerable<byte[]> GetSidecarCoversAsync(TrackReference track,
+        [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct)
+    {
+        ct.ThrowIfCancellationRequested();
         string file = GetFilePath(track), folder = Path.GetDirectoryName(file)!;
         foreach (string path in new[] { Path.ChangeExtension(file, ".jpg"), Path.ChangeExtension(file, ".png"), Path.Combine(folder, "cover.jpg"), Path.Combine(folder, "cover.png"), Path.Combine(folder, "folder.jpg") })
         {
-            var bytes = await ReadSidecarAsync(path, 4 * 1024 * 1024, ct);
-            if (bytes is not null) return bytes;
+            ct.ThrowIfCancellationRequested();
+            byte[]? bytes;
+            try { bytes = await ReadSidecarAsync(path, 4 * 1024 * 1024, ct); }
+            catch (InvalidDataException) { continue; }
+            catch (IOException) { continue; }
+            catch (UnauthorizedAccessException) { continue; }
+            if (bytes is { Length: > 0 }) yield return bytes;
         }
-        return null;
     }
     private static async Task<byte[]?> ReadSidecarAsync(string path, int limit, CancellationToken ct)
     {
