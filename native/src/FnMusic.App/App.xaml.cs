@@ -9,6 +9,8 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-local-formats"))
+        { RunLocalFormatVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-account-restore"))
         { RunAccountRestoreVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-accounts"))
@@ -41,6 +43,8 @@ public partial class App : Application
         window.Activate();
     }
 #if DEBUG
+    private async void RunLocalFormatVerification()
+    { await Services.LocalFormatVerification.RunAsync(); Exit(); }
     private async void RunAccountRestoreVerification()
     { await Services.AccountVerification.RestoreAsync(); Exit(); }
     private async void RunAccountVerification()
