@@ -15,6 +15,9 @@ public sealed partial class MainWindow
     private CancellationTokenSource lyricsWork = new();
     private Lyrics currentLyrics = Lyrics.Empty;
     private int activeLyric = -1;
+#if DEBUG
+    private Func<Task>? localArtworkBeforeCommit;
+#endif
     private void InitializePresentation()
     {
         InitializeThemeChoice();
@@ -104,8 +107,15 @@ public sealed partial class MainWindow
                     if (bytes is null || bytes.Length == 0) return;
                     bitmap = await DecodeArtworkAsync(bytes, ct);
                 }
+#if DEBUG
+                if (source is not null && localArtworkBeforeCommit is { } beforeCommit) await beforeCommit();
+#endif
                 if (ct.IsCancellationRequested || closed || !ReferenceEquals(image.DataContext, context)) return;
-                if (context is not MusicTrack localTrack || localTrack.SourceInstanceId != source?.Source.Id)
+                if (source is not null)
+                {
+                    if (!ReferenceEquals(localSources.GetValueOrDefault(source.Source.Id), source)) return;
+                }
+                else
                     if (!ReferenceEquals(api, ViewModel.AuthenticatedClient)) return;
                 if (coverCache.Count >= 96) coverCache.Clear();
                 coverCache[key] = bitmap; image.Source = bitmap;

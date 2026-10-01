@@ -122,6 +122,23 @@ public sealed partial class MainWindow
             await File.WriteAllBytesAsync(Path.Combine(localDirectory, "000-playback.jpg"), new byte[4 * 1024 * 1024 + 1]);
             coverCache.Clear(); await LoadArtworkAsync(NowCover);
             Verify("local_oversized_cover_falls_back", NowCover.Source is not null);
+            coverCache.Clear();
+            var coverEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var coverRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            localArtworkBeforeCommit = () => { coverEntered.TrySetResult(); return coverRelease.Task; };
+            var oldCoverRequest = LoadArtworkAsync(NowCover);
+            try
+            {
+                await coverEntered.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                var replacement = await FnMusic.Infrastructure.LocalMusicSource.ScanAsync(local.Settings, default);
+                ReplaceLocalSource(replacement);
+                coverRelease.TrySetResult(); await oldCoverRequest;
+                Verify("local_replaced_source_discards_late_cover", NowCover.Source is null && coverCache.Count == 0);
+                local = replacement;
+            }
+            finally { localArtworkBeforeCommit = null; coverRelease.TrySetResult(); }
+            await LoadArtworkAsync(NowCover);
+            Verify("local_replacement_cover_loads", NowCover.Source is not null);
             Verify("local_lyrics_loaded", currentLyrics.IsTimed && currentLyrics.Lines.Count == 3);
             LyricsPanel.Visibility = Visibility.Visible;
             music.Player.Pause();
