@@ -20,6 +20,7 @@ public sealed partial class MainWindow
             music.Player.IsMuted = true;
             if (!Environment.GetCommandLineArgs().Contains("--preview-collections")) throw new InvalidOperationException();
             SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
+            await VerifyRemoteCommandsWindowAsync(Verify);
             foreach (var kind in new[] { CollectionKind.Album, CollectionKind.Artist })
             {
                 string prefix = kind == CollectionKind.Album ? "album" : "artist";
@@ -297,7 +298,7 @@ public sealed partial class MainWindow
         await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "collection-window-verification.json"),
             JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, timings }));
     }
-    private sealed class CapabilityPlaybackSource(FnMusic.Infrastructure.LocalMusicSource source, MusicSourceCapabilities capabilities) : IMusicPlaybackSource
+    private sealed class CapabilityPlaybackSource(IMusicPlaybackSource source, MusicSourceCapabilities capabilities) : IMusicPlaybackSource
     {
         public MusicSource Source { get; } = source.Source with { Capabilities = capabilities };
         public Task<Stream> OpenAsync(TrackReference track, CancellationToken ct) => source.OpenAsync(track, ct);

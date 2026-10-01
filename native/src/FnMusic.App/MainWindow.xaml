@@ -11,16 +11,16 @@
     <TextBlock Text="Windows 原生客户端" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
     <TextBlock Text="音乐导航" FontWeight="SemiBold" />
-    <Button Content="所有音乐" Click="Library_Click" HorizontalAlignment="Stretch"/><Button Content="收藏" Click="SidebarFavorites_Click" HorizontalAlignment="Stretch"/><Button Content="专辑" Click="SidebarAlbums_Click" HorizontalAlignment="Stretch"/><Button Content="歌手" Click="SidebarArtists_Click" HorizontalAlignment="Stretch"/>
+    <Button x:Name="RemoteMusicNavigation" Content="所有音乐" Click="Library_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteFavoritesNavigation" Content="收藏" Click="SidebarFavorites_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteAlbumsNavigation" Content="专辑" Click="SidebarAlbums_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteArtistsNavigation" Content="歌手" Click="SidebarArtists_Click" HorizontalAlignment="Stretch"/>
     <Button Content="本地音乐" Click="LocalMusic_Click" HorizontalAlignment="Stretch" />
     <Button Content="本地歌单" Click="LocalPlaylists_Click" HorizontalAlignment="Stretch" />
-    <Button Content="飞牛歌单" Click="NasPlaylists_Click" HorizontalAlignment="Stretch" />
+    <Button x:Name="RemotePlaylistsNavigation" Content="飞牛歌单" Click="NasPlaylists_Click" HorizontalAlignment="Stretch" />
     <Button Content="导入文件夹" Click="ImportLocal_Click" HorizontalAlignment="Stretch" />
     <Button Content="音乐库管理" Click="ManageLocalLibraries_Click" HorizontalAlignment="Stretch" />
     <TextBlock x:Name="LocalScanStatus" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
     <Button x:Name="CancelLocalScan" Content="取消扫描" Visibility="Collapsed" Click="CancelLocalScan_Click" />
     <Button Content="连接与账号" Click="Settings_Click" HorizontalAlignment="Stretch" />
-    <Button Click="NasSettings_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="飞牛素材库与设置"><TextBlock Text="飞牛素材库与设置" TextWrapping="Wrap" TextAlignment="Center" /></Button>
+    <Button x:Name="RemoteSettingsNavigation" Click="NasSettings_Click" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch" AutomationProperties.Name="飞牛素材库与设置"><TextBlock Text="飞牛素材库与设置" TextWrapping="Wrap" TextAlignment="Center" /></Button>
     <ComboBox x:Name="ThemePicker" Header="外观" AutomationProperties.Name="外观模式" HorizontalAlignment="Stretch" SelectionChanged="Theme_Changed">
      <ComboBoxItem Content="跟随系统"/><ComboBoxItem Content="浅色"/><ComboBoxItem Content="深色"/>
     </ComboBox>
@@ -57,10 +57,10 @@
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
    <StackPanel Grid.ColumnSpan="2" Spacing="12"><TextBlock Text="音乐，陪伴每一个时刻" TextWrapping="Wrap" Style="{ThemeResource TitleTextBlockStyle}"/><TextBlock Text="浏览你的音乐资料库，或从本地文件夹开始聆听。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
     <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled" VerticalScrollBarVisibility="Disabled"><StackPanel Orientation="Horizontal" Spacing="8">
-     <Button Content="歌曲" Click="Songs_Click"/>
-     <Button Content="收藏" Click="Favorites_Click"/>
-     <Button Content="专辑" Click="Albums_Click"/>
-     <Button Content="歌手" Click="Artists_Click"/>
+     <Button x:Name="RemoteSongsTab" Content="歌曲" Click="Songs_Click"/>
+     <Button x:Name="RemoteFavoritesTab" Content="收藏" Click="Favorites_Click"/>
+     <Button x:Name="RemoteAlbumsTab" Content="专辑" Click="Albums_Click"/>
+     <Button x:Name="RemoteArtistsTab" Content="歌手" Click="Artists_Click"/>
      <Button x:Name="CollectionBack" Content="返回列表" Click="CollectionBack_Click" Visibility="Collapsed"/>
      <Button x:Name="CollectionOpen" Content="查看详情" Click="CollectionOpen_Click" Visibility="Collapsed"/>
      <Button x:Name="ArtistAlbums" Content="歌手专辑" Click="ArtistAlbums_Click" Visibility="Collapsed"/>
@@ -70,7 +70,7 @@
     <Grid ColumnSpacing="8">
      <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <TextBox x:Name="SearchInput" PlaceholderText="搜索歌曲" AutomationProperties.Name="搜索歌曲" MaxLength="256"/>
-     <Button Grid.Column="1" Content="搜索" Click="Search_Click"/>
+     <Button x:Name="SearchAction" Grid.Column="1" Content="搜索" Click="Search_Click"/>
      <Button Grid.Column="2" Content="清空搜索" Click="ClearSearch_Click"/>
     </Grid>
     <StackPanel Orientation="Horizontal" Spacing="8">

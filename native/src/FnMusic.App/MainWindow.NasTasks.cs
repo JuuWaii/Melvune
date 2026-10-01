@@ -8,7 +8,7 @@ public sealed partial class MainWindow
 {
     private sealed record BackgroundTaskRow(NasBackgroundTask Task, string Name);
     private static (StackPanel Panel, Action UpdateButtons) CreateNasTasksPanel(NasApiClient api,
-        CancellationToken ct, Func<bool> isAdmin, Func<Func<Task>, Task> run)
+        CancellationToken ct, Func<bool> isAdmin, Func<Func<Task>, bool, Task> run)
     {
         var panel = new StackPanel { Spacing = 10 };
         var picker = new ComboBox { Header = "后台任务", DisplayMemberPath = "Name", HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -58,11 +58,11 @@ public sealed partial class MainWindow
                 var tasks = await api.ChangeBackgroundTaskAsync(row.Task, action, ct); ct.ThrowIfCancellationRequested();
                 Render(tasks, row.Task.Id);
                 message.Text = action == NasTaskAction.Delete ? "任务记录已删除，音乐文件不受影响。" : "请求已提交。请刷新查看最终状态；请求成功不代表任务完成。";
-            });
+            }, true);
         }
         picker.SelectionChanged += (_, _) => Select();
         confirmation.Click += (_, _) => UpdateButtons();
-        refresh.Click += async (_, _) => await run(Refresh);
+        refresh.Click += async (_, _) => await run(Refresh, false);
         cancel.Click += async (_, _) => await Change(NasTaskAction.Cancel);
         retry.Click += async (_, _) => await Change(NasTaskAction.Retry);
         delete.Click += async (_, _) => await Change(NasTaskAction.Delete);

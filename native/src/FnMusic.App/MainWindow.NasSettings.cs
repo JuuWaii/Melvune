@@ -20,6 +20,7 @@ public sealed partial class MainWindow
     private async void NasSettings_Click(object sender, RoutedEventArgs e)
     {
         if (nasSettingsOpen || closed) return;
+        if (!RequireRemoteCapability(MusicSourceCapabilities.ReadSettings)) return;
         var api = ViewModel.AuthenticatedClient;
         if (api is null) { PlaybackStatus.Text = "请先连接飞牛并登录。"; return; }
         nasSettingsOpen = true;
@@ -83,24 +84,27 @@ public sealed partial class MainWindow
         Action updateTaskButtons = () => { };
         Action refreshReconnectSelection = () => { };
         Action updateReconnectButtons = () => { };
-        var tasks = CreateNasTasksPanel(api, ct, () => admin, operation => Run(operation));
+        bool CanWriteSettings() => admin && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.ReadSettings | MusicSourceCapabilities.WriteSettings);
+        var tasks = CreateNasTasksPanel(api, ct, CanWriteSettings, (operation, mutation) => Run(operation, mutation: mutation));
         updateTaskButtons = tasks.UpdateButtons;
         tabs.Items.Add(new PivotItem { Header = "后台任务", Content = tasks.Panel });
-        var reconnect = CreateNasReconnectPanel(api, ct, () => admin, () => selected, operation => Run(operation), id => Refresh(id));
+        var reconnect = CreateNasReconnectPanel(api, ct, CanWriteSettings, () => selected, (operation, mutation) => Run(operation, mutation: mutation), id => Refresh(id));
         refreshReconnectSelection = reconnect.RefreshSelection;
         updateReconnectButtons = reconnect.UpdateButtons;
         tabs.Items.Add(new PivotItem { Header = "重新关联", Content = reconnect.Panel });
         void UpdateButtons()
         {
             bool known = preference.SelectedIndex >= 0;
-            saveLibrary.IsEnabled = admin && selected is not null && known;
-            scan.IsEnabled = admin && selected is not null;
-            delete.IsEnabled = admin && selected is not null && confirmDelete.IsChecked == true;
-            create.IsEnabled = admin && librariesReady && known && !string.IsNullOrWhiteSpace(createPath.Text);
-            preference.IsEnabled = autoLyric.IsEnabled = authorized.IsEnabled = createPath.IsEnabled = admin;
-            serverName.IsEnabled = saveServer.IsEnabled = admin && server is not null;
-            mode.IsEnabled = saveAccess.IsEnabled = admin && librariesReady && access is not null;
-            accessLibraries.IsEnabled = admin && librariesReady && access is not null && mode.SelectedIndex == 1;
+            bool writable = CanWriteSettings();
+            confirmDelete.IsEnabled = writable;
+            saveLibrary.IsEnabled = writable && selected is not null && known;
+            scan.IsEnabled = writable && selected is not null;
+            delete.IsEnabled = writable && selected is not null && confirmDelete.IsChecked == true;
+            create.IsEnabled = writable && librariesReady && known && !string.IsNullOrWhiteSpace(createPath.Text);
+            preference.IsEnabled = autoLyric.IsEnabled = authorized.IsEnabled = createPath.IsEnabled = writable;
+            serverName.IsEnabled = saveServer.IsEnabled = writable && server is not null;
+            mode.IsEnabled = saveAccess.IsEnabled = writable && librariesReady && access is not null;
+            accessLibraries.IsEnabled = writable && librariesReady && access is not null && mode.SelectedIndex == 1;
             updateTaskButtons();
             updateReconnectButtons();
         }
@@ -147,9 +151,11 @@ public sealed partial class MainWindow
             if (access is not null) foreach (var row in rows.Where(row => access.LibraryIds.Contains(row.Value.Library.Id))) accessLibraries.SelectedItems.Add(row);
             rendering = false; UpdateButtons();
         }
-        async Task Run(Func<Task> operation, bool scanRequest = false)
+        async Task Run(Func<Task> operation, bool scanRequest = false, bool mutation = true)
         {
             if (busy || ct.IsCancellationRequested) return;
+            if (!ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.ReadSettings) || (mutation && !CanWriteSettings()))
+            { status.Text = "当前来源不支持此设置操作，或账号没有写入权限。"; UpdateButtons(); return; }
             busy = true; editor.IsEnabled = false; status.Text = "正在与飞牛同步…";
             try { await operation(); ct.ThrowIfCancellationRequested(); status.Text = (scanRequest ? "扫描请求已提交，请在后台任务页刷新查看状态，完成后刷新曲库。" : "操作已返回；具体结果以当前页面回读状态为准。") + (refreshWarning.Length == 0 ? "" : "\n" + refreshWarning); }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
@@ -172,7 +178,7 @@ public sealed partial class MainWindow
                 preference.SelectedIndex = selected is null ? 1 : Array.IndexOf(preferences, selected.MetadataPreference);
                 autoLyric.IsChecked = selected?.AutoDownloadLyric ?? false; confirmDelete.IsChecked = false;
                 refreshReconnectSelection();
-            });
+            }, mutation: false);
         };
         preference.SelectionChanged += (_, _) => UpdateButtons(); mode.SelectionChanged += (_, _) => UpdateButtons(); confirmDelete.Click += (_, _) => UpdateButtons();
         createPath.TextChanged += (_, _) => UpdateButtons();
@@ -193,7 +199,7 @@ public sealed partial class MainWindow
             var chosen = accessLibraries.SelectedItems.Cast<SharedLibraryRow>().Select(item => item.Value.Library).ToArray();
             await Run(async () => { access = await api.UpdateDefaultLibraryAccessAsync(current, requested, chosen, ct); await Refresh(selected?.Library.Id); });
         };
-        refresh.Click += async (_, _) => await Run(() => Refresh(selected?.Library.Id));
+        refresh.Click += async (_, _) => await Run(() => Refresh(selected?.Library.Id), mutation: false);
         dialog.Closing += (_, args) => { if (busy && !ct.IsCancellationRequested && !closed) args.Cancel = true; };
         void SessionChanged() { lifetime.Cancel(); if (showing && !busy && !closed) dialog.Hide(); }
         ViewModel.SessionChanging += SessionChanged;

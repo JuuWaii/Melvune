@@ -136,6 +136,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
         client?.Dispose();
         client = scoped;
         AuthenticatedClient = scoped;
+        Changed(nameof(AuthenticatedClient));
     }
     public Task LogoutAsync() => RunAsync(async () =>
     {
@@ -161,6 +162,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
         SessionChanging?.Invoke();
         if (AuthenticatedClient is { } active) PlaybackRouter.Unregister(active.SourceInstanceId);
         AuthenticatedClient = null;
+        Changed(nameof(AuthenticatedClient));
     }
     public void Dispose()
     {

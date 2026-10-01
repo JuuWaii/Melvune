@@ -14,6 +14,7 @@ public sealed partial class MainWindow
     private string CollectionLabel => collectionKind == CollectionKind.Album ? "专辑" : "歌手";
     private void UpdateCollectionView()
     {
+        UpdateSourceCommands();
         RevealBrowseContent();
         LocalLibraryFilters.Visibility = localView ? Visibility.Visible : Visibility.Collapsed;
         bool listing = collectionKind is not null && collection is null;
@@ -28,6 +29,7 @@ public sealed partial class MainWindow
     }
     private async Task SwitchCollectionAsync(CollectionKind? kind)
     {
+        if (!RequireRemoteCapability(MusicSourceCapabilities.Browse)) return;
         localView = false;
         favoritesView = false;
         parentArtist = null;

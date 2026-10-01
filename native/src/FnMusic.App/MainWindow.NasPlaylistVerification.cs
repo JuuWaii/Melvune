@@ -45,6 +45,7 @@ public sealed partial class MainWindow
         var handler = new PlaylistFixtureHandler();
         using var api = new NasApiClient(ServerEndpoint.Parse("https://nas.example.invalid/"), handler, Guid.NewGuid());
         playlistTestClient = api;
+        ViewModel.PlaybackRouter.Register(new NasPlaybackSource(api));
         TrackList.ItemsSource = new[] { new MusicTrack("fixture-track", "飞牛夹具歌曲", "夹具", 1, false) { SourceInstanceId = api.SourceInstanceId } };
         TrackList.SelectedIndex = 0;
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -78,6 +79,17 @@ public sealed partial class MainWindow
                 verify("nas_playlist_ui_conflict", handler.Writes == writes && status.Text.Contains("变化") && !dialog.IsPrimaryButtonEnabled);
                 await Click("刷新");
                 verify("nas_playlist_ui_refresh", name.Text == "网页改名" && list.Items.Count == 1);
+                ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId);
+                ViewModel.PlaybackRouter.Register(new CapabilityPlaybackSource(new NasPlaybackSource(api), MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.Playback));
+                writes = handler.Writes;
+                await Click("刷新");
+                verify("nas_playlist_read_only_controls", list.Items.Count == 1 && dialog.IsPrimaryButtonEnabled
+                    && !name.IsEnabled && buttons.Where(button => button.Content.ToString() != "刷新").All(button => !button.IsEnabled));
+                verify("nas_playlist_read_only_refresh_no_write", handler.Writes == writes && status.Text.Contains("核对"));
+                ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId);
+                ViewModel.PlaybackRouter.Register(new NasPlaybackSource(api));
+                await Click("刷新");
+                verify("nas_playlist_write_capability_restored", name.IsEnabled && buttons.Single(button => button.Content.ToString() == "移除所选歌曲").IsEnabled);
                 await Click("移除所选歌曲");
                 verify("nas_playlist_ui_remove", list.Items.Count == 0 && handler.Tracks.Count == 0);
                 var checkbox = panel.Children.OfType<CheckBox>().Single();
@@ -90,7 +102,7 @@ public sealed partial class MainWindow
             finally { dialog.Hide(); }
         };
         try { await ShowNasPlaylistsAsync(api); await done.Task.WaitAsync(TimeSpan.FromSeconds(15)); }
-        finally { playlistTestClient = null; nasPlaylistDialogOpened = null; }
+        finally { ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId); playlistTestClient = null; nasPlaylistDialogOpened = null; }
     }
 }
 #endif

@@ -70,6 +70,7 @@ public sealed partial class MainWindow
         var handler = new SettingsFixtureHandler { FailedRead = "settings/server" };
         using var api = new NasApiClient(ServerEndpoint.Parse("https://nas.example.invalid/"), handler, Guid.NewGuid());
         settingsTestClient = api;
+        ViewModel.PlaybackRouter.Register(new NasPlaybackSource(api));
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         settingsDialogOpened = async dialog =>
         {
@@ -159,7 +160,21 @@ public sealed partial class MainWindow
                     && buttons.Single(button => button.Content.ToString() == "保存服务器名称").IsEnabled);
                 tabs.SelectedIndex = 3; await Task.Delay(150); await Click("刷新后台任务");
                 verify("nas_settings_partial_failure_keeps_tasks", taskDetails.Text.Contains("不代表之前的扫描已成功完成") && status.Text.Contains("素材库"));
-                handler.FailedRead = null; handler.Admin = false; await Click("刷新飞牛设置");
+                handler.FailedRead = null;
+                ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId);
+                ViewModel.PlaybackRouter.Register(new CapabilityPlaybackSource(new NasPlaybackSource(api), MusicSourceCapabilities.ReadSettings));
+                int readonlyWrites = handler.Writes;
+                await Click("刷新飞牛设置");
+                verify("nas_settings_read_only_capability", !buttons.Single(button => button.Content.ToString() == "保存素材库设置").IsEnabled
+                    && !buttons.Single(button => button.Content.ToString() == "保存服务器名称").IsEnabled
+                    && !buttons.Single(button => button.Content.ToString() == "重新关联素材库").IsEnabled);
+                await Click("刷新后台任务");
+                verify("nas_settings_read_only_refresh_no_writes", handler.Writes == readonlyWrites && status.Text.Contains("操作已返回"));
+                ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId);
+                ViewModel.PlaybackRouter.Register(new NasPlaybackSource(api));
+                await Click("刷新飞牛设置");
+                verify("nas_settings_write_capability_restored", buttons.Single(button => button.Content.ToString() == "保存素材库设置").IsEnabled);
+                handler.Admin = false; await Click("刷新飞牛设置");
                 verify("nas_settings_member_readonly", !buttons.Single(button => button.Content.ToString() == "保存默认访问范围").IsEnabled
                     && !buttons.Single(button => button.Content.ToString() == "保存素材库设置").IsEnabled);
                 done.TrySetResult();
@@ -168,7 +183,7 @@ public sealed partial class MainWindow
             finally { dialog.Hide(); }
         };
         try { await ShowNasSettingsAsync(api); await done.Task.WaitAsync(TimeSpan.FromSeconds(15)); }
-        finally { settingsTestClient = null; settingsDialogOpened = null; }
+        finally { ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId); settingsTestClient = null; settingsDialogOpened = null; }
     }
 }
 #endif

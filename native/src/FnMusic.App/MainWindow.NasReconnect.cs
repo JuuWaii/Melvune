@@ -7,7 +7,7 @@ namespace FnMusic.App;
 public sealed partial class MainWindow
 {
     private static (StackPanel Panel, Action RefreshSelection, Action UpdateButtons) CreateNasReconnectPanel(NasApiClient api, CancellationToken ct,
-        Func<bool> isAdmin, Func<NasSharedLibrary?> selection, Func<Func<Task>, Task> run, Func<string, Task> refreshSettings)
+        Func<bool> isAdmin, Func<NasSharedLibrary?> selection, Func<Func<Task>, bool, Task> run, Func<string, Task> refreshSettings)
     {
         NasLibraryReconnectCheck? checkedPath = null;
         var panel = new StackPanel { Spacing = 10 };
@@ -46,7 +46,7 @@ public sealed partial class MainWindow
                 checkedPath = await api.CheckLibraryReconnectAsync(original, target, ct); ct.ThrowIfCancellationRequested();
                 result.Text = checkedPath.NeedsConfirmation ? "服务器未确认目录完全匹配，或要求额外确认。请核对目标目录；继续可能重新匹配索引。" : "服务器已接受目录匹配，可以重新关联。";
                 confirmation.Visibility = checkedPath.NeedsConfirmation ? Visibility.Visible : Visibility.Collapsed; Update();
-            });
+            }, false);
         };
         reconnect.Click += async (_, _) =>
         {
@@ -58,7 +58,7 @@ public sealed partial class MainWindow
                 var changed = await api.ReconnectLibraryAsync(current, confirmed, ct); ct.ThrowIfCancellationRequested();
                 await refreshSettings(changed.Library.Library.Id);
                 result.Text = changed.ScanStarted ? "目录重关联已回读确认，服务器已启动扫描；请到后台任务页查看进度。" : "目录重关联已回读确认；服务器未报告启动扫描。";
-            });
+            }, true);
         };
         foreach (var child in new UIElement[] { library, path, check, result, confirmation, reconnect }) panel.Children.Add(child);
         panel.Children.Add(new TextBlock { Text = "在素材库页选择要操作的库。本页保留素材库身份和现有歌词/元数据选项；目录必须属于 NAS 并已授权。文件索引能否保留取决于服务器匹配结果，客户端不会声称所有歌曲引用都已恢复。", TextWrapping = TextWrapping.Wrap });

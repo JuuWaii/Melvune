@@ -83,6 +83,7 @@ public sealed partial class MainWindow
     }
     private async Task ShowLibraryAsync()
     {
+        if (!RequireRemoteCapability(MusicSourceCapabilities.Browse)) return;
         localView = false;
 #if DEBUG
         if (IsSyntheticPreview) { SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible; await SwitchCollectionAsync(null); return; }
@@ -121,6 +122,8 @@ public sealed partial class MainWindow
         if (closed) return;
         RevealBrowseContent();
         if (localView) { await LoadLocalPageAsync(requestedPage); return; }
+        if (!RequireRemoteCapability(favoritesView ? MusicSourceCapabilities.ReadFavorites
+            : collectionKind is null && searchQuery.Length > 0 ? MusicSourceCapabilities.Search : MusicSourceCapabilities.Browse)) return;
         libraryWork.Cancel();
         var api = ViewModel.AuthenticatedClient;
         if (api is null && !IsSyntheticPreview) { PlaybackStatus.Text = "请先在连接与账号中登录。"; return; }

@@ -18,6 +18,7 @@ public sealed partial class MainWindow
     private async void NasPlaylists_Click(object sender, RoutedEventArgs e)
     {
         if (nasPlaylistDialogOpen || closed) return;
+        if (!RequireRemoteCapability(MusicSourceCapabilities.ReadPlaylists)) return;
         var api = ViewModel.AuthenticatedClient;
         if (api is null) { PlaybackStatus.Text = "请先连接飞牛并登录，再打开飞牛歌单。"; return; }
         nasPlaylistDialogOpen = true;
@@ -58,10 +59,12 @@ public sealed partial class MainWindow
         void UpdateButtons()
         {
             bool selected = snapshot is not null;
-            rename.IsEnabled = selected; delete.IsEnabled = selected && confirm.IsChecked == true;
-            add.IsEnabled = selected && picked is not null && picked.SourceInstanceId == api.SourceInstanceId;
-            remove.IsEnabled = selected && list.SelectedItem is MusicTrack;
-            dialog.IsPrimaryButtonEnabled = !busy && selected && list.SelectedItem is MusicTrack { IsCue: false };
+            bool writable = ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.WritePlaylists);
+            create.IsEnabled = name.IsEnabled = confirm.IsEnabled = writable;
+            rename.IsEnabled = writable && selected; delete.IsEnabled = writable && selected && confirm.IsChecked == true;
+            add.IsEnabled = writable && selected && picked is not null && picked.SourceInstanceId == api.SourceInstanceId;
+            remove.IsEnabled = writable && selected && list.SelectedItem is MusicTrack;
+            dialog.IsPrimaryButtonEnabled = !busy && selected && list.SelectedItem is MusicTrack { IsCue: false } song && ViewModel.PlaybackRouter.CanPlay(song.Reference);
         }
         void RenderSnapshot()
         {
@@ -84,9 +87,12 @@ public sealed partial class MainWindow
             rendering = false;
             await LoadSelected();
         }
-        async Task Run(Func<Task> operation)
+        async Task Run(Func<Task> operation, bool mutation = false)
         {
             if (busy || ct.IsCancellationRequested) return;
+            var required = MusicSourceCapabilities.ReadPlaylists | (mutation ? MusicSourceCapabilities.WritePlaylists : MusicSourceCapabilities.None);
+            if (!ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, required))
+            { status.Text = "当前来源不支持歌单" + (mutation ? "写入。" : "读取。"); UpdateButtons(); return; }
             busy = true; editor.IsEnabled = false; dialog.IsPrimaryButtonEnabled = false;
             status.Text = "正在同步飞牛歌单…";
             try { await operation(); ct.ThrowIfCancellationRequested(); status.Text = "已与飞牛服务器核对。"; }
@@ -109,26 +115,26 @@ public sealed partial class MainWindow
         {
             var created = await api.CreatePlaylistAsync(name.Text, ct);
             await Refresh(created.Reference);
-        });
+        }, true);
         rename.Click += async (_, _) =>
         {
             if (snapshot is not { } current) return;
-            await Run(async () => { var renamed = await api.RenamePlaylistAsync(current.Playlist, name.Text, ct); await Refresh(renamed.Reference); });
+            await Run(async () => { var renamed = await api.RenamePlaylistAsync(current.Playlist, name.Text, ct); await Refresh(renamed.Reference); }, true);
         };
         delete.Click += async (_, _) =>
         {
             if (snapshot is not { } current || confirm.IsChecked != true) return;
-            await Run(async () => { await api.DeletePlaylistAsync(current, ct); await Refresh(); });
+            await Run(async () => { await api.DeletePlaylistAsync(current, ct); await Refresh(); }, true);
         };
         add.Click += async (_, _) =>
         {
             if (snapshot is not { } current || picked is null || picked.SourceInstanceId != api.SourceInstanceId) return;
-            await Run(async () => { snapshot = await api.ChangePlaylistTracksAsync(current, [picked.Reference], true, ct); RenderSnapshot(); });
+            await Run(async () => { snapshot = await api.ChangePlaylistTracksAsync(current, [picked.Reference], true, ct); RenderSnapshot(); }, true);
         };
         remove.Click += async (_, _) =>
         {
             if (snapshot is not { } current || list.SelectedItem is not MusicTrack track) return;
-            await Run(async () => { snapshot = await api.ChangePlaylistTracksAsync(current, [track.Reference], false, ct); RenderSnapshot(); });
+            await Run(async () => { snapshot = await api.ChangePlaylistTracksAsync(current, [track.Reference], false, ct); RenderSnapshot(); }, true);
         };
         refresh.Click += async (_, _) => await Run(() => Refresh((picker.SelectedItem as NasPlaylist)?.Reference));
         dialog.Closing += (_, args) => { if (busy && !ct.IsCancellationRequested && !closed) args.Cancel = true; };

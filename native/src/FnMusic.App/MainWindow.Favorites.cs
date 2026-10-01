@@ -12,6 +12,7 @@ public sealed partial class MainWindow
     { await ShowFavoritesAsync(); }
     private async Task ShowFavoritesAsync()
     {
+        if (!RequireRemoteCapability(MusicSourceCapabilities.ReadFavorites)) return;
         localView = false;
         favoritesView = true; parentArtist = null; collectionKind = null; collection = null;
         SearchInput.Text = searchQuery = ""; UpdateCollectionView(); await LoadPageAsync(1);
