@@ -206,6 +206,61 @@ await Test("local playlists retain cross-source references, ordering and reject 
         }
     }
 });
+await Test("library membership survives snapshots without changing source-scoped track identity", () =>
+{
+    string[] memberships = ["library-a", "library-b"];
+    var first = new MusicTrack("same", "Title", "Artist", 10, false) { SourceInstanceId = Guid.NewGuid(), LibraryIds = memberships };
+    var entry = LocalPlaylistEntry.FromTrack(first);
+    memberships[0] = "changed-after-snapshot";
+    Check(entry.GetLibraryIds().SequenceEqual(new[] { "library-a", "library-b" }));
+    var restored = entry.ToTrack();
+    Check(restored.Reference == first.Reference && restored.LibraryIds.Count == 2);
+    Check((restored with { LibraryIds = ["another-library"] }).Reference == first.Reference);
+    var otherSource = restored with { SourceInstanceId = Guid.NewGuid() };
+    Check(restored.GetLibraries()[0] != otherSource.GetLibraries()[0] && restored.Reference != otherSource.Reference);
+    var sameSnapshot = entry with { LibraryIds = new[] { "library-a", "library-b" } };
+    Check(entry == sameSnapshot && entry.GetHashCode() == sameSnapshot.GetHashCode());
+    Check(entry != (entry with { LibraryIds = ["library-a"] }));
+    return Task.CompletedTask;
+});
+await Test("playlist membership reads version one and persists version two without losing references", async () =>
+{
+    string directory = Path.Combine(Path.GetTempPath(), "fnmusic-playlist-membership-" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(directory);
+    string file = Path.Combine(directory, "local-playlists.json");
+    var legacy = new LocalPlaylistEntry(Guid.NewGuid(), new(Guid.NewGuid(), "legacy-song"), "Title", "Artist", "Album", 10, false, "legacy-library");
+    var unknown = legacy with { Id = Guid.NewGuid(), Track = new(Guid.NewGuid(), "unknown-song"), LibraryId = null };
+    var playlistId = Guid.NewGuid();
+    await File.WriteAllTextAsync(file, JsonSerializer.Serialize(new { Version = 1, Revision = 3, Playlists = new[] {
+        new { Id = playlistId, Name = "旧歌单", Entries = new[] { legacy, unknown }.Select(entry => new {
+            entry.Id, entry.Track, entry.Title, entry.Artist, entry.Album, entry.DurationSeconds, entry.IsCue, entry.LibraryId, entry.CoverId }) }
+    } }));
+    var store = new LocalPlaylistStore(directory);
+    var loaded = await store.LoadAsync();
+    Check(loaded.Revision == 3 && loaded.Playlists[0].Entries[0].ToTrack().LibraryIds.SequenceEqual(new[] { "legacy-library" }));
+    Check(loaded.Playlists[0].Entries[1].ToTrack().LibraryIds.Count == 0);
+    var multi = LocalPlaylistEntry.FromTrack(new MusicTrack("multi", "多个库", "Artist", 10, false) {
+        SourceInstanceId = Guid.NewGuid(), LibraryIds = ["library-a", "library-b"] });
+    await store.SaveAsync(loaded with { Playlists = [loaded.Playlists[0] with { Entries = [legacy, unknown, multi] }] });
+    using (var json = JsonDocument.Parse(await File.ReadAllTextAsync(file))) Check(json.RootElement.GetProperty("Version").GetInt32() == 2);
+    var restored = await new LocalPlaylistStore(directory).LoadAsync();
+    Check(restored.Revision == 4 && restored.Playlists[0].Id == playlistId && restored.Playlists[0].Entries[0] == legacy);
+    Check(restored.Playlists[0].Entries[1].Track == unknown.Track && restored.Playlists[0].Entries[2] == multi);
+    byte[] before = await File.ReadAllBytesAsync(file);
+    foreach (var invalid in new[] {
+        multi with { LibraryIds = ["library-a", "library-a"] },
+        multi with { LibraryIds = [""] },
+        multi with { LibraryIds = Enumerable.Range(0, 101).Select(i => "library-" + i).ToArray(), LibraryId = "library-0" },
+        multi with { LibraryId = "wrong-primary" }
+    })
+    {
+        try { await store.SaveAsync(restored with { Playlists = [new(playlistId, "Invalid", [invalid])] }); throw new Exception("Invalid memberships accepted"); }
+        catch (InvalidDataException) { }
+        byte[] afterInvalid = await File.ReadAllBytesAsync(file);
+        Check(before.SequenceEqual(afterInvalid));
+    }
+    File.Delete(file); File.Delete(Path.Combine(directory, "local-playlists.json.lock")); Directory.Delete(directory);
+});
 await Test("local library catalog migrates identities and preserves libraries across conflicts and corruption", async () =>
 {
     string directory = Path.Combine(Path.GetTempPath(), "fnmusic-libraries-" + Guid.NewGuid().ToString("N"));
@@ -741,6 +796,7 @@ await Test("local music scans nested audio files with stable identities and open
     await File.WriteAllTextAsync(Path.Combine(directory, "ignore.txt"), "not audio");
     var settings = new LocalMusicSettings(Guid.NewGuid(), directory);
     var source = await LocalMusicSource.ScanAsync(settings, default);
+    Check(source.Library.SourceInstanceId == settings.SourceId && source.Tracks.All(track => track.GetLibraries().Single() == new LibraryReference(settings.SourceId, source.Library.Id)));
     Check(source.Source.Capabilities.HasFlag(MusicSourceCapabilities.Artwork | MusicSourceCapabilities.Lyrics));
     Check(!source.Source.Capabilities.HasFlag(MusicSourceCapabilities.WriteFavorites)
         && !source.Source.Capabilities.HasFlag(MusicSourceCapabilities.WriteSettings));

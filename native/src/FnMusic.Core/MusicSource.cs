@@ -22,6 +22,7 @@ public enum MusicSourceCapabilities
 
 /// <summary>库归属不参与曲目身份，同一源的歌曲可属于多个库。</summary>
 public sealed record MusicLibrary(Guid SourceInstanceId, string Id, string Name);
+public sealed record LibraryReference(Guid SourceInstanceId, string LibraryId);
 
 /// <summary>Empty 源 ID 仅用于尚未迁移的单源会话，不用于持久化跨源歌单。</summary>
 public sealed record TrackReference(Guid SourceInstanceId, string TrackId);

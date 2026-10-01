@@ -17,7 +17,7 @@ public sealed class LocalPlaylistStore(string directory)
             65536, FileOptions.Asynchronous);
         if (stream.Length > MaxBytes) throw new InvalidDataException("Playlist catalog is too large.");
         var document = await JsonSerializer.DeserializeAsync<Document>(stream, cancellationToken: ct).ConfigureAwait(false);
-        if (document is null || document.Version != 1) throw new InvalidDataException("Unsupported playlist catalog.");
+        if (document is null || document.Version is not (1 or 2)) throw new InvalidDataException("Unsupported playlist catalog.");
         var catalog = new LocalPlaylistCatalog(document.Revision, document.Playlists);
         Validate(catalog);
         return catalog;
@@ -27,7 +27,7 @@ public sealed class LocalPlaylistStore(string directory)
     {
         Validate(catalog);
         var next = catalog with { Revision = checked(catalog.Revision + 1) };
-        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new Document(1, next.Revision, next.Playlists.ToArray()));
+        byte[] bytes = JsonSerializer.SerializeToUtf8Bytes(new Document(2, next.Revision, next.Playlists.ToArray()));
         if (bytes.Length > MaxBytes) throw new InvalidDataException("Playlist catalog is too large.");
         ct.ThrowIfCancellationRequested();
         Directory.CreateDirectory(directory);
@@ -76,6 +76,7 @@ public sealed class LocalPlaylistStore(string directory)
                     entry.Track.SourceInstanceId == Guid.Empty || string.IsNullOrWhiteSpace(entry.Track.TrackId) || entry.Track.TrackId.Length > 4096 ||
                     !tracks.Add(entry.Track) || !TextValid(entry.Title) || !TextValid(entry.Artist) || !TextValid(entry.Album) ||
                     (entry.LibraryId is not null && entry.LibraryId.Length > 4096) ||
+                    !LibrariesValid(entry) ||
                     (entry.CoverId is not null && entry.CoverId.Length > 4096) ||
                     !double.IsFinite(entry.DurationSeconds) || entry.DurationSeconds is < 0 or > 864000)
                     throw new InvalidDataException("Invalid playlist entry.");
@@ -83,4 +84,11 @@ public sealed class LocalPlaylistStore(string directory)
         }
     }
     private static bool TextValid(string text) => text is not null && text.Length <= 4096;
+    private static bool LibrariesValid(LocalPlaylistEntry entry)
+    {
+        var ids = entry.GetLibraryIds();
+        return ids.Count <= 100 && ids.All(id => !string.IsNullOrWhiteSpace(id) && id.Length <= 4096)
+            && ids.Distinct(StringComparer.Ordinal).Count() == ids.Count
+            && (entry.LibraryIds is null || entry.LibraryId == ids.FirstOrDefault());
+    }
 }

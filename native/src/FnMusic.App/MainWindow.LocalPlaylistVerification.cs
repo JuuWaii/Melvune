@@ -46,6 +46,7 @@ public sealed partial class MainWindow
                 await Click("将所选条目重新关联到列表歌曲");
                 var relinked = (await playlistStore.LoadAsync()).Playlists[0].Entries.Single();
                 verify("playlist_relink_keeps_entry_identity", relinked.Id == offline.Id && relinked.Track == available.Track && dialog.IsPrimaryButtonEnabled);
+                verify("playlist_relink_keeps_library_membership", relinked.ToTrack().LibraryIds.SequenceEqual(track.LibraryIds));
                 name.Text = "已改名"; await Click("改名");
                 verify("playlist_rename_persisted", (await playlistStore.LoadAsync()).Playlists[0].Name == "已改名");
                 name.Text = "新建夹具"; await Click("新建");
@@ -71,6 +72,7 @@ public sealed partial class MainWindow
         await PlayLocalPlaylistAsync(final with { Entries = [available, offline] }, available);
         for (int i = 0; i < 80 && !mediaReady; i++) await Task.Delay(100);
         verify("playlist_play_skips_offline", queue.Count == 1 && queue.Current?.Reference == track.Reference && mediaReady);
+        verify("playlist_play_restores_library_membership", queue.Current?.LibraryIds.SequenceEqual(track.LibraryIds) == true);
         verify("playlist_play_lyrics", currentLyrics.Lines.Count == 3);
         await LoadArtworkAsync(NowCover);
         verify("playlist_play_cover", NowCover.Source is not null);

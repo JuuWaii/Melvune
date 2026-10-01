@@ -149,8 +149,7 @@ public sealed partial class MainWindow
         {
             if (Selected() is not { } current || pickedTrack is null || pickedTrack.SourceInstanceId == Guid.Empty) return;
             if (current.Entries.Any(entry => entry.Track == pickedTrack.Reference)) { status.Text = "该歌曲已在歌单中。"; return; }
-            var entry = LocalPlaylistEntry.FromTrack(pickedTrack,
-                localCatalog.Libraries.Any(item => item.SourceId == pickedTrack.SourceInstanceId) ? pickedTrack.SourceInstanceId.ToString("N") : null);
+            var entry = LocalPlaylistEntry.FromTrack(pickedTrack);
             await Replace(current, current.Entries.Append(entry).ToArray(), entry.Id);
         };
         remove.Click += async (_, _) =>
@@ -163,8 +162,7 @@ public sealed partial class MainWindow
             if (Selected() is not { } current || list.SelectedItem is not PlaylistRow row || pickedTrack is null || pickedTrack.SourceInstanceId == Guid.Empty) return;
             if (current.Entries.Any(entry => entry.Id != row.Entry.Id && entry.Track == pickedTrack.Reference))
             { status.Text = "目标歌曲已在此歌单中，请先处理重复条目。"; return; }
-            var replacement = LocalPlaylistEntry.FromTrack(pickedTrack,
-                localCatalog.Libraries.Any(item => item.SourceId == pickedTrack.SourceInstanceId) ? pickedTrack.SourceInstanceId.ToString("N") : null) with { Id = row.Entry.Id };
+            var replacement = LocalPlaylistEntry.FromTrack(pickedTrack) with { Id = row.Entry.Id };
             await Replace(current, current.Entries.Select(entry => entry.Id == row.Entry.Id ? replacement : entry).ToArray(), replacement.Id);
         };
         async Task Move(int delta)

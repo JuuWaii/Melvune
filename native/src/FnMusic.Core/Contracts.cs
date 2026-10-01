@@ -9,6 +9,9 @@ public sealed record MusicTrack(string Id, string Title, string Artist, double D
 {
     public Guid SourceInstanceId { get; init; }
     public TrackReference Reference => new(SourceInstanceId, Id);
+    // Membership does not change track identity. Empty means the provider has not reported it.
+    public IReadOnlyList<string> LibraryIds { get; init; } = [];
+    public IReadOnlyList<LibraryReference> GetLibraries() => LibraryIds.Select(id => new LibraryReference(SourceInstanceId, id)).ToArray();
     public bool IsFavorite { get; init; }
     public string Album { get; init; } = "";
     public string SourceLabel { get; init; } = "";

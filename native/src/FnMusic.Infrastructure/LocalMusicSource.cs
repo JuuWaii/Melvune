@@ -18,6 +18,7 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
     public MusicSource Source { get; }
     public IReadOnlyList<MusicTrack> Tracks { get; }
     public LocalMusicSettings Settings { get; }
+    public MusicLibrary Library => new(Source.Id, Source.Id.ToString("N"), Source.Name);
     private static readonly HashSet<string> extensions = new(StringComparer.OrdinalIgnoreCase)
         { ".mp3", ".flac", ".wav", ".ogg", ".opus", ".m4a", ".aac", ".wma", ".aiff", ".aif", ".ape" };
 
@@ -71,7 +72,7 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
                 catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                 catch (Exception) { /* 不支持的标签不能阻止文件被浏览和播放。 */ }
             }
-            tracks.Add(new(id, title, artist, duration, false) { SourceInstanceId = settings.SourceId, Album = album });
+            tracks.Add(new(id, title, artist, duration, false) { SourceInstanceId = settings.SourceId, Album = album, LibraryIds = [settings.SourceId.ToString("N")] });
             ct.ThrowIfCancellationRequested();
             if (tracks.Count % 25 == 0) progress?.Report(tracks.Count);
         }

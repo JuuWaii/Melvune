@@ -32,7 +32,8 @@ public sealed partial class MainWindow
         LocalGroupFilter.SelectedIndex = 0;
         for (int i = 0; i < 60 && total != 2; i++) await Task.Delay(50);
         verify("library_all_groups_restored", total == 2);
-        var entries = tracks.Select(track => LocalPlaylistEntry.FromTrack(track, track.SourceInstanceId.ToString("N"))).ToArray();
+        var entries = tracks.Select(track => LocalPlaylistEntry.FromTrack(track)).ToArray();
+        verify("multi_library_scanned_membership", tracks.All(track => track.LibraryIds.SequenceEqual(new[] { track.SourceInstanceId.ToString("N") })));
         var playlist = new LocalPlaylist(Guid.NewGuid(), "跨库窗口夹具", entries);
         var catalog = await playlistStore.LoadAsync();
         await playlistStore.SaveAsync(catalog with { Playlists = [playlist] });
@@ -105,6 +106,8 @@ public sealed partial class MainWindow
         await RestoreLocalSourcesAsync(default);
         var reloaded = (await playlistStore.LoadAsync()).Playlists.Single();
         verify("multi_library_playlist_restart_restore", reloaded.Entries.All(PlaylistTrackAvailable) && localSources.Count == 2);
+        verify("multi_library_membership_restart_restore", reloaded.Entries.All(entry => entry.ToTrack().GetLibraries().Single()
+            == new LibraryReference(entry.Track.SourceInstanceId, entry.Track.SourceInstanceId.ToString("N"))));
         var unavailable = libraries[1] with { Directory = Path.Combine(libraries[1].Directory, "missing") };
         ApplyLocalCatalog(saved with { Libraries = [libraries[0], unavailable] });
         await RestoreLocalSourcesAsync(default);
