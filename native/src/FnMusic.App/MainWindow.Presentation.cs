@@ -15,8 +15,10 @@ public sealed partial class MainWindow
     private CancellationTokenSource lyricsWork = new();
     private Lyrics currentLyrics = Lyrics.Empty;
     private int activeLyric = -1;
+    private bool lyricsNeedsRetry;
 #if DEBUG
     private Func<Task>? localArtworkBeforeCommit;
+    private Func<Task>? lyricsBeforeCommit;
 #endif
     private void InitializePresentation()
     {
@@ -53,10 +55,13 @@ public sealed partial class MainWindow
     private async void SidebarAlbums_Click(object sender, RoutedEventArgs e) { ShowBrowsePanel(); await SwitchCollectionAsync(CollectionKind.Album); }
     private async void SidebarArtists_Click(object sender, RoutedEventArgs e) { ShowBrowsePanel(); await SwitchCollectionAsync(CollectionKind.Artist); }
     private void ShowBrowsePanel() { SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible; }
-    private void Lyrics_Click(object sender, RoutedEventArgs e)
+    private async void Lyrics_Click(object sender, RoutedEventArgs e)
     {
         ShowBrowsePanel(); LyricsPanel.Visibility = LyricsPanel.Visibility == Visibility.Visible ? Visibility.Collapsed : Visibility.Visible;
         UpdateAdaptiveLayout(Root.ActualWidth);
+        if (LyricsPanel.Visibility == Visibility.Visible && lyricsNeedsRetry && queue.Current is { } track
+            && TrackSupports(track, MusicSourceCapabilities.Lyrics)) await LoadLyricsAsync(track);
+        if (closed) return;
         if (LyricsPanel.Visibility == Visibility.Visible && activeLyric >= 0) LyricsList.ScrollIntoView(currentLyrics.Lines[activeLyric]);
     }
 
@@ -143,6 +148,7 @@ public sealed partial class MainWindow
     {
         lyricsWork.Cancel(); lyricsWork.Dispose(); lyricsWork = new();
         currentLyrics = Lyrics.Empty; activeLyric = -1; LyricsList.ItemsSource = null;
+        lyricsNeedsRetry = false;
         LyricsStatus.Text = "播放歌曲后显示歌词。"; NowCover.DataContext = null; NowCover.Source = null; NowAlbum.Text = "";
     }
     private async Task LoadLyricsAsync(MusicTrack track)
@@ -150,8 +156,17 @@ public sealed partial class MainWindow
         if (closed) return;
         ClearPresentation(); NowCover.DataContext = track; NowAlbum.Text = track.Album;
         if (!TrackSupports(track, MusicSourceCapabilities.Lyrics))
-        { LyricsStatus.Text = "当前歌曲来源未连接或不支持歌词。"; return; }
+        { lyricsNeedsRetry = true; LyricsStatus.Text = "当前歌曲来源未连接或不支持歌词。"; return; }
         var ct = lyricsWork.Token; LyricsStatus.Text = "正在加载歌词…";
+        var source = localSources.GetValueOrDefault(track.SourceInstanceId);
+        var api = ViewModel.AuthenticatedClient;
+        bool SourceIsCurrent() => TrackSupports(track, MusicSourceCapabilities.Lyrics) && (source is not null
+            ? ReferenceEquals(source, localSources.GetValueOrDefault(track.SourceInstanceId))
+            : api is not null && track.SourceInstanceId == api.SourceInstanceId && ReferenceEquals(api, ViewModel.AuthenticatedClient)
+#if DEBUG
+                || (IsSyntheticPreview && track.SourceInstanceId == Guid.Empty)
+#endif
+        );
         try
         {
             Lyrics result;
@@ -160,16 +175,27 @@ public sealed partial class MainWindow
                 result = Lyrics.Parse("[00:00.00]合成歌词验证\n[00:10.00]播放进度同步\n[00:20.00]点击歌词可跳转");
             else
 #endif
-            if (localSources.TryGetValue(track.SourceInstanceId, out var source)) result = await source.GetLyricsAsync(track.Reference, ct);
-            else if (ViewModel.AuthenticatedClient is { } api && api.SourceInstanceId == track.SourceInstanceId) result = await api.GetLyricsAsync(track.Reference, ct);
+            if (source is not null) result = await source.GetLyricsAsync(track.Reference, ct);
+            else if (api is not null && api.SourceInstanceId == track.SourceInstanceId) result = await api.GetLyricsAsync(track.Reference, ct);
             else result = Lyrics.Empty;
+#if DEBUG
+            if (lyricsBeforeCommit is { } beforeCommit) await beforeCommit();
+#endif
             if (ct.IsCancellationRequested || closed) return;
+            if (!SourceIsCurrent()) { lyricsNeedsRetry = true; LyricsStatus.Text = "歌曲来源已变化或不支持歌词，打开歌词可重试。"; return; }
             currentLyrics = result; LyricsList.ItemsSource = result.Lines;
             LyricsStatus.Text = result.Lines.Count == 0 ? "暂无歌词。本地音乐可放置同名 .lrc 文件。" : result.IsTimed ? "随播放高亮 · 点击歌词跳转" : "纯文本歌词（无时间轴）";
             UpdateLyricsPosition();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
-        catch (Exception) { if (!closed && !ct.IsCancellationRequested) LyricsStatus.Text = "歌词加载失败，可重新播放重试。"; }
+        catch (Exception)
+        {
+            if (!closed && !ct.IsCancellationRequested)
+            {
+                lyricsNeedsRetry = true;
+                LyricsStatus.Text = SourceIsCurrent() ? "歌词加载失败，打开歌词可重试。" : "歌曲来源已变化或不支持歌词，打开歌词可重试。";
+            }
+        }
     }
     private void UpdateLyricsPosition()
     {

@@ -162,6 +162,7 @@ public sealed partial class MainWindow
             await LoadArtworkAsync(NowCover);
             Verify("local_replacement_cover_loads", NowCover.Source is not null);
             Verify("local_lyrics_loaded", currentLyrics.IsTimed && currentLyrics.Lines.Count == 3);
+            local = await VerifyLyricsSourceChangesAsync(Verify, local, TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
             LyricsPanel.Visibility = Visibility.Visible;
             music.Player.Pause();
             pendingSeek = 20; CommitSeek();
@@ -237,7 +238,7 @@ public sealed partial class MainWindow
             ResetLibrary();
             Verify("nas_reset_clears_remote_view_only", TrackList.ItemsSource is null && total == 0 && queue.Count == 1
                 && ReferenceEquals(music.Player.Source, activeLocalAudio) && mediaReady);
-            Stop_Click(this, new RoutedEventArgs());
+            await VerifyStoppedLyricsRequestAsync(Verify, queue.Current ?? throw new InvalidOperationException());
             Verify("stop_clears_presentation", NowCover.Source is null && currentLyrics.Lines.Count == 0 && LyricsList.ItemsSource is null);
             await SwitchCollectionAsync(null);
             Verify("local_return_to_nas", !localView && TrackList.SelectedItem is MusicTrack { Id: "synthetic-a" } && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));
