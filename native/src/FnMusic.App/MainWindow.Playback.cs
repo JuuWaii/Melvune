@@ -109,9 +109,11 @@ public sealed partial class MainWindow
     }
     private async Task SearchAsync()
     {
+        string query = SearchInput.Text.Trim();
+        if (!localView && !RequireRemoteCapability(query.Length == 0 ? MusicSourceCapabilities.Browse : MusicSourceCapabilities.Search)) return;
         favoritesView = false;
         parentArtist = null; collectionKind = null; collection = null; UpdateCollectionView();
-        searchQuery = SearchInput.Text.Trim();
+        searchQuery = query;
         await LoadPageAsync(1);
     }
     private async void ClearSearch_Click(object sender, RoutedEventArgs e)

@@ -32,12 +32,52 @@ public sealed partial class MainWindow
             await LoadPageAsync(1);
             verify("unsupported_search_preserve_browser", ReferenceEquals(items, TrackList.ItemsSource));
             searchQuery = "";
+            await SwitchCollectionAsync(CollectionKind.Album);
+            await LoadPageAsync(2);
+            await OpenCollectionAsync(((IEnumerable<MusicCollection>)CollectionList.ItemsSource!).First());
+            var detailItems = TrackList.ItemsSource;
+            var detailSelection = TrackList.SelectedItem;
+            var detail = collection;
+            int detailPage = page, detailTotal = total;
+            SearchInput.Text = "不支持搜索";
+            await SearchAsync();
+            verify("unsupported_search_entry_preserves_detail_context", ReferenceEquals(detailItems, TrackList.ItemsSource)
+                && ReferenceEquals(detailSelection, TrackList.SelectedItem) && ReferenceEquals(detail, collection)
+                && collectionKind == CollectionKind.Album && page == detailPage && total == detailTotal
+                && searchQuery.Length == 0 && TrackList.Visibility == Visibility.Visible);
+            await SwitchCollectionAsync(null);
+            items = TrackList.ItemsSource;
             ViewModel.PlaybackRouter.Unregister(id);
             ViewModel.PlaybackRouter.Register(new RemoteCapabilityFixture(id, MusicSourceCapabilities.Browse | MusicSourceCapabilities.ReadFavorites
                 | MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.ReadSettings));
             UpdateSourceCommands();
             verify("read_capability_navigation_enabled", RemoteFavoritesNavigation.IsEnabled && RemoteFavoritesTab.IsEnabled
                 && RemotePlaylistsNavigation.IsEnabled && RemoteSettingsNavigation.IsEnabled);
+            await ShowFavoritesAsync();
+            var favoriteItems = TrackList.ItemsSource;
+            string favoritePageStatus = PageStatus.Text;
+            SearchInput.Text = "不支持搜索";
+            await SearchAsync();
+            verify("unsupported_search_entry_preserves_favorites", favoritesView && ReferenceEquals(favoriteItems, TrackList.ItemsSource)
+                && searchQuery.Length == 0 && PageStatus.Text == favoritePageStatus);
+            await SwitchCollectionAsync(null);
+            items = TrackList.ItemsSource;
+            ViewModel.PlaybackRouter.Unregister(id);
+            ViewModel.PlaybackRouter.Register(new RemoteCapabilityFixture(id, MusicSourceCapabilities.Search));
+            UpdateSourceCommands();
+            SearchInput.Text = "合成";
+            await SearchAsync();
+            var searchItems = TrackList.ItemsSource;
+            string currentQuery = searchQuery, searchPageStatus = PageStatus.Text;
+            SearchInput.Text = " ";
+            await SearchAsync();
+            verify("empty_search_requires_browse_preserves_search_results", currentQuery == "合成" && searchQuery == currentQuery
+                && ReferenceEquals(searchItems, TrackList.ItemsSource) && PageStatus.Text == searchPageStatus
+                && SearchAction.IsEnabled && !RemoteMusicNavigation.IsEnabled);
+            ViewModel.PlaybackRouter.Unregister(id);
+            ViewModel.PlaybackRouter.Register(new RemoteCapabilityFixture(id, MusicSourceCapabilities.Browse));
+            await SwitchCollectionAsync(null);
+            items = TrackList.ItemsSource;
             ViewModel.PlaybackRouter.Unregister(id);
             ConnectionCapabilitiesChanged(ViewModel, new(nameof(ViewModel.AuthenticatedClient)));
             verify("disconnected_remote_navigation_disabled", !RemoteMusicNavigation.IsEnabled && !RemoteFavoritesTab.IsEnabled
@@ -45,6 +85,10 @@ public sealed partial class MainWindow
             var panel = LibraryPanel.Visibility;
             await ShowLibraryAsync();
             verify("disconnected_browse_rejected_before_navigation", ReferenceEquals(items, TrackList.ItemsSource) && LibraryPanel.Visibility == panel);
+            SearchInput.Text = "无法搜索";
+            await SearchAsync();
+            verify("disconnected_search_entry_preserves_browser", ReferenceEquals(items, TrackList.ItemsSource)
+                && searchQuery.Length == 0 && !favoritesView && collection is null && LibraryPanel.Visibility == panel);
         }
         finally { ViewModel.PlaybackRouter.Unregister(id); remoteCapabilityTestSource = null; searchQuery = ""; UpdateSourceCommands(); }
     }
