@@ -47,3 +47,26 @@ Range 模式额外验证打开媒体时分别阻塞 HTTP 响应头和响应正�
 追加 `--fast-seek` 将 FFmpeg `fflags` 设为 `+fastseek`。MP3 同一样本三次定位均只读取 262,144 字节，总读取 1,048,577 字节；响应头/正文阻塞后的退出分别约 12 / 0 毫秒。
 
 该选项没有进入正式播放器，也不默认启用。FFmpeg 的 [MP3 解复用源码](https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/mp3dec.c) 表明快速模式使用 TOC 或文件比例定位，VBR 可能不精确。当前恒定频率样本只验证位置推进，不能验证实际音频与目标时间一致。下一步须用带可识别时间标记的 CBR/VBR 样本检查内容误差后，才能决定产品定位策略。此选项不同于 FFmpegInteropX 为视频关键帧提供的 General.FastSeek。
+
+## 音频内容定位诊断（2026-10-01）
+
+新增独立入口，补足上文恒定频率样本的证据缺口：
+
+```powershell
+./.tools/dotnet/dotnet.exe run --project native/tests/FnMusic.SeekProbe/FnMusic.SeekProbe.csproj --no-restore -- --verify-content
+./.tools/dotnet/dotnet.exe run --project native/tests/FnMusic.SeekProbe/FnMusic.SeekProbe.csproj --no-restore -- --verify-content --format=mp3-vbr --fast-seek
+```
+
+生成 10 分钟、48 kHz 单声道可识别时间位置的确定性噪声样本，交替改变复杂度和音量，避免 VBR 字节分布均匀。格式为 WAV、FLAC、128 kbps CBR MP3、q=2 VBR MP3、q=4 Vorbis OGG；每种依次定位 571、31、451、5 秒，覆盖前后定位及不同编码复杂度。所有输入经过真实 HttpRangeStream、受控 Range 响应及 MediaPlayer；没有真实网络请求或用户音乐。准确模式链接生产 SeekablePlayback，快速模式只修改实验配置。
+
+解码器创建 MediaPlaybackItem 后，在它已有的 MediaStreamSource 上追加只读 SampleRequested 观察者，不改变提供给播放器的 Sample。样本参考由另一个 FFmpeg 进程从整个编码文件顺序解码产生，参考链路没有 seek；使用归一化互相关定位实际 PCM 内容，避免把有损压缩差异误判为时间错误。跨越目标的音频包裁掉目标之前的部分；最多收集目标后半秒的 32 帧。每项另用偏移 20 秒的参考作反向控制，确认错误内容不能匹配。
+
+诊断目标为在 50 毫秒内出现稳定音频、内容误差不超过 50 毫秒、相关系数超过 0.8，且至少两帧以及恢复后的全部观察帧满足条件。50 毫秒是本探针的回归目标，不是主观听音或全部格式的产品保证。报告保留起始过渡时长、全部帧的内容误差/相关度、读取量、编码文件大小和包含至少 250 毫秒播放观察的耗时。未达到目标返回非零退出码并保留 JSON，不隐藏首帧过渡以制造通过结果。
+
+当前准确模式报告时间 `2026-10-01T18:11:34.3290986+08:00`：20 项中 17 项通过，VBR MP3 的 571、451、5 秒三项未通过，起始恢复时长分别约 57、57、65 毫秒。CBR MP3 约 33～41 毫秒。全部格式恢复后的已观察帧与顺序解码参考的匹配偏移均为 0 个样本；这是本次有限合成样本的诊断证据，不能替代真实设备声音、边界处每个采样点或长期播放验证。
+
+随后 VBR 快速定位对照中，571、31、451 秒对应实际内容偏移约 -599、+407、-138 毫秒，5 秒一项通过；准确模式没有同样的持续内容偏移。快速模式因此继续禁止进入默认配置。准确模式的起始解码过渡和较大的首次读取量仍需处理，不把本诊断标为全部定位验收完成。
+
+输出位于可执行目录的 `seek-content-verification.json`；追加 --fast-seek 时另存 `seek-content-comparison.json`，保留主矩阵。临时数据仅为本探针创建的随机目录和生成音频，退出时校验目录范围再清理。JSON、PCM 和编码样本不进入版本库。
+
+公开的 [FFmpegInteropX 常规定位实现](https://github.com/ffmpeginteropx/FFmpegInteropX/blob/master/Source/FFmpegReader.cpp) 在音频目标包定位后刷新解码状态，且 [公开接口](https://github.com/ffmpeginteropx/FFmpegInteropX/blob/master/Source/FFmpegInteropX.idl) 没有独立的音频 seek/preroll 方法。这支持后续调查解码预滚的方向，但 master 不是本次固定包源码，不能据它直接确认固定包的内部原因。

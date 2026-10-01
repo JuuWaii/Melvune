@@ -7,6 +7,16 @@ using System.Net.Http.Headers;
 using FnMusic.App.Services;
 
 // Synthetic input only: no user files, credentials or network access.
+if (args.Contains("--verify-content", StringComparer.Ordinal))
+{
+    try { await SeekContentVerification.RunAsync(args); }
+    catch (Exception error)
+    {
+        Console.Error.WriteLine($"FAIL content verification: {error.GetType().Name}. See the JSON report for individual cases.");
+        Environment.ExitCode = 1;
+    }
+    return;
+}
 const int sampleRate = 48000, seconds = 600;
 var path = Path.Combine(Path.GetTempPath(), $"fnmusic-seek-{Guid.NewGuid():N}.wav");
 var wavePath = path;

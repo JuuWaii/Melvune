@@ -44,6 +44,8 @@ FFmpegInteropX 官方声明支持 WinUI 3 Desktop，公开了 IRandomAccessStrea
 
 ## 一手资料
 
+2026-10-01 更新：新增带时间特征的音频内容诊断，通过实际 MediaPlayer 的 MediaStreamSource 观察 PCM，并对比完整顺序解码的独立参考。准确模式 20 项中 17 项达到探针目标，三个 VBR MP3 场景起始恢复约 57～65 毫秒；恢复后的观察帧内容匹配正确。快速 VBR 定位的三处持续偏移约 -599、+407、-138 毫秒，不能进入默认配置。完整方法、失败条件和证据范围见 SeekProbe README，不能将时钟推进或部分恢复后的内容匹配当作全部定位验收完成。下一步优先调查 MP3 音频预滚，同时保留真实慢网、读取量及连续交互扩展。
+
 - [FFmpegInteropX 项目与流接入说明](https://github.com/ffmpeginteropx/FFmpegInteropX)
 - [FFmpegMediaSource 自定义 IO 源码](https://github.com/ffmpeginteropx/FFmpegInteropX/blob/master/Source/FFmpegMediaSource.cpp)
 - [NuGet 包](https://www.nuget.org/packages/FFmpegInteropX)
