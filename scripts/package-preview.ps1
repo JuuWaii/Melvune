@@ -1,4 +1,4 @@
-param([string]$Name = ('FnMusic-0.2.0-preview.5-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss')))
+param([string]$Name = ('FnMusic-0.2.0-preview.6-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss')))
 $ErrorActionPreference = 'Stop'
 if ($Name -notmatch '^[a-zA-Z0-9._-]+$' -or $Name -in @('.', '..')) { throw 'Invalid package name' }
 $repo = Split-Path $PSScriptRoot -Parent
