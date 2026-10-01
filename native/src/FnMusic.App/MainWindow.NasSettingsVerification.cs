@@ -19,11 +19,14 @@ public sealed partial class MainWindow
         public int Writes;
         public bool TaskExists = true, TaskDone, TaskCancelling;
         public bool ReconnectMatch = true;
+        public string? FailedRead;
         public readonly Dictionary<string, (string Path, bool Lyric, string Metadata)> Libraries = new() { ["initial"] = ("/music/initial", false, "cloud_preferred") };
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             object Library(string id) => new { guid = id, name = id, path = Libraries[id].Path, autoDownloadLyric = Libraries[id].Lyric, metadataPreference = Libraries[id].Metadata };
             string path = request.RequestUri!.AbsolutePath; object? data = null;
+            if (request.Method == HttpMethod.Get && FailedRead is not null && path.EndsWith(FailedRead))
+                return new(HttpStatusCode.ServiceUnavailable);
             if (request.Method == HttpMethod.Post)
             {
                 Writes++;
@@ -64,7 +67,7 @@ public sealed partial class MainWindow
     }
     private async Task VerifyNasSettingsWindowAsync(Action<string, bool> verify)
     {
-        var handler = new SettingsFixtureHandler();
+        var handler = new SettingsFixtureHandler { FailedRead = "settings/server" };
         using var api = new NasApiClient(ServerEndpoint.Parse("https://nas.example.invalid/"), handler, Guid.NewGuid());
         settingsTestClient = api;
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -87,6 +90,12 @@ public sealed partial class MainWindow
                     for (int i = 0; i < 100 && !editor.IsEnabled; i++) await Task.Delay(50);
                     if (!editor.IsEnabled) throw new TimeoutException();
                 }
+                verify("nas_settings_initial_partial_failure_opens", status.Text.Contains("服务器设置")
+                    && !buttons.Single(button => button.Content.ToString() == "保存服务器名称").IsEnabled
+                    && buttons.Single(button => button.Content.ToString() == "保存素材库设置").IsEnabled);
+                handler.FailedRead = null; await Click("刷新飞牛设置");
+                verify("nas_settings_partial_retry_recovers", buttons.Single(button => button.Content.ToString() == "保存服务器名称").IsEnabled
+                    && !status.Text.Contains("读取失败"));
                 library.Children.OfType<ComboBox>().Single(item => item.Header?.ToString() == "元数据优先策略").SelectedIndex = 2;
                 library.Children.OfType<CheckBox>().First().IsChecked = true;
                 await Click("保存素材库设置");
@@ -143,7 +152,14 @@ public sealed partial class MainWindow
                 ((IToggleProvider)new CheckBoxAutomationPeer(reconnect.Children.OfType<CheckBox>().Single()).GetPattern(PatternInterface.Toggle)).Toggle();
                 await Click("重新关联素材库");
                 verify("nas_reconnect_path_readback", handler.Libraries["initial"].Path == "/music/moved" && reconnect.Children.OfType<TextBlock>().Any(text => text.Text.Contains("已回读确认")));
-                handler.Admin = false; await Click("刷新飞牛设置");
+                handler.FailedRead = "shared-library/list"; await Click("刷新飞牛设置");
+                verify("nas_settings_library_failure_disables_dependent_writes", status.Text.Contains("素材库")
+                    && !buttons.Single(button => button.Content.ToString() == "保存默认访问范围").IsEnabled
+                    && !buttons.Single(button => button.Content.ToString() == "保存素材库设置").IsEnabled
+                    && buttons.Single(button => button.Content.ToString() == "保存服务器名称").IsEnabled);
+                tabs.SelectedIndex = 3; await Task.Delay(150); await Click("刷新后台任务");
+                verify("nas_settings_partial_failure_keeps_tasks", taskDetails.Text.Contains("不代表之前的扫描已成功完成") && status.Text.Contains("素材库"));
+                handler.FailedRead = null; handler.Admin = false; await Click("刷新飞牛设置");
                 verify("nas_settings_member_readonly", !buttons.Single(button => button.Content.ToString() == "保存默认访问范围").IsEnabled
                     && !buttons.Single(button => button.Content.ToString() == "保存素材库设置").IsEnabled);
                 done.TrySetResult();

@@ -41,6 +41,8 @@ public sealed partial class MainWindow
         NasDefaultLibraryAccess? access = null;
         NasSharedLibrary? selected = null;
         IReadOnlyList<NasSharedLibrary> libraries = [];
+        bool librariesReady = false;
+        string refreshWarning = "";
         var panel = new StackPanel { Spacing = 10, MinWidth = 320 };
         var tabs = new Pivot();
         var libraryPanel = new StackPanel { Spacing = 10 };
@@ -94,18 +96,18 @@ public sealed partial class MainWindow
             saveLibrary.IsEnabled = admin && selected is not null && known;
             scan.IsEnabled = admin && selected is not null;
             delete.IsEnabled = admin && selected is not null && confirmDelete.IsChecked == true;
-            create.IsEnabled = admin && known && !string.IsNullOrWhiteSpace(createPath.Text);
+            create.IsEnabled = admin && librariesReady && known && !string.IsNullOrWhiteSpace(createPath.Text);
             preference.IsEnabled = autoLyric.IsEnabled = authorized.IsEnabled = createPath.IsEnabled = admin;
             serverName.IsEnabled = saveServer.IsEnabled = admin && server is not null;
-            mode.IsEnabled = saveAccess.IsEnabled = admin && access is not null;
-            accessLibraries.IsEnabled = admin && access is not null && mode.SelectedIndex == 1;
+            mode.IsEnabled = saveAccess.IsEnabled = admin && librariesReady && access is not null;
+            accessLibraries.IsEnabled = admin && librariesReady && access is not null && mode.SelectedIndex == 1;
             updateTaskButtons();
             updateReconnectButtons();
         }
         void RenderSelected()
         {
             selected = (picker.SelectedItem as SharedLibraryRow)?.Value;
-            currentPath.Text = selected?.Path ?? "尚无素材库。";
+            currentPath.Text = selected?.Path ?? (librariesReady ? "尚无素材库。" : "素材库读取失败，请刷新重试。");
             preference.SelectedIndex = selected is null ? 1 : Array.IndexOf(preferences, selected.MetadataPreference);
             autoLyric.IsChecked = selected?.AutoDownloadLyric ?? false; confirmDelete.IsChecked = false;
             refreshReconnectSelection();
@@ -115,21 +117,31 @@ public sealed partial class MainWindow
         {
             admin = await api.IsAdministratorAsync(ct);
             role.Text = admin ? "管理员设置 · 保存与刷新直接同步飞牛服务器" : "当前账号仅查看素材库；管理设置需要飞牛管理员权限。";
-            libraries = await api.ListSharedLibrariesAsync(ct);
+            var failed = new List<string>();
+            async Task ReadSection(string label, Func<Task> read)
+            {
+                try { await read(); }
+                catch (OperationCanceledException) { throw; }
+                catch (MusicApiException ex) when (ex.Failure == MusicFailure.Unauthorized) { throw; }
+                catch (Exception) { failed.Add(label); }
+            }
+            libraries = []; librariesReady = false; server = null; access = null;
+            authorized.ItemsSource = null;
+            await ReadSection("素材库", async () => { libraries = await api.ListSharedLibrariesAsync(ct); librariesReady = true; });
             if (admin)
             {
-                server = await api.GetServerSettingsAsync(ct);
-                access = await api.GetDefaultLibraryAccessAsync(ct);
-                authorized.ItemsSource = await api.ListAuthorizedDirectoriesAsync(ct);
+                await ReadSection("服务器设置", async () => server = await api.GetServerSettingsAsync(ct));
+                await ReadSection("默认访问范围", async () => access = await api.GetDefaultLibraryAccessAsync(ct));
+                await ReadSection("授权目录", async () => authorized.ItemsSource = await api.ListAuthorizedDirectoriesAsync(ct));
             }
-            else { server = null; access = null; authorized.ItemsSource = null; }
             ct.ThrowIfCancellationRequested();
+            refreshWarning = failed.Count == 0 ? "" : "部分设置读取失败：" + string.Join("、", failed) + "。请刷新重试；其他已读取项仍可使用。";
             rendering = true;
             var rows = libraries.Select(item => new SharedLibraryRow(item, string.IsNullOrWhiteSpace(item.Library.Name) ? item.Path : item.Library.Name)).ToArray();
             picker.ItemsSource = rows; picker.SelectedItem = rows.FirstOrDefault(item => item.Value.Library.Id == selectedId) ?? rows.FirstOrDefault();
             RenderSelected();
             serverName.Text = server?.Name ?? "";
-            language.Text = server is null ? "需要管理员权限。" : "服务端语言：" + server.Language + "（保留现有值）";
+            language.Text = server is null ? (admin ? "服务器设置读取失败，请刷新重试。" : "需要管理员权限。") : "服务端语言：" + server.Language + "（保留现有值）";
             mode.SelectedIndex = access?.Mode switch { "partial" => 1, "all" => 2, _ => 0 };
             accessLibraries.ItemsSource = rows;
             if (access is not null) foreach (var row in rows.Where(row => access.LibraryIds.Contains(row.Value.Library.Id))) accessLibraries.SelectedItems.Add(row);
@@ -139,7 +151,7 @@ public sealed partial class MainWindow
         {
             if (busy || ct.IsCancellationRequested) return;
             busy = true; editor.IsEnabled = false; status.Text = "正在与飞牛同步…";
-            try { await operation(); ct.ThrowIfCancellationRequested(); status.Text = scanRequest ? "扫描请求已提交，请在后台任务页刷新查看状态，完成后刷新曲库。" : "操作已返回；具体结果以当前页面回读状态为准。"; }
+            try { await operation(); ct.ThrowIfCancellationRequested(); status.Text = (scanRequest ? "扫描请求已提交，请在后台任务页刷新查看状态，完成后刷新曲库。" : "操作已返回；具体结果以当前页面回读状态为准。") + (refreshWarning.Length == 0 ? "" : "\n" + refreshWarning); }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
             catch (RemoteSettingsConflictException)
             { selected = null; server = null; access = null; status.Text = "服务端设置已变化或回读不一致，请刷新核对后重试。"; }
@@ -188,6 +200,7 @@ public sealed partial class MainWindow
         try
         {
             await Refresh();
+            status.Text = refreshWarning;
             if (closed || !IsCurrentSettingsClient(api)) return;
 #if DEBUG
             dialog.Opened += (_, _) => settingsDialogOpened?.Invoke(dialog);
