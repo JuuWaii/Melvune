@@ -235,6 +235,36 @@ public sealed partial class MainWindow
             try { await pendingScan; throw new InvalidOperationException(); } catch (OperationCanceledException) { }
             Verify("local_scan_cancel_preserves_source", ReferenceEquals(localSource, local) && CancelLocalScan.Visibility == Visibility.Collapsed
                 && LocalScanStatus.Text.Contains("已取消") && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));
+            var storedLibraries = await localLibraryStore.LoadAsync();
+            ApplyLocalCatalog(await localLibraryStore.SaveAsync(localCatalog with { Revision = storedLibraries.Revision }));
+            await LoadPageAsync(2);
+            TrackList.SelectedIndex = 1;
+            var beforeRefreshItems = TrackList.ItemsSource;
+            var beforeRefreshSelection = TrackList.SelectedItem;
+            var refreshEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            localPageMetadataReader = async (_, ct) =>
+            { refreshEntered.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); return new("", "", 0); };
+            try
+            {
+                var refresh = LoadLocalPageAsync(1, true);
+                await refreshEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                Verify("local_refresh_loading", TrackList.ItemsSource is null && CancelLocalScan.Visibility == Visibility.Visible);
+                CancelLocalScan_Click(this, new RoutedEventArgs());
+                await refresh;
+                Verify("local_refresh_cancel_restores_page_selection", ReferenceEquals(TrackList.ItemsSource, beforeRefreshItems)
+                    && ReferenceEquals(TrackList.SelectedItem, beforeRefreshSelection) && page == 2 && total == 53
+                    && PreviousPage.IsEnabled && !NextPage.IsEnabled && PageStatus.Text.Contains("已取消"));
+                Verify("local_refresh_cancel_keeps_registration", ReferenceEquals(localSources[local.Source.Id], local)
+                    && ViewModel.PlaybackRouter.CanPlay(local.Tracks[0].Reference));
+                TrackList.ItemsSource = new[] { remoteTrack }; TrackList.SelectedIndex = 0;
+                refreshEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                refresh = LoadLocalPageAsync(1, true);
+                await refreshEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                CancelLocalScan_Click(this, new RoutedEventArgs()); await refresh;
+                Verify("local_cancel_does_not_restore_foreign_page", TrackList.ItemsSource is null && TrackList.SelectedItem is null
+                    && page == 1 && total == 0 && !PreviousPage.IsEnabled && !NextPage.IsEnabled);
+            }
+            finally { localPageMetadataReader = null; }
             SearchInput.Text = "000-playback"; await SearchAsync();
             await VerifyLocalPlaylistWindowAsync(Verify, TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
             await VerifyMultiLibraryWindowAsync(Verify);

@@ -18,6 +18,9 @@ public sealed partial class MainWindow
     private CancellationTokenSource? localScan;
     private readonly CancellationTokenSource localLifetime = new();
     private readonly LocalLibraryStore localLibraryStore = new(ThemeSettingsDirectory());
+#if DEBUG
+    private Func<string, CancellationToken, Task<LocalMusicMetadata>>? localPageMetadataReader;
+#endif
 
     private async void LocalMusic_Click(object sender, RoutedEventArgs e) => await ShowLocalMusicAsync();
     private async Task ShowLocalMusicAsync()
@@ -186,6 +189,17 @@ public sealed partial class MainWindow
     {
         libraryWork.Cancel(); libraryWork.Dispose(); libraryWork = new();
         var ct = libraryWork.Token;
+        var previousItems = TrackList.ItemsSource;
+        var previousSelection = TrackList.SelectedItem;
+        int previousPage = page, previousTotal = total;
+        bool previousBack = PreviousPage.IsEnabled, previousNext = NextPage.IsEnabled;
+        // Entering local music may still have a remote page on screen. Do not restore it as local music.
+        if (previousItems is not IEnumerable<MusicTrack> previousTracks ||
+            previousTracks.Any(track => !localSources.ContainsKey(track.SourceInstanceId)))
+        {
+            previousItems = null; previousSelection = null;
+            previousPage = 1; previousTotal = 0; previousBack = previousNext = false;
+        }
         TrackList.ItemsSource = null; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
         PageStatus.Text = "正在读取本地音乐…";
         try
@@ -193,19 +207,28 @@ public sealed partial class MainWindow
             if (!localCatalogLoaded) ApplyLocalCatalog(await localLibraryStore.LoadAsync(ct));
             if (rescan) ApplyLocalCatalog(await localLibraryStore.LoadAsync(ct));
             var definitions = FilteredLocalLibraries().ToArray();
+            var scannedSources = new List<LocalMusicSource>();
+            var failedSources = new List<Guid>();
             foreach (var definition in definitions)
             {
                 if (!rescan && localSources.ContainsKey(definition.SourceId)) continue;
                 try
                 {
-                    var source = await ScanLocalAsync(definition.Settings, ct);
+                    var source = await ScanLocalAsync(definition.Settings, ct
+#if DEBUG
+                        , localPageMetadataReader
+#endif
+                    );
                     if (ct.IsCancellationRequested || closed) return;
-                    ReplaceLocalSource(source);
+                    scannedSources.Add(source);
                 }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception) { unavailableLibraries.Add(definition.SourceId); }
+                catch (Exception) { failedSources.Add(definition.SourceId); }
             }
             if (ct.IsCancellationRequested || closed) return;
+            // Commit only after every scan finishes. Cancellation must not replace earlier libraries.
+            foreach (var source in scannedSources) ReplaceLocalSource(source);
+            foreach (var id in failedSources) unavailableLibraries.Add(id);
             RenderLocalFilters();
             var result = definitions.Where(item => localSources.ContainsKey(item.SourceId))
                 .SelectMany(item => localSources[item.SourceId].Tracks.Select(track => track with { SourceLabel = item.Name })).Where(track => track.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase)
@@ -219,7 +242,16 @@ public sealed partial class MainWindow
             PreviousPage.IsEnabled = page > 1; NextPage.IsEnabled = page * 50 < total;
         }
         catch (OperationCanceledException)
-        { if (!closed && !ct.IsCancellationRequested) PageStatus.Text = "扫描已取消，点击本地音乐可返回原列表。"; }
+        {
+            if (!closed && !ct.IsCancellationRequested)
+            {
+                TrackList.ItemsSource = previousItems;
+                TrackList.SelectedItem = previousSelection;
+                page = previousPage; total = previousTotal;
+                PreviousPage.IsEnabled = previousBack; NextPage.IsEnabled = previousNext;
+                PageStatus.Text = previousItems is null ? "扫描已取消，请重试。" : "扫描已取消，显示扫描前的列表。";
+            }
+        }
         catch (Exception) { if (!closed && !ct.IsCancellationRequested) PageStatus.Text = "本地音乐库配置无法读取，原文件保留，请检查后重试。"; }
     }
 

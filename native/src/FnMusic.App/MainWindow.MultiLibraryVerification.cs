@@ -47,6 +47,53 @@ public sealed partial class MainWindow
         await PlayTrackAsync(queue.Next(false) ?? throw new InvalidOperationException());
         for (int i = 0; i < 80 && !mediaReady; i++) await Task.Delay(100);
         verify("cross_library_next_lyrics", mediaReady && currentLyrics.Lines.Count == 1 && currentLyrics.Lines[0].Text == "音乐库1");
+        var beforeRefreshSources = localSources.ToDictionary(item => item.Key, item => item.Value);
+        var beforeRefreshAudio = music.Player.Source;
+        var secondScanEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        int scannedFiles = 0;
+        localPageMetadataReader = async (_, ct) =>
+        {
+            if (++scannedFiles == 2)
+            {
+                secondScanEntered.TrySetResult();
+                await Task.Delay(Timeout.Infinite, ct);
+            }
+            return new("刷新夹具", "夹具", 60);
+        };
+        try
+        {
+            var refresh = LoadLocalPageAsync(1, true);
+            await secondScanEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            verify("multi_library_refresh_not_partially_committed", beforeRefreshSources.All(item => ReferenceEquals(localSources[item.Key], item.Value)));
+            CancelLocalScan_Click(this, new RoutedEventArgs()); await refresh;
+            verify("multi_library_cancel_keeps_sources_and_playback", beforeRefreshSources.All(item => ReferenceEquals(localSources[item.Key], item.Value))
+                && mediaReady && ReferenceEquals(beforeRefreshAudio, music.Player.Source) && entries.All(PlaylistTrackAvailable));
+
+            localPageMetadataReader = (_, _) => Task.FromResult(new LocalMusicMetadata("刷新成功", "夹具", 60));
+            await LoadLocalPageAsync(1, true);
+            verify("multi_library_refresh_retry_commits_all", beforeRefreshSources.All(item => !ReferenceEquals(localSources[item.Key], item.Value))
+                && ((IEnumerable<MusicTrack>)TrackList.ItemsSource).All(track => track.Title == "刷新成功") && total == 2);
+            verify("multi_library_refresh_keeps_identity_playlist_playback", entries.All(PlaylistTrackAvailable)
+                && entries.All(entry => localSources[entry.Track.SourceInstanceId].Tracks.Any(track => track.Reference == entry.Track))
+                && mediaReady && ReferenceEquals(beforeRefreshAudio, music.Player.Source));
+
+            scannedFiles = 0;
+            secondScanEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            localPageMetadataReader = async (_, ct) =>
+            {
+                if (++scannedFiles == 2)
+                { secondScanEntered.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); }
+                return new("刷新夹具", "夹具", 60);
+            };
+            var staleRefresh = LoadLocalPageAsync(1, true);
+            await secondScanEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            await SwitchCollectionAsync(null);
+            var remoteItems = TrackList.ItemsSource;
+            await staleRefresh;
+            verify("local_refresh_navigation_does_not_restore_old_list", !localView && ReferenceEquals(TrackList.ItemsSource, remoteItems)
+                && TrackList.SelectedItem is MusicTrack { Id: "synthetic-a" });
+        }
+        finally { localPageMetadataReader = null; }
         Stop_Click(this, new RoutedEventArgs());
         queue.Replace([remote, tracks[0]], remote.Reference);
         ResetLibrary();
