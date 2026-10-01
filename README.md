@@ -1,6 +1,6 @@
 # 飞牛音乐 Windows 原生客户端
 
-当前代码版本为 **0.2.0-preview.6**，包含多目录音乐库、两类歌单、飞牛设置、来源能力界面、曲目库归属及歌词重试修复。使用范围、歌单格式升级和验证步骤见 [测试指南](docs/PREVIEW_VALIDATION.md)；此前固定包的证据见 [preview.5 记录](docs/PREVIEW5_ACCEPTANCE.md)。可通过 `./scripts/package-preview.ps1` 生成独立测试目录；尚非正式安装发行版。
+当前代码版本为 **0.2.0-preview.6**，包含多目录音乐库、两类歌单、飞牛设置、来源能力界面、曲目库归属及歌词重试修复。使用范围、歌单格式升级和验证步骤见 [测试指南](docs/PREVIEW_VALIDATION.md)；固定包的运行和文件校验证据见 [preview.6 记录](docs/PREVIEW6_ACCEPTANCE.md)。可通过 `./scripts/package-preview.ps1` 生成独立测试目录；尚非正式安装发行版。
 
 使用 C#、WinUI 3/XAML 和 FFmpeg 构建的非官方 NAS 音乐客户端，目前处于阶段 4 开发预览。
 
