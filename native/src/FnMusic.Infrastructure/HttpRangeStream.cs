@@ -15,7 +15,7 @@ public sealed class HttpRangeStream : Stream
     private readonly CancellationTokenSource lifetime = new();
     private byte[] block = [];
     private long blockOffset = -1, position;
-    private bool disposed;
+    private volatile bool disposed;
     public string ContentType { get; }
 
     private HttpRangeStream(HttpClient client, Uri source, long length, string contentType)
@@ -72,9 +72,13 @@ public sealed class HttpRangeStream : Stream
                 byte[] next = new byte[checked((int)(end - start + 1))];
                 using var input = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
                 await input.ReadExactlyAsync(next, timeout.Token).ConfigureAwait(false);
+                ObjectDisposedException.ThrowIf(disposed, this);
+                timeout.Token.ThrowIfCancellationRequested();
                 block = next;
                 blockOffset = start;
             }
+            ObjectDisposedException.ThrowIf(disposed, this);
+            timeout.Token.ThrowIfCancellationRequested();
             int offset = checked((int)(position - blockOffset));
             int count = Math.Min(buffer.Length, block.Length - offset);
             block.AsMemory(offset, count).CopyTo(buffer);
@@ -88,9 +92,12 @@ public sealed class HttpRangeStream : Stream
     public override long Seek(long offset, SeekOrigin origin)
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        gate.Wait();
+        try { gate.Wait(lifetime.Token); }
+        catch (OperationCanceledException) when (lifetime.IsCancellationRequested)
+        { throw new ObjectDisposedException(nameof(HttpRangeStream)); }
         try
         {
+            ObjectDisposedException.ThrowIf(disposed, this);
             long next = checked((origin switch { SeekOrigin.Begin => 0, SeekOrigin.Current => position, SeekOrigin.End => length, _ => throw new ArgumentOutOfRangeException(nameof(origin)) }) + offset);
             if (next < 0) throw new IOException("Invalid seek");
             return position = next;

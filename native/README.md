@@ -39,6 +39,8 @@ HTTP 自动重定向关闭。服务器错误不直接显示原始 body 或异常
 
 ## 阶段 3：FFmpeg 预览
 
+此节保留阶段 3 历史。当前 App 使用固定的 FFmpegInteropX 动态库与随机访问输入，日常播放无需独立 ffmpeg.exe，见 [当前定位方案](../docs/SEEK_ARCHITECTURE.md) 和 [解码依赖](../docs/NATIVE_DECODER_DEPENDENCIES.md)。CLI 解码器仍用于生成音频和基础回归。
+
 已新增分页曲库、播放/暂停/停止、进度、音量、静音和输出设备选择。解码使用 FFmpeg，Windows 只接收 PCM 输出。当前开发预览需要 PATH 中存在 `ffmpeg.exe`，不捆绑本机 GPL 二进制。格式矩阵、跳转限制及发布要求见 [FFmpeg 播放层](../docs/FFMPEG_PLAYBACK.md)。
 
 测试程序可额外传入 `--ffmpeg` 执行本机合成音频解码验证；`--skip-dpapi` 仅用于没有正常用户配置的沙箱，并明确输出 SKIP，不代表 DPAPI 已重新测试通过。

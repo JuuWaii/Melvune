@@ -1,8 +1,10 @@
 # FFmpeg 播放层（阶段 3）
 
+本页是阶段 3 的历史实现记录。当前 App 已改用 FFmpegInteropX 原生随机访问流，日常播放无需 PATH 中的 ffmpeg.exe；当前结构见 [随机访问方案](SEEK_ARCHITECTURE.md)，固定依赖见 [解码依赖](NATIVE_DECODER_DEPENDENCIES.md)，输入取消/超时见 [可靠性验证](NATIVE_STREAM_RELIABILITY.md)。以下 stdin/PCM 与命令行依赖描述仅适用于当时的实现和保留的 CLI 回归工具。
+
 2026-09-12：根据用户要求，压缩音频改由 FFmpeg 解码，不再把原始 FLAC/MP3 等交给 Windows 系统解码器。
 
-## 当前实现
+## 阶段 3 实现
 
 WinUI 曲库 → NAS 鉴权 Range 流 → FFmpeg stdin → PCM stdout → MediaStreamSource → 音频设备。
 

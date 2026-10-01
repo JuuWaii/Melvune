@@ -1136,6 +1136,12 @@ await Test("range stream rejects a file changing size between requests", async (
     using var stream = await HttpRangeStream.OpenAsync(new HttpClient(handler), endpoint.MusicUri, default);
     await Fails(MusicFailure.InvalidResponse, async () => { _ = await stream.ReadAsync(new byte[10]); });
 });
+await Test("range stream discards a completed block after caller cancellation", RangeStreamVerification.CallerCancellationAsync);
+await Test("range stream discards a completed block after disposal", RangeStreamVerification.DisposalAsync);
+await Test("range stream disposal wakes a seek waiting behind a delayed read", RangeStreamVerification.QueuedSeekAsync);
+await Test("range stream disposal cancels a partial body over real loopback TCP", LoopbackRangeVerification.DisposalAsync);
+await Test("range stream body timeout preserves position and allows TCP retry", LoopbackRangeVerification.BodyTimeoutAsync);
+await Test("range stream open timeout closes a stalled TCP response", LoopbackRangeVerification.OpenTimeoutAsync);
 if (args.Contains("--ffmpeg"))
 {
     foreach (string format in new[] { "wav", "flac", "mp3", "ogg" })
