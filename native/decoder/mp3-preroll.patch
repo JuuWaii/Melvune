@@ -1,0 +1,47 @@
+diff --git a/Source/FFmpegReader.cpp b/Source/FFmpegReader.cpp
+index 7d9daab..99c74ae 100644
+--- a/Source/FFmpegReader.cpp
++++ b/Source/FFmpegReader.cpp
+@@ -142,8 +142,21 @@ HRESULT FFmpegReader::Seek(TimeSpan position, TimeSpan& actualPosition, TimeSpan
+ 
+     auto isForwardSeek = position > currentPosition;
+ 
+-    if (isForwardSeek && TrySeekBuffered(position, actualPosition, fastSeek, isForwardSeek, videoStream, audioStream))
++    // FNMusic modification (2026-10-01): restore MP3 bit reservoir and synthesis
++    // state after a decoder flush by decoding preroll. Keep the requested
++    // presentation position so MediaStreamSource drops the earlier audio.
++    auto decoderPosition = position;
++    auto needsMp3Preroll = !videoStream && audioStream &&
++        avFormatCtx->streams[audioStream->StreamIndex()]->codecpar->codec_id == AV_CODEC_ID_MP3;
++    if (needsMp3Preroll)
+     {
++        decoderPosition = position > TimeSpan{ 5000000 } ? position - TimeSpan{ 5000000 } : TimeSpan{ 0 };
++    }
++    auto bufferedPosition = actualPosition;
++
++    if (isForwardSeek && TrySeekBuffered(decoderPosition, bufferedPosition, fastSeek, isForwardSeek, videoStream, audioStream))
++    {
++        actualPosition = needsMp3Preroll ? position : bufferedPosition;
+         // all good
+         DebugMessage(L"BufferedSeek!\n");
+     }
+@@ -156,7 +169,7 @@ HRESULT FFmpegReader::Seek(TimeSpan position, TimeSpan& actualPosition, TimeSpan
+         DebugMessage(L"NormalSeek\n");
+         // Select the first valid stream either from video or audio
+         auto stream = videoStream ? videoStream : audioStream;
+-        int64_t seekTarget = stream->ConvertPosition(position);
++        int64_t seekTarget = stream->ConvertPosition(decoderPosition);
+         if (av_seek_frame(avFormatCtx, stream->StreamIndex(), seekTarget, AVSEEK_FLAG_BACKWARD) < 0)
+         {
+             hr = E_FAIL;
+@@ -166,6 +179,10 @@ HRESULT FFmpegReader::Seek(TimeSpan position, TimeSpan& actualPosition, TimeSpan
+         {
+             // Flush all active streams with buffers
+             FlushCodecsAndBuffers();
++            if (needsMp3Preroll)
++            {
++                actualPosition = position;
++            }
+         }
+     }
+ 

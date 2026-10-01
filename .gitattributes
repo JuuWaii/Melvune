@@ -1,0 +1,2 @@
+# Git patch context lines contain a required leading space, including blank lines.
+native/decoder/*.patch text eol=lf whitespace=-trailing-space

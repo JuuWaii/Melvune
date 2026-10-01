@@ -17,6 +17,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File scripts/native.ps1 run
 
 bootstrap 从微软下载已固定版本 SDK，校验 SHA-512 后解压至 `.tools/`；不修改系统 PATH。已具备匹配 SDK 时可以跳过 bootstrap。依赖还原只使用 native/NuGet.Config 中的官方源。修改依赖时需主动更新锁文件，常规构建使用 locked-mode。
 
+当前 App/SeekProbe 使用固定源码的 MP3 预滚补丁库。首次 build 还需要 Python 3.11+ 和 Git，自动下载经哈希校验的微软 C++ 构建工具到 `.tools/native-decoder`；后续复用缓存，不安装系统开发工具。直接调用 dotnet build 前先还原依赖并运行 `python scripts/build-native-decoder.py`，见 [预滚构建与验证](../docs/NATIVE_MP3_PREROLL.md)。
+
 当前生成路径：`src/FnMusic.App/bin/Release/net10.0-windows10.0.26100.0/win-x64/FnMusic.App.exe`。运行需保留同目录依赖文件，不可只复制 exe。它不是最终安装包。
 
 ## 项目边界

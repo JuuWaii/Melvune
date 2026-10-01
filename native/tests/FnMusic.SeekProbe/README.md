@@ -70,3 +70,5 @@ Range 模式额外验证打开媒体时分别阻塞 HTTP 响应头和响应正�
 输出位于可执行目录的 `seek-content-verification.json`；追加 --fast-seek 时另存 `seek-content-comparison.json`，保留主矩阵。临时数据仅为本探针创建的随机目录和生成音频，退出时校验目录范围再清理。JSON、PCM 和编码样本不进入版本库。
 
 公开的 [FFmpegInteropX 常规定位实现](https://github.com/ffmpeginteropx/FFmpegInteropX/blob/master/Source/FFmpegReader.cpp) 在音频目标包定位后刷新解码状态，且 [公开接口](https://github.com/ffmpeginteropx/FFmpegInteropX/blob/master/Source/FFmpegInteropX.idl) 没有独立的音频 seek/preroll 方法。这支持后续调查解码预滚的方向，但 master 不是本次固定包源码，不能据它直接确认固定包的内部原因。
+
+后续正式构建已使用固定提交的 MP3 预滚补丁库，20/20 内容矩阵通过；旧版原码对照仍为 17/20。首次构建须还原包后运行 `python scripts/build-native-decoder.py`，见 [修复及证据](../../../docs/NATIVE_MP3_PREROLL.md)。报告新增实际加载的 DLL 版本及 SHA-256。追加 `--near-seeks` 使用 5、6、7、8、7、6、0、1、579 秒序列；`--read-ahead` 额外启用实验读取缓冲，默认配置仍保持原设置。短距测试发现并修正曲首匹配器粗搜索相位问题，五个已知 PCM 及错误时间控制通过，诊断门槛未改变。

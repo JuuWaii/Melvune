@@ -111,6 +111,25 @@ const ALLOWED_IP = ['127.0.0.1', '0.0.0.0', '::1'];
 let violations = 0;
 const report = [];
 
+// Fixed decoder metadata only: the same digits in a URL or another field remain
+// addresses. Do not exempt a whole dependency file or arbitrary version strings.
+function reviewedDecoderVersion(file, match, content) {
+  const prefix = content.slice(Math.max(0, match.index - 40), match.index);
+  const suffix = content.slice(match.index + match[0].length, match.index + match[0].length + 30);
+  if (match[0] === [14, 44, 17, 14].join('.') && file === 'native/decoder/toolchain-lock.json') {
+    return prefix.endsWith('Microsoft.VC.') && /^\.(?:CRT|Tools)\./.test(suffix);
+  }
+  if (match[0] !== [2, 1, 0, 1].join('.')) return false;
+  if (['docs/NATIVE_MP3_PREROLL.md', 'docs/NATIVE_DECODER_DEPENDENCIES.md'].includes(file)) {
+    return /DLL (?:文件)?版本(?:为)?\s*`$/.test(prefix) && suffix.startsWith('`');
+  }
+  if (file === 'scripts/build-native-decoder.py') {
+    return (prefix.endsWith('LIB_VERSION_STR="') && suffix.startsWith('"')) ||
+      (prefix.endsWith("'version': '") && suffix.startsWith("-fnmusic-mp3-preroll'"));
+  }
+  return false;
+}
+
 function checkFile(file) {
   if (FORBIDDEN_FILES.includes(file) || /^(?:\.chrome-debug|\.review-audit|\.tools)\//.test(file)) {
     violations++;
@@ -119,13 +138,15 @@ function checkFile(file) {
   }
   // 点文件（.npmrc/.gitignore 等）也纳入内容扫描
   const isDotfile = /^\.[a-z0-9_-]+$/i.test(path.basename(file));
-  if (!isDotfile && !/\.(js|cjs|json|md|yml|yaml|html|css|txt|example|cs|csproj|xaml|resw|props|targets|config|manifest|sln|slnx|ps1)$/i.test(file)) return;
+  if (!isDotfile && !/\.(js|cjs|json|md|yml|yaml|html|css|txt|example|cs|csproj|xaml|resw|props|targets|config|manifest|sln|slnx|ps1|py|patch)$/i.test(file)) return;
   let content;
   try {
     content = fs.readFileSync(path.join(ROOT, file), 'utf8');
   } catch { return; }
   for (const { name, re } of PATTERNS) {
-    const matches = [...content.matchAll(new RegExp(re.source, re.flags + 'g'))].map(match => match[0]);
+    const matches = [...content.matchAll(new RegExp(re.source, re.flags + 'g'))]
+      .filter(match => name !== '外网 IPv4（非文档示例）' || !reviewedDecoderVersion(file, match, content))
+      .map(match => match[0]);
     if (!matches.length) continue;
     // 仅豁免这个已审查测试中的固定合成值，其后的其他匹配仍继续检查。
     if (file === 'tests/nas-browser-probe.test.cjs' && name === '凭据（token/secret/password/key）') {

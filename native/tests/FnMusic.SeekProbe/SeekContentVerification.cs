@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
 using System.Text.Json;
 using FFmpegInteropX;
 using FnMusic.App.Services;
@@ -27,6 +28,7 @@ internal static class SeekContentVerification
         try
         {
             var reference = CreateReference(Path.Combine(directory, "reference.wav"));
+            VerifyMatcher(reference);
             string requested = args.FirstOrDefault(value => value.StartsWith("--format=", StringComparison.Ordinal))?[9..] ?? "all";
             var formats = requested == "all" ? new[] { "wav", "flac", "mp3-cbr", "mp3-vbr", "ogg" } : new[] { requested };
             if (formats.Any(format => format is not ("wav" or "flac" or "mp3-cbr" or "mp3-vbr" or "ogg")))
@@ -35,9 +37,12 @@ internal static class SeekContentVerification
             {
                 string path = await EncodeAsync(directory, format);
                 var decodedReference = format == "wav" ? reference : await DecodeReferenceAsync(path, directory);
-                await VerifyAsync(path, format, decodedReference, false, results);
+                bool readAhead = args.Contains("--read-ahead", StringComparer.Ordinal);
+                int[] positions = args.Contains("--near-seeks", StringComparer.Ordinal)
+                    ? [5, 6, 7, 8, 7, 6, 0, 1, 579] : [571, 31, 451, 5];
+                await VerifyAsync(path, format, decodedReference, false, readAhead, positions, results);
                 if (args.Contains("--fast-seek", StringComparer.Ordinal))
-                    await VerifyAsync(path, format, decodedReference, true, results);
+                    await VerifyAsync(path, format, decodedReference, true, readAhead, positions, results);
             }
             if (results.Any(result => !result.Passed)) throw new InvalidOperationException("Decoded audio alignment failed.");
         }
@@ -47,6 +52,7 @@ internal static class SeekContentVerification
             string report = args.Contains("--fast-seek", StringComparer.Ordinal) ? "seek-content-comparison.json" : "seek-content-verification.json";
             await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, report),
                 JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, error, sampleRate = Rate, seconds = Seconds,
+                    decoder = GetDecoderIdentity(), readAhead = args.Contains("--read-ahead", StringComparer.Ordinal),
                     consumer = "MediaPlayer with MediaStreamSource sample observation",
                     gate = "stable aligned audio within 50ms; correlation >0.8; offset <=50ms; all later observed frames aligned", results }));
             // Only this probe's randomly named, synthetic temporary directory.
@@ -132,23 +138,39 @@ internal static class SeekContentVerification
         return samples;
     }
 
-    private static async Task VerifyAsync(string path, string format, short[] reference, bool fast, List<Result> results)
+    private static object? GetDecoderIdentity()
+    {
+        using var process = Process.GetCurrentProcess();
+        var module = process.Modules.Cast<ProcessModule>().FirstOrDefault(module => module.ModuleName.Equals("FFmpegInteropX.dll", StringComparison.OrdinalIgnoreCase));
+        if (module is null) return null;
+        using var file = File.OpenRead(module.FileName);
+        return new { name = module.ModuleName, version = module.FileVersionInfo.FileVersion,
+            sha256 = Convert.ToHexString(SHA256.HashData(file)) };
+    }
+
+    private static async Task VerifyAsync(string path, string format, short[] reference, bool fast, bool readAhead, int[] positions, List<Result> results)
     {
         using var handler = new RangeHandler(path);
         using var client = new HttpClient(handler, false);
         using var input = await HttpRangeStream.OpenAsync(client, new Uri("https://seek.invalid/audio"), CancellationToken.None);
         SeekablePlayback? production = null;
         FFmpegMediaSource? experiment = null;
-        using var random = fast ? input.AsRandomAccessStream() : null;
+        using var random = fast || readAhead ? input.AsRandomAccessStream() : null;
         using var player = new MediaPlayer { IsMuted = true, AutoPlay = false };
         try
         {
             FFmpegMediaSource decoded;
-            if (fast)
+            if (fast || readAhead)
             {
                 var config = new MediaSourceConfig();
                 config.FFmpegOptions.Add("protocol_whitelist", "none");
-                config.FFmpegOptions.Add("fflags", "+fastseek");
+                if (fast) config.FFmpegOptions.Add("fflags", "+fastseek");
+                if (readAhead)
+                {
+                    config.General.ReadAheadBufferEnabled = true;
+                    config.General.ReadAheadBufferSize = 1024 * 1024;
+                    config.General.ReadAheadBufferDuration = TimeSpan.FromSeconds(4);
+                }
                 decoded = experiment = await FFmpegMediaSource.CreateFromStreamAsync(random!, config);
             }
             else
@@ -189,7 +211,7 @@ internal static class SeekContentVerification
                 player.Source = item;
                 await AwaitOrFailure(opened.Task, failed.Task);
                 if (!player.PlaybackSession.CanSeek) throw new IOException("Source is not seekable.");
-                foreach (int position in new[] { 571, 31, 451, 5 })
+                foreach (int position in positions)
                 {
                     player.Pause();
                     Task<Marker> observed;
@@ -265,6 +287,14 @@ internal static class SeekContentVerification
         int first = Math.Max(0, expected - Rate * 2), last = Math.Min(reference.Length - marker.Samples.Length, expected + Rate * 2);
         int best = first;
         double score = double.NegativeInfinity;
+        // Near the beginning, clamping the search to zero changes its coarse
+        // phase. Check the expected alignment directly before the broad search:
+        // narrow-band correlation peaks must not fall between coarse candidates.
+        for (int candidate = Math.Max(first, expected - 8); candidate <= Math.Min(last, expected + 8); candidate++)
+        {
+            double correlation = Correlate(reference, marker.Samples, candidate, 1);
+            if (correlation > score) { score = correlation; best = candidate; }
+        }
         for (int candidate = first; candidate <= last; candidate += 8)
         {
             double correlation = Correlate(reference, marker.Samples, candidate, 8);
@@ -277,6 +307,21 @@ internal static class SeekContentVerification
             if (correlation > score) { score = correlation; best = candidate; }
         }
         return new((best - expected) * 1000d / Rate, score);
+    }
+
+    private static void VerifyMatcher(short[] reference)
+    {
+        foreach (int position in new[] { 47, 6959, 48001, 143999, Rate * 31 + 113 })
+        {
+            float[] samples = reference.AsSpan(position, 1024).ToArray().Select(sample => sample / 32768f).ToArray();
+            var marker = new Marker(position / (double)Rate, samples);
+            var correct = Match(reference, marker, marker.Timestamp);
+            if (correct.OffsetMilliseconds != 0 || correct.Correlation < .999)
+                throw new InvalidOperationException("Known PCM alignment failed.");
+            var displaced = Match(reference, marker, marker.Timestamp + 20);
+            if (displaced.Correlation > .8)
+                throw new InvalidOperationException("Displaced PCM control passed.");
+        }
     }
 
     private static double Correlate(short[] reference, float[] sample, int start, int stride)

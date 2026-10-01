@@ -48,6 +48,8 @@ FFmpegInteropX 官方声明支持 WinUI 3 Desktop，公开了 IRandomAccessStrea
 
 进一步核对固定 NuGet 包的 repository commit 为 841fc8e79346a235906f1dbd45be53034b2e2f52，其 [常规定位源码](https://github.com/ffmpeginteropx/FFmpegInteropX/blob/841fc8e79346a235906f1dbd45be53034b2e2f52/Source/FFmpegReader.cpp) 同样在 av_seek_frame 后刷新解码状态；公开接口没有独立音频预滚参数。该定位流程支持继续调查预滚的方向，尚不能单凭它确认全部起始过渡原因。本轮已另行修复输入关闭与取消的迟到结果，并补充真实回环 TCP 超时/重试，见 NATIVE_STREAM_RELIABILITY.md。
 
+后续已从上述固定源码构建原版对照及 MP3 预滚补丁：解码起点提前最多 500 毫秒，呈现起点不变，缓冲定位也保留更早的输入。原版仍为 17/20，补丁正式构建为 20/20，短距及读取缓冲各九处内容回归通过，取消/停止/60 轮清理及十种本地格式回归通过。构建校验补丁/脚本/锁文件和实际 DLL，Publish 同步补丁库。见 NATIVE_MP3_PREROLL.md；首次大读取量与真实连续交互、设备和编码变体仍保留。
+
 - [FFmpegInteropX 项目与流接入说明](https://github.com/ffmpeginteropx/FFmpegInteropX)
 - [FFmpegMediaSource 自定义 IO 源码](https://github.com/ffmpeginteropx/FFmpegInteropX/blob/master/Source/FFmpegMediaSource.cpp)
 - [NuGet 包](https://www.nuget.org/packages/FFmpegInteropX)

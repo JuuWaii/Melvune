@@ -92,3 +92,5 @@ SOFTWARE.
 preview.3 随附 FFmpegInteropX 2.1.0 桥接库和 FFmpeg 8.1.2 动态库，来自锁定的 NuGet 依赖。桥接库声明 Apache-2.0；FFmpeg 组件及附属依赖另有 LGPL、Zlib、MIT 等许可，不适用上面的 MIT 条款。预览目录内 `licenses/` 包含桥接库许可证和 FFmpeg 包提供的全部许可证。版本及源码标识见 `NATIVE_DECODER_DEPENDENCIES.md`（仓库中位于 docs）。开发回归仍可使用外部 FFmpeg 命令行程序，但不将该程序打入预览包。对外发布前仍需补齐对应源码和构建材料；参见 [FFmpeg 官方许可说明](https://ffmpeg.org/legal.html)。
 
 说明（2026-09-13）：Electron 与 electron-builder 已退出活动依赖，以下相关条目作为历史归属保留。
+
+2026-10-01 后续源码构建修改 FFmpegInteropX 桥接库的纯音频 MP3 定位，增加解码预滚。修改文件为 Source/FFmpegReader.cpp，仍适用 Apache-2.0；原始版权及许可头保留。预览打包包含 `licenses/FFmpegInteropX-build/` 中的补丁、构建脚本和依赖锁，`native-decoder-build.json` 标识固定源码提交及实际 DLL 哈希。开发机微软编译工具仅用于构建，不随播放器分发；FFmpeg 库本身仍来自原锁定包。

@@ -34,6 +34,8 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Dependency restore failed.' }
     }
     if ($Action -eq 'build') {
+        . (Join-Path $PSScriptRoot 'ensure-native-decoder.ps1')
+        Ensure-FnMusicNativeDecoder $nativeRepoRoot
         & $nativeSdk build src/FnMusic.App/FnMusic.App.csproj -c Release --no-restore --nologo
         if ($LASTEXITCODE -ne 0) { throw 'Native build failed.' }
     } elseif ($Action -eq 'test') {

@@ -17,6 +17,8 @@
 
 本机已有匹配 SDK 时可跳过 bootstrap。原生播放器使用固定版本的 FFmpeg 动态库，构建与独立发布目录包含这些依赖；日常播放无需 PATH 中的 ffmpeg.exe。部分合成音频验证工具使用开发机已有的 FFmpeg 可执行文件生成样本。依赖和许可边界见 [解码器说明](docs/NATIVE_DECODER_DEPENDENCIES.md)。
 
+后续源码构建已接入 MP3 定位预滚补丁；首次 build 需要 Python 3.11+ 和 Git，自动在项目内准备固定的 C++ 工具链。源码及 DLL 身份校验、回归范围见 [预滚修复](docs/NATIVE_MP3_PREROLL.md)。固定 preview.6 包保持不变。
+
 [原生工程说明](native/README.md) · [阶段进度](docs/PHASE_STATUS.md) · [开发清单](docs/NATIVE_BACKLOG.md) · [FFmpeg 播放层](docs/FFMPEG_PLAYBACK.md)
 
 多音乐源、音乐库分类、两类歌单、飞牛设置同步、主题及对外音乐/歌词信息接口的最新排期见 [产品路线图](docs/PRODUCT_ROADMAP.md)。收藏基础已接入，验证边界见 [收藏状态](docs/NATIVE_FAVORITES.md)。

@@ -45,3 +45,29 @@ test('untracked native build outputs are excluded from source scan', () => {
   });
   assert.equal(result.status, 0);
 });
+
+test('fixed DLL metadata permits the version but still detects later addresses', () => {
+  const version = [2, 1, 0, 1].join('.');
+  const address = [203, 0, 113, 9].join('.');
+  const name = 'docs/NATIVE_MP3_PREROLL.md';
+  const metadata = '桥接 DLL 文件版本为 `' + version + '`';
+  assert.equal(scan({ [name]: metadata }).status, 0);
+  assert.equal(scan({ [name]: metadata + '\nhttps://' + address }).status, 1);
+  assert.equal(scan({ [name]: metadata + '\nhttps://' + version }).status, 1);
+});
+
+test('fixed MSVC component numbers do not exempt the same value in an endpoint', () => {
+  const version = [14, 44, 17, 14].join('.');
+  const name = 'native/decoder/toolchain-lock.json';
+  const component = 'Microsoft.VC.' + version + '.Tools.HostX64.TargetX64.base.vsix';
+  assert.equal(scan({ [name]: JSON.stringify({ fileName: component }) }).status, 0);
+  assert.equal(scan({ [name]: JSON.stringify({ fileName: component, endpoint: 'https://' + version }) }).status, 1);
+});
+
+test('Python build inputs are scanned for credentials without printing values', () => {
+  const value = 'q'.repeat(20);
+  const result = scan({ 'scripts/build-native-decoder.py': 'api_key = "' + value + '"' });
+  assert.equal(result.status, 1);
+  assert.ok(result.stdout.includes('scripts/build-native-decoder.py'));
+  assert.ok(!result.stdout.includes(value));
+});

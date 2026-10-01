@@ -1,0 +1,26 @@
+<Project>
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'FnMusic.App' Or '$(MSBuildProjectName)' == 'FnMusic.SeekProbe'">
+    <FnMusicUsesNativeDecoder>true</FnMusicUsesNativeDecoder>
+    <FnMusicDecoderRoot>$(MSBuildThisFileDirectory)../.tools/native-decoder/build</FnMusicDecoderRoot>
+  </PropertyGroup>
+  <Import Project="$(FnMusicDecoderRoot)/decoder.props" Condition="'$(FnMusicUsesNativeDecoder)' == 'true' And Exists('$(FnMusicDecoderRoot)/decoder.props')" />
+
+  <Target Name="VerifyFnMusicNativeDecoder" BeforeTargets="PrepareForBuild" Condition="'$(FnMusicUsesNativeDecoder)' == 'true' And '$(DesignTimeBuild)' != 'true'">
+    <Error Condition="'$(FnMusicDecoderDecoderSha256)' == '' Or !Exists('$(FnMusicDecoderRoot)/FFmpegInteropX.dll') Or !Exists('$(FnMusicDecoderRoot)/build-manifest.json')" Text="Pinned MP3 preroll decoder is missing. Restore native/FnMusic.sln, then run python scripts/build-native-decoder.py." />
+    <GetFileHash Files="$(MSBuildThisFileDirectory)decoder/mp3-preroll.patch" Algorithm="SHA256"><Output TaskParameter="Items" ItemName="FnMusicPatchHash" /></GetFileHash>
+    <GetFileHash Files="$(MSBuildThisFileDirectory)../scripts/build-native-decoder.py" Algorithm="SHA256"><Output TaskParameter="Items" ItemName="FnMusicScriptHash" /></GetFileHash>
+    <GetFileHash Files="$(MSBuildThisFileDirectory)decoder/toolchain-lock.json" Algorithm="SHA256"><Output TaskParameter="Items" ItemName="FnMusicLockHash" /></GetFileHash>
+    <GetFileHash Files="$(FnMusicDecoderRoot)/FFmpegInteropX.dll" Algorithm="SHA256"><Output TaskParameter="Items" ItemName="FnMusicDecoderHash" /></GetFileHash>
+    <Error Condition="'%(FnMusicPatchHash.FileHash)' != '$(FnMusicDecoderPatchSha256)'" Text="Native decoder patch changed. Run python scripts/build-native-decoder.py." />
+    <Error Condition="'%(FnMusicScriptHash.FileHash)' != '$(FnMusicDecoderScriptSha256)'" Text="Native decoder build script changed. Run python scripts/build-native-decoder.py." />
+    <Error Condition="'%(FnMusicLockHash.FileHash)' != '$(FnMusicDecoderLockSha256)'" Text="Native decoder dependency lock changed. Run python scripts/build-native-decoder.py." />
+    <Error Condition="'%(FnMusicDecoderHash.FileHash)' != '$(FnMusicDecoderDecoderSha256)'" Text="Native decoder DLL changed. Run python scripts/build-native-decoder.py." />
+  </Target>
+
+  <Target Name="CopyFnMusicNativeDecoder" AfterTargets="CopyFilesToOutputDirectory" DependsOnTargets="VerifyFnMusicNativeDecoder" Condition="'$(FnMusicUsesNativeDecoder)' == 'true' And '$(DesignTimeBuild)' != 'true'">
+    <Copy SourceFiles="$(FnMusicDecoderRoot)/FFmpegInteropX.dll;$(FnMusicDecoderRoot)/build-manifest.json" DestinationFiles="$(TargetDir)FFmpegInteropX.dll;$(TargetDir)native-decoder-build.json" SkipUnchangedFiles="true" />
+  </Target>
+  <Target Name="PublishFnMusicNativeDecoder" AfterTargets="Publish" DependsOnTargets="VerifyFnMusicNativeDecoder" Condition="'$(FnMusicUsesNativeDecoder)' == 'true'">
+    <Copy SourceFiles="$(FnMusicDecoderRoot)/FFmpegInteropX.dll;$(FnMusicDecoderRoot)/build-manifest.json" DestinationFiles="$(PublishDir)FFmpegInteropX.dll;$(PublishDir)native-decoder-build.json" SkipUnchangedFiles="true" />
+  </Target>
+</Project>
