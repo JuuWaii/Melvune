@@ -17,17 +17,36 @@ public sealed partial class MainWindow
         SearchInput.Text = searchQuery = ""; UpdateCollectionView(); await LoadPageAsync(1);
     }
     private void TrackSelection_Changed(object sender, SelectionChangedEventArgs e) => UpdateFavoriteButton();
+    private bool TrackSupports(MusicTrack track, MusicSourceCapabilities capability)
+    {
+#if DEBUG
+        if (IsSyntheticPreview && track.SourceInstanceId == Guid.Empty)
+            return capability is MusicSourceCapabilities.Playback or MusicSourceCapabilities.Artwork or MusicSourceCapabilities.Lyrics
+                or MusicSourceCapabilities.WriteFavorites or MusicSourceCapabilities.ReadFavorites;
+#endif
+        return ViewModel.PlaybackRouter.Supports(track.SourceInstanceId, capability);
+    }
+    private bool CanFavoriteTrack(MusicTrack track) => TrackSupports(track, MusicSourceCapabilities.WriteFavorites)
+        && (ViewModel.AuthenticatedClient?.SourceInstanceId == track.SourceInstanceId
+#if DEBUG
+            || (IsSyntheticPreview && track.SourceInstanceId == Guid.Empty)
+#endif
+        );
     private void UpdateFavoriteButton()
     {
         if (FavoriteToggle is null) return;
-        FavoriteToggle.IsEnabled = !localView && !favoriteBusy && TrackList.SelectedItem is MusicTrack;
+        FavoriteToggle.IsEnabled = !favoriteBusy && TrackList.SelectedItem is MusicTrack selected && CanFavoriteTrack(selected);
         FavoriteToggle.Content = TrackList.SelectedItem is MusicTrack { IsFavorite: true } ? "取消收藏" : "收藏歌曲";
+        ToolTipService.SetToolTip(FavoriteToggle, TrackList.SelectedItem is not MusicTrack ? "请先选择歌曲。"
+            : FavoriteToggle.IsEnabled || favoriteBusy ? "收藏到歌曲所属的飞牛账号。"
+            : localView ? "本地来源不支持远端收藏，可加入本地歌单。" : "当前歌曲来源未连接或不支持收藏。");
     }
     private async void Favorite_Click(object sender, RoutedEventArgs e)
     { await ToggleFavoriteAsync(); }
     private async Task ToggleFavoriteAsync()
     {
-        if (localView || favoriteBusy || TrackList.SelectedItem is not MusicTrack track) return;
+        if (favoriteBusy || TrackList.SelectedItem is not MusicTrack track) return;
+        if (!CanFavoriteTrack(track)) { FavoriteStatus.Text = "歌曲来源未连接或不支持收藏，可使用本地歌单。"; return; }
         var api = ViewModel.AuthenticatedClient;
         if (api is null && !IsSyntheticPreview) { FavoriteStatus.Text = "请先登录后使用收藏。"; return; }
         var ct = favoriteWork.Token;

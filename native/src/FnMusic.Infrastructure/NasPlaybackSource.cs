@@ -11,7 +11,12 @@ public sealed class NasPlaybackSource : IMusicPlaybackSource
     {
         if (client.SourceInstanceId == Guid.Empty) throw new ArgumentException("An account-scoped client is required");
         this.client = client;
-        Source = new MusicSource(client.SourceInstanceId, "飞牛音乐", "fnmusic", MusicSourceCapabilities.Playback);
+        Source = new MusicSource(client.SourceInstanceId, "飞牛音乐", "fnmusic",
+            MusicSourceCapabilities.Browse | MusicSourceCapabilities.Search | MusicSourceCapabilities.Playback |
+            MusicSourceCapabilities.ReadFavorites | MusicSourceCapabilities.WriteFavorites |
+            MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.WritePlaylists |
+            MusicSourceCapabilities.ReadSettings | MusicSourceCapabilities.WriteSettings |
+            MusicSourceCapabilities.Artwork | MusicSourceCapabilities.Lyrics);
     }
 
     public async Task<Stream> OpenAsync(TrackReference track, CancellationToken ct) =>

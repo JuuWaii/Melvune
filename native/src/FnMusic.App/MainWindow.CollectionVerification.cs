@@ -95,6 +95,14 @@ public sealed partial class MainWindow
             Verify("favorite_removed", total == 0 && TrackList.SelectedItem is null && !FavoriteToggle.IsEnabled && queue.Count == 1);
             await SwitchCollectionAsync(null);
             Verify("favorite_state_reloaded", TrackList.SelectedItem is MusicTrack { IsFavorite: false });
+            var beforeForeignItems = TrackList.ItemsSource;
+            var beforeForeignSelection = TrackList.SelectedItem;
+            var foreignFavorite = (beforeForeignSelection as MusicTrack ?? throw new InvalidOperationException()) with { SourceInstanceId = Guid.NewGuid() };
+            TrackList.ItemsSource = new[] { foreignFavorite }; TrackList.SelectedIndex = 0;
+            Verify("favorite_foreign_source_disabled", !FavoriteToggle.IsEnabled);
+            await ToggleFavoriteAsync();
+            Verify("favorite_foreign_source_write_rejected", syntheticFavorites.Count == 0 && FavoriteStatus.Text.Contains("来源"));
+            TrackList.ItemsSource = beforeForeignItems; TrackList.SelectedItem = beforeForeignSelection;
             string localDirectory = Path.Combine(AppContext.BaseDirectory, "local-fixture", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(localDirectory);
             await File.WriteAllTextAsync(Path.Combine(localDirectory, "000-playback.lrc"), "[00:00]第一行\n[00:10]第二行\n[00:20]第三行");
@@ -114,6 +122,19 @@ public sealed partial class MainWindow
             await StartQueueAsync(TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
             for (int i = 0; i < 80 && (!mediaReady || music.Player.PlaybackSession.Position.TotalSeconds <= 0); i++) await Task.Delay(100);
             Verify("local_file_playback", mediaReady && music.Player.PlaybackSession.Position.TotalSeconds > 0 && queue.Current?.SourceInstanceId == local.Source.Id);
+            var capabilityTrack = TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException();
+            ViewModel.PlaybackRouter.Unregister(local.Source.Id);
+            ViewModel.PlaybackRouter.Register(new CapabilityPlaybackSource(local, MusicSourceCapabilities.Playback));
+            try
+            {
+                await LoadLyricsAsync(capabilityTrack);
+                Verify("unsupported_lyrics_explicit_status", currentLyrics.Lines.Count == 0 && LyricsStatus.Text.Contains("不支持歌词"));
+                coverCache.Clear(); await LoadArtworkAsync(NowCover);
+                Verify("unsupported_artwork_does_not_load_or_cache", NowCover.Source is null && coverCache.Count == 0 && NowCover.Tag is null);
+            }
+            finally { ViewModel.PlaybackRouter.Unregister(local.Source.Id); ViewModel.PlaybackRouter.Register(local); }
+            await LoadLyricsAsync(capabilityTrack);
+            Verify("restored_source_lyrics_capability", currentLyrics.Lines.Count == 3);
             await LoadArtworkAsync(NowCover);
             Verify("local_cover_decoded", NowCover.Source is not null);
             await File.WriteAllBytesAsync(Path.Combine(localDirectory, "000-playback.jpg"), [1, 2, 3]);
@@ -275,6 +296,11 @@ public sealed partial class MainWindow
         catch (Exception ex) { error = ex.GetType().Name; }
         await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "collection-window-verification.json"),
             JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, timings }));
+    }
+    private sealed class CapabilityPlaybackSource(FnMusic.Infrastructure.LocalMusicSource source, MusicSourceCapabilities capabilities) : IMusicPlaybackSource
+    {
+        public MusicSource Source { get; } = source.Source with { Capabilities = capabilities };
+        public Task<Stream> OpenAsync(TrackReference track, CancellationToken ct) => source.OpenAsync(track, ct);
     }
 }
 #endif

@@ -741,6 +741,9 @@ await Test("local music scans nested audio files with stable identities and open
     await File.WriteAllTextAsync(Path.Combine(directory, "ignore.txt"), "not audio");
     var settings = new LocalMusicSettings(Guid.NewGuid(), directory);
     var source = await LocalMusicSource.ScanAsync(settings, default);
+    Check(source.Source.Capabilities.HasFlag(MusicSourceCapabilities.Artwork | MusicSourceCapabilities.Lyrics));
+    Check(!source.Source.Capabilities.HasFlag(MusicSourceCapabilities.WriteFavorites)
+        && !source.Source.Capabilities.HasFlag(MusicSourceCapabilities.WriteSettings));
     Check(source.Tracks.Count == 2 && source.Tracks.All(track => track.SourceInstanceId == settings.SourceId));
     var again = await LocalMusicSource.ScanAsync(settings, default);
     Check(source.Tracks.Select(t => t.Reference).SequenceEqual(again.Tracks.Select(t => t.Reference)));
@@ -1267,6 +1270,39 @@ await Test("playback router rejects duplicate and empty source registrations", (
     try { router.Register(new FakePlaybackSource(Guid.Empty, MusicSourceCapabilities.Playback, (_, _) => throw new Exception())); throw new Exception("Empty accepted"); }
     catch (ArgumentException) { }
     router.Unregister(provider.Source.Id);
+    return Task.CompletedTask;
+});
+await Test("source capabilities stay isolated and follow the current registration", () =>
+{
+    var router = new MusicPlaybackRouter();
+    Guid reader = Guid.NewGuid(), writer = Guid.NewGuid();
+    router.Register(new FakePlaybackSource(reader, MusicSourceCapabilities.Playback | MusicSourceCapabilities.Lyrics,
+        (_, _) => throw new Exception("Capability inspection must not open streams")));
+    router.Register(new FakePlaybackSource(writer, MusicSourceCapabilities.Playback | MusicSourceCapabilities.WriteFavorites,
+        (_, _) => throw new Exception("Capability inspection must not open streams")));
+    Check(router.Supports(reader, MusicSourceCapabilities.Playback | MusicSourceCapabilities.Lyrics));
+    Check(!router.Supports(reader, MusicSourceCapabilities.Lyrics | MusicSourceCapabilities.Artwork));
+    Check(!router.Supports(reader, MusicSourceCapabilities.WriteFavorites) && router.Supports(writer, MusicSourceCapabilities.WriteFavorites));
+    Check(!router.Supports(Guid.Empty, MusicSourceCapabilities.Playback) && !router.Supports(Guid.NewGuid(), MusicSourceCapabilities.Playback));
+    Check(!router.Supports(reader, MusicSourceCapabilities.None));
+    router.Unregister(writer);
+    Check(!router.Supports(writer, MusicSourceCapabilities.WriteFavorites));
+    router.Register(new FakePlaybackSource(writer, MusicSourceCapabilities.Playback, (_, _) => throw new Exception()));
+    Check(!router.Supports(writer, MusicSourceCapabilities.WriteFavorites) && router.CanPlay(new(writer, "same")));
+    router.Unregister(reader); router.Unregister(writer);
+    return Task.CompletedTask;
+});
+await Test("NAS source declares implemented capabilities without sending requests", () =>
+{
+    using var api = new NasApiClient(ServerEndpoint.Parse("https://example.invalid"),
+        new FakeHandler(_ => throw new Exception("Declaration must not contact the service")), Guid.NewGuid());
+    var router = new MusicPlaybackRouter(); var source = new NasPlaybackSource(api); router.Register(source);
+    Check(router.Supports(api.SourceInstanceId, MusicSourceCapabilities.Browse | MusicSourceCapabilities.Search |
+        MusicSourceCapabilities.ReadFavorites | MusicSourceCapabilities.WriteFavorites |
+        MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.WritePlaylists |
+        MusicSourceCapabilities.ReadSettings | MusicSourceCapabilities.WriteSettings |
+        MusicSourceCapabilities.Artwork | MusicSourceCapabilities.Lyrics));
+    router.Unregister(api.SourceInstanceId);
     return Task.CompletedTask;
 });
 await Test("playback router cancels disconnected sources and disposes late streams after re-registration", async () =>

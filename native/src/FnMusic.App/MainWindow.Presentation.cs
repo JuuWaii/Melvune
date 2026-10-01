@@ -68,15 +68,18 @@ public sealed partial class MainWindow
     {
         if (closed) return;
         if (image.Tag is CancellationTokenSource old) old.Cancel();
+        image.Tag = null;
         image.Source = null;
         object context = image.DataContext;
+        if (context is MusicTrack unsupported && !TrackSupports(unsupported, MusicSourceCapabilities.Artwork)) return;
         using var request = CancellationTokenSource.CreateLinkedTokenSource(localLifetime.Token);
         image.Tag = request; request.CancelAfter(TimeSpan.FromSeconds(15)); var ct = request.Token;
         var api = ViewModel.AuthenticatedClient;
         var source = context is MusicTrack localContext ? localSources.GetValueOrDefault(localContext.SourceInstanceId) : null;
         string? coverId = context is MusicTrack track ? track.CoverId : context is MusicCollection album ? album.CoverId : null;
         string? key = context is MusicTrack song && source?.Source.Id == song.SourceInstanceId ? "local:" + song.Reference
-            : api is not null && !string.IsNullOrEmpty(coverId) && (context is not MusicTrack remote || remote.SourceInstanceId == api.SourceInstanceId)
+            : api is not null && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.Artwork)
+                && !string.IsNullOrEmpty(coverId) && (context is not MusicTrack remote || remote.SourceInstanceId == api.SourceInstanceId)
                 ? api.SourceInstanceId + ":" + coverId : null;
         if (key is null) { image.Tag = null; return; }
         try
@@ -146,6 +149,8 @@ public sealed partial class MainWindow
     {
         if (closed) return;
         ClearPresentation(); NowCover.DataContext = track; NowAlbum.Text = track.Album;
+        if (!TrackSupports(track, MusicSourceCapabilities.Lyrics))
+        { LyricsStatus.Text = "当前歌曲来源未连接或不支持歌词。"; return; }
         var ct = lyricsWork.Token; LyricsStatus.Text = "正在加载歌词…";
         try
         {

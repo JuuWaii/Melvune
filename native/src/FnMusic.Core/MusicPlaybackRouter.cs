@@ -33,11 +33,14 @@ public sealed class MusicPlaybackRouter
         finally { removed.Lifetime.Dispose(); }
     }
 
-    public bool CanPlay(TrackReference track)
+    /// <summary>声明的是 Provider 能力；账户权限仍由对应服务验证。</summary>
+    public bool Supports(Guid sourceId, MusicSourceCapabilities capabilities)
     {
-        lock (gate) return sources.TryGetValue(track.SourceInstanceId, out var entry)
-            && entry.Source.Capabilities.HasFlag(MusicSourceCapabilities.Playback);
+        lock (gate) return capabilities != MusicSourceCapabilities.None && sources.TryGetValue(sourceId, out var entry)
+            && entry.Source.Capabilities.HasFlag(capabilities);
     }
+
+    public bool CanPlay(TrackReference track) => Supports(track.SourceInstanceId, MusicSourceCapabilities.Playback);
 
     public async Task<Stream> OpenAsync(TrackReference track, CancellationToken ct)
     {

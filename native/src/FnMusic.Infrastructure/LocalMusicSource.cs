@@ -24,7 +24,8 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
     private LocalMusicSource(LocalMusicSettings settings, Dictionary<string, string> files, List<MusicTrack> tracks)
     {
         Settings = settings; this.files = files; Tracks = tracks.AsReadOnly();
-        Source = new(settings.SourceId, "本地音乐", "local", MusicSourceCapabilities.Browse | MusicSourceCapabilities.Search | MusicSourceCapabilities.Playback);
+        Source = new(settings.SourceId, "本地音乐", "local", MusicSourceCapabilities.Browse | MusicSourceCapabilities.Search |
+            MusicSourceCapabilities.Playback | MusicSourceCapabilities.Artwork | MusicSourceCapabilities.Lyrics);
     }
 
     public static Task<LocalMusicSource> ScanAsync(LocalMusicSettings settings, CancellationToken ct,
