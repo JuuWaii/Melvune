@@ -63,6 +63,8 @@ public sealed partial class MainWindow
             selectedLocalGroup = null; selectedLocalLibrary = definition.SourceId;
             RenderLocalFilters();
             await ShowLocalMusicAsync();
+            if (!closed && PlaybackStatus.Text == "正在扫描本地音乐…")
+                PlaybackStatus.Text = $"导入完成，已保存音乐库，共 {scanned.Tracks.Count} 首。";
         }
         catch (OperationCanceledException) { }
         catch (LocalLibraryConflictException) { if (!closed) PlaybackStatus.Text = "音乐库已在其他窗口修改，请重新导入。"; }
