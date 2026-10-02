@@ -9,6 +9,10 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-native-library-lifecycle"))
+        { RunLibraryLifecycleVerification(); return; }
+        if (Environment.GetCommandLineArgs().Contains("--verify-native-library-directory"))
+        { RunLibraryDirectoryDiscovery(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-local-formats"))
         { RunLocalFormatVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-account-restore"))
@@ -43,6 +47,10 @@ public partial class App : Application
         window.Activate();
     }
 #if DEBUG
+    private async void RunLibraryLifecycleVerification()
+    { await Services.LibraryLifecycleVerification.RunAsync(); Exit(); }
+    private async void RunLibraryDirectoryDiscovery()
+    { await Services.SettingsVerification.RunAsync(discoverDirectories: true); Exit(); }
     private async void RunLocalFormatVerification()
     { await Services.LocalFormatVerification.RunAsync(); Exit(); }
     private async void RunAccountRestoreVerification()

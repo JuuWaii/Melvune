@@ -27,9 +27,19 @@ public sealed partial class NasApiClient
                 done.ValueKind is not (JsonValueKind.True or JsonValueKind.False)) throw new MusicApiException(MusicFailure.InvalidResponse);
             result.Add(new(SourceInstanceId, id, RequiredSettingsString(item, "type", 128), RequiredSettingsString(item, "name"),
                 TaskNumber(item, "total"), TaskNumber(item, "successCount"), TaskNumber(item, "failCount"), TaskNumber(item, "canceledCount"),
-                done.GetBoolean(), SettingsBoolean(item, "cancelling"), SettingsBoolean(item, "canceled"), SettingsBoolean(item, "retryable"), TaskNumber(item, "createdAt")));
+                done.GetBoolean(), SettingsBoolean(item, "cancelling"), SettingsBoolean(item, "canceled"), SettingsBoolean(item, "retryable"), TaskNumber(item, "createdAt"))
+            { LibraryId = ReadTaskLibraryId(item) });
         }
         return result;
+    }
+
+    private static string? ReadTaskLibraryId(JsonElement item)
+    {
+        if (!item.TryGetProperty("ext", out var ext) || ext.ValueKind == JsonValueKind.Null) return null;
+        if (ext.ValueKind != JsonValueKind.Object) throw new MusicApiException(MusicFailure.InvalidResponse);
+        if (!ext.TryGetProperty("libraryGUID", out var id) || id.ValueKind == JsonValueKind.Null) return null;
+        if (id.ValueKind != JsonValueKind.String || id.GetString()!.Length > 256) throw new MusicApiException(MusicFailure.InvalidResponse);
+        return string.IsNullOrWhiteSpace(id.GetString()) ? null : id.GetString();
     }
 
     public async Task<IReadOnlyList<NasBackgroundTask>> ChangeBackgroundTaskAsync(NasBackgroundTask expected, NasTaskAction action, CancellationToken ct)
@@ -39,7 +49,7 @@ public sealed partial class NasApiClient
         await RequireAdministratorAsync(ct);
         var current = (await ListBackgroundTasksAsync(ct)).SingleOrDefault(item => item.Id == expected.Id);
         // Progress may advance between reads; identity and the current action state must still match.
-        if (current is null || current.Type != expected.Type || current.CreatedAt != expected.CreatedAt ||
+        if (current is null || current.Type != expected.Type || current.CreatedAt != expected.CreatedAt || current.LibraryId != expected.LibraryId ||
             !(action switch { NasTaskAction.Cancel => current.CanCancel, NasTaskAction.Retry => current.CanRetry, NasTaskAction.Delete => current.CanDelete, _ => false }))
             throw new RemoteSettingsConflictException();
         string route = action switch { NasTaskAction.Cancel => "cancel", NasTaskAction.Retry => "retry", _ => "delete" };

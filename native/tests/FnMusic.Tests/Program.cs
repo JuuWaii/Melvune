@@ -113,6 +113,28 @@ await Test("NAS tasks validate states, source identity and guarded background ac
         await Fails(MusicFailure.InvalidResponse, () => api.ListBackgroundTasksAsync(default));
     }
 });
+await Test("NAS task library association is optional, exact and guarded before actions", async () =>
+{
+    string extension = "{\"libraryGUID\":\"library-A\"}"; int writes = 0;
+    using var api = new NasApiClient(endpoint, new FakeHandler(request =>
+    {
+        if (request.Method == HttpMethod.Post) writes++;
+        string data = request.RequestUri!.AbsolutePath.EndsWith("user/me") ? "{\"role\":\"admin\"}" :
+            "[{\"id\":\"scan\",\"type\":\"fileScan\",\"name\":\"same display name\",\"total\":3,\"successCount\":1,\"failCount\":0,\"canceledCount\":0,\"done\":false,\"createdAt\":1,\"ext\":" + extension + "}]";
+        return Json("{\"code\":0,\"data\":" + data + "}");
+    }), Guid.NewGuid());
+    var original = (await api.ListBackgroundTasksAsync(default)).Single();
+    Check(original.LibraryId == "library-A");
+    extension = "{\"libraryGUID\":\"library-a\"}";
+    try { await api.ChangeBackgroundTaskAsync(original, NasTaskAction.Cancel, default); throw new Exception("Changed library association accepted"); }
+    catch (RemoteSettingsConflictException) { }
+    Check(writes == 0);
+    foreach (string absent in new[] { "null", "{}", "{\"libraryGUID\":null}", "{\"libraryGUID\":\"\"}" })
+    { extension = absent; Check((await api.ListBackgroundTasksAsync(default)).Single().LibraryId is null); }
+    foreach (string invalid in new[] { "false", "[]", "{\"libraryGUID\":1}", "{\"libraryGUID\":\"" + new string('a', 257) + "\"}" })
+    { extension = invalid; await Fails(MusicFailure.InvalidResponse, () => api.ListBackgroundTasksAsync(default)); }
+    Check(writes == 0);
+});
 await Test("theme settings persist all modes and reject corrupt or unknown preferences", () =>
 {
     string directory = Path.Combine(Path.GetTempPath(), "fnmusic-theme-" + Guid.NewGuid().ToString("N"));
