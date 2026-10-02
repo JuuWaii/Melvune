@@ -15,6 +15,28 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+#if DEBUG
+await Test("indexed file diagnostics validate paths and metadata identity without mutating tracks", async () =>
+{
+    string audio = "{\"path\":\"/fixture/song.flac\"}"; bool identityMatches = true; int calls = 0;
+    using var api = new NasApiClient(endpoint, new FakeHandler(request =>
+    {
+        calls++; Check(request.Method == HttpMethod.Get);
+        string data = request.RequestUri!.AbsolutePath.EndsWith("track/list")
+            ? "{\"list\":[{\"guid\":\"song\",\"title\":\"fixture\",\"audioSpec\":" + audio + "}],\"total\":1}"
+            : "{\"track\":{\"guid\":\"" + (identityMatches ? "song" : "wrong") + "\"},\"audioSpec\":{\"path\":\"/fixture/song.flac\"}}";
+        return Json("{\"code\":0,\"data\":" + data + "}");
+    }), Guid.NewGuid());
+    var first = (await api.ListTrackFilesForVerificationAsync(1, 10, default)).Single();
+    Check(first.Path == "/fixture/song.flac" && first.Track.SourceInstanceId == api.SourceInstanceId && calls == 1);
+    audio = "null";
+    Check((await api.ListTrackFilesForVerificationAsync(1, 10, default)).Single().Track.Reference == first.Track.Reference && calls == 3);
+    identityMatches = false;
+    await Fails(MusicFailure.InvalidResponse, () => api.ListTrackFilesForVerificationAsync(1, 10, default));
+    foreach (string invalid in new[] { "false", "{\"path\":1}", "{\"path\":\"\"}", "{\"path\":\"" + new string('a', 4097) + "\"}" })
+    { audio = invalid; await Fails(MusicFailure.InvalidResponse, () => api.ListTrackFilesForVerificationAsync(1, 10, default)); }
+});
+#endif
 await Test("NAS library reconnect rechecks matching and requires current explicit confirmation", async () =>
 {
     Guid source = Guid.NewGuid(); string directory = "/music/original";

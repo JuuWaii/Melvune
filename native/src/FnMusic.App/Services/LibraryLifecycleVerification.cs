@@ -9,9 +9,10 @@ namespace FnMusic.App.Services;
 // Explicit, opt-in NAS write probe. The caller supplies two copied directories
 // beneath one unique fixture root. Existing libraries and original files are
 // never edited. Reports contain checks/counters, never session material.
-internal static class LibraryLifecycleVerification
+internal static partial class LibraryLifecycleVerification
 {
-    private sealed record Fixture(string OriginalPath, string ReplacementPath, int FileCount);
+    private sealed record FixtureFile(string Name, string Sha256);
+    private sealed record Fixture(string OriginalPath, string ReplacementPath, int FileCount, IReadOnlyList<FixtureFile> Files);
     private static void Require(bool condition)
     { if (!condition) throw new InvalidOperationException("Library fixture invariant failed."); }
     private static string ValidateFixture(Fixture fixture)
@@ -21,8 +22,14 @@ internal static class LibraryLifecycleVerification
         string root = fixture.OriginalPath[..^suffix.Length];
         string leaf = root[(root.LastIndexOf('/') + 1)..];
         Require(leaf.StartsWith("fnmusic-verify-", StringComparison.Ordinal) && Guid.TryParseExact(leaf[15..], "N", out _));
-        Require(root.Split('/').All(segment => segment is not ("." or "..") && !segment.Contains('\\') && !segment.Contains('\0')));
+        Require(root[1..].Split('/').All(segment => !string.IsNullOrWhiteSpace(segment) && segment is not ("." or "..") && !segment.Contains('\\') && !segment.Any(char.IsControl)));
         Require(fixture.ReplacementPath == root + "/replacement" && fixture.FileCount is >= 1 and <= 20);
+        Require(fixture.Files is not null && fixture.Files.Count == fixture.FileCount);
+        var files = fixture.Files ?? throw new InvalidOperationException();
+        Require(files.Select(file => file.Name).Distinct(StringComparer.Ordinal).Count() == files.Count);
+        Require(files.All(file => !string.IsNullOrWhiteSpace(file.Name) && file.Name.Length <= 256 && file.Name is not ("." or "..")
+            && !file.Name.Contains('/') && !file.Name.Contains('\\') && !file.Name.Any(char.IsControl)
+            && file.Sha256.Length == 64 && file.Sha256.All(Uri.IsHexDigit)));
         return root;
     }
     private static bool Within(string path, string directory) => path == directory || path.StartsWith(directory.TrimEnd('/') + "/", StringComparison.Ordinal);
@@ -35,6 +42,11 @@ internal static class LibraryLifecycleVerification
         var checks = new Dictionary<string, bool>(); var scans = new List<object>();
         string stage = "fixture", error = ""; Fixture? fixture = null;
         NasSharedLibrary? owned = null; bool attempted = false, cleaned = false;
+        NasPlaylistSnapshot? ownedPlaylist = null;
+        IReadOnlyList<NasPlaylist>? playlistsBefore = null;
+        bool playlistAttempted = false;
+        string playlistName = "FN验证-" + Guid.NewGuid().ToString("N")[..16];
+        var allowedTracks = new HashSet<TrackReference>();
         IReadOnlyList<NasSharedLibrary>? before = null;
         var existingTaskIds = new HashSet<(string, long)>();
         using var connection = new ConnectionViewModel(); using var observer = new ConnectionViewModel();
@@ -64,6 +76,23 @@ internal static class LibraryLifecycleVerification
             Verify("second_client_observes_created_library", await other.GetSharedLibraryAsync(owned.Library, timeout.Token) == owned);
             stage = "creation_scan_completed";
             scans.Add(await WaitForScanAsync(api, owned.Library.Id, baseline, fixture.FileCount, timeout.Token)); Verify(stage, true);
+            stage = "indexed_files_and_bytes_before_reconnect";
+            var indexedBefore = await ReadFixtureFilesAsync(api, fixture, fixture.OriginalPath, timeout.Token);
+            await VerifyFixtureBytesAsync(api, indexedBefore, fixture, timeout.Token); Verify(stage, true);
+            allowedTracks = indexedBefore.Select(file => file.Track.Reference).ToHashSet();
+            playlistsBefore = await api.ListPlaylistsAsync(timeout.Token);
+            stage = "fixture_playlist_created"; playlistAttempted = true;
+            var playlist = await api.CreatePlaylistAsync(playlistName, timeout.Token);
+            Require(playlistsBefore.All(item => item.Reference != playlist.Reference));
+            ownedPlaylist = await api.ReadPlaylistSnapshotAsync(playlist.Reference, timeout.Token);
+            ownedPlaylist = await api.ChangePlaylistTracksAsync(ownedPlaylist, allowedTracks.ToArray(), true, timeout.Token);
+            Verify(stage, ownedPlaylist.Tracks.Count == fixture.FileCount && allowedTracks.SetEquals(ownedPlaylist.Tracks.Select(track => track.Reference)));
+            var remoteReferences = ownedPlaylist.Tracks.Select(track => track.Reference).ToArray();
+            var storePath = Path.Combine(AppContext.BaseDirectory, "library-reference-store", Guid.NewGuid().ToString("N"));
+            var store = new LocalPlaylistStore(storePath);
+            var localPlaylist = new LocalPlaylist(Guid.NewGuid(), playlistName, indexedBefore.Select(file => LocalPlaylistEntry.FromTrack(file.Track, owned.Library.Id)).ToArray());
+            await store.SaveAsync(new(0, [localPlaylist]), timeout.Token);
+            Verify("local_playlist_saved_before_reconnect", (await store.LoadAsync(timeout.Token)).Playlists.Single().Entries.SequenceEqual(localPlaylist.Entries));
 
             stage = "option_change_readback";
             var stale = owned;
@@ -97,16 +126,52 @@ internal static class LibraryLifecycleVerification
             stage = "reconnect_scan_completed";
             if (!result.ScanStarted) await api.ScanSharedLibraryAsync(owned.Library, timeout.Token);
             scans.Add(await WaitForScanAsync(api, owned.Library.Id, baseline, fixture.FileCount, timeout.Token)); Verify(stage, true);
+            stage = "indexed_identity_and_bytes_after_reconnect";
+            var indexedAfter = await ReadFixtureFilesAsync(api, fixture, fixture.ReplacementPath, timeout.Token);
+            Verify(stage, indexedBefore.Select(file => (file.Track.Reference, Name(file.Path)))
+                .SequenceEqual(indexedAfter.Select(file => (file.Track.Reference, Name(file.Path)))));
+            await VerifyFixtureBytesAsync(api, indexedAfter, fixture, timeout.Token);
+            Verify("encoded_audio_hashes_preserved", true);
+            stage = "remote_playlist_references_preserved";
+            var observedPlaylist = await other.ReadPlaylistSnapshotAsync(ownedPlaylist.Playlist.Reference, timeout.Token);
+            Verify(stage, observedPlaylist.Tracks.Select(track => track.Reference).SequenceEqual(remoteReferences));
+            stage = "local_playlist_restart_references_preserved";
+            var restored = (await new LocalPlaylistStore(storePath).LoadAsync(timeout.Token)).Playlists.Single();
+            Verify(stage, restored.Id == localPlaylist.Id && restored.Entries.SequenceEqual(localPlaylist.Entries)
+                && restored.Entries.All(entry => indexedAfter.Any(file => file.Track.Reference == entry.Track)));
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; }
         finally
         {
+            bool playlistCleaned = !playlistAttempted;
+            if (playlistAttempted && playlistsBefore is not null && connection.AuthenticatedClient is { } playlistApi)
+            {
+                try
+                {
+                    using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+                    var candidates = (await playlistApi.ListPlaylistsAsync(cleanup.Token)).Where(item => item.Name == playlistName
+                        && playlistsBefore.All(original => original.Reference != item.Reference)).ToArray();
+                    Require(candidates.Length <= 1 && (ownedPlaylist is null || candidates.All(item => item.Reference == ownedPlaylist.Playlist.Reference)));
+                    foreach (var candidate in candidates)
+                    {
+                        var current = await playlistApi.ReadPlaylistSnapshotAsync(candidate.Reference, cleanup.Token);
+                        Require(current.Playlist.Name == playlistName && current.Tracks.All(track => allowedTracks.Contains(track.Reference)));
+                        await playlistApi.DeletePlaylistAsync(current, cleanup.Token);
+                    }
+                    var remaining = await playlistApi.ListPlaylistsAsync(cleanup.Token);
+                    playlistCleaned = remaining.Count == playlistsBefore.Count && playlistsBefore.All(original => remaining.Contains(original));
+                }
+                catch (Exception) { }
+                checks["fixture_playlist_removed_existing_playlists_unchanged"] = playlistCleaned;
+                if (!playlistCleaned) stage = "cleanup_incomplete";
+            }
             if (attempted && fixture is not null && before is not null && connection.AuthenticatedClient is { } api)
             {
                 try
                 {
                     using var cleanup = new CancellationTokenSource(TimeSpan.FromSeconds(45));
+                    Require(playlistCleaned);
                     var beforeIds = before.Select(item => item.Library.Id).ToHashSet();
                     var candidates = (await api.ListSharedLibrariesAsync(cleanup.Token)).Where(item => Owned(item, fixture, beforeIds)).ToArray();
                     // Recover an uncertain create response by its unique path, without

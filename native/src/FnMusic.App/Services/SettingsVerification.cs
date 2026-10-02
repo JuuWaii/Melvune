@@ -11,6 +11,7 @@ internal static class SettingsVerification
         string stage = "session", error = "";
         IReadOnlyList<string>? authorizedDirectories = null;
         IReadOnlyList<string>? libraryPaths = null;
+        IReadOnlyList<string>? sampleTrackPaths = null;
         using var connection = new ConnectionViewModel();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         try
@@ -20,6 +21,12 @@ internal static class SettingsVerification
             stage = "account_role"; bool admin = await api.IsAdministratorAsync(timeout.Token); checks[stage] = true;
             stage = "shared_library_list"; var libraries = await api.ListSharedLibrariesAsync(timeout.Token); checks[stage] = true;
             if (discoverDirectories) libraryPaths = libraries.Select(item => item.Path).ToArray();
+            if (discoverDirectories)
+            {
+                stage = "indexed_file_paths";
+                sampleTrackPaths = (await api.ListTrackFilesForVerificationAsync(1, 3, timeout.Token)).Select(item => item.Path).ToArray();
+                checks[stage] = true;
+            }
             stage = "background_task_list"; await api.ListBackgroundTasksAsync(timeout.Token); checks[stage] = true;
             if (libraries.Count > 0)
             {
@@ -47,7 +54,7 @@ internal static class SettingsVerification
         catch (Exception ex) { error = ex.GetType().Name; }
         // Paths are opt-in local diagnostic data; never credentials or normal logs.
         await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, discoverDirectories ? "library-directory-discovery.json" : "settings-verification.json"),
-            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, skipped, authorizedDirectories, libraryPaths }));
+            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, skipped, authorizedDirectories, libraryPaths, sampleTrackPaths }));
     }
 }
 #endif
