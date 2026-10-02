@@ -10,6 +10,19 @@ public sealed partial class MainWindow
     {
         string sidecar = Path.ChangeExtension(source.GetFilePath(track.Reference), ".lrc");
         string original = await File.ReadAllTextAsync(sidecar);
+        try
+        {
+            await File.WriteAllTextAsync(sidecar, "[offset:-250]\r[00:00]第一句\r[00:10]第二句", System.Text.Encoding.Unicode);
+            await LoadLyricsAsync(track);
+            verify("lyrics_cr_utf16_rows_and_offset_presented", currentLyrics.IsTimed && LyricsList.Items.Count == 2
+                && currentLyrics.Lines[0] == new LyricLine(.25, "第一句") && currentLyrics.Lines[1] == new LyricLine(10.25, "第二句"));
+            await File.WriteAllTextAsync(sidecar, "[ti:fixture]\r第一句\r第二句");
+            await LoadLyricsAsync(track);
+            verify("lyrics_cr_plain_rows_presented", !currentLyrics.IsTimed && LyricsList.Items.Count == 2
+                && currentLyrics.Lines.Select(line => line.Text).SequenceEqual(new[] { "第一句", "第二句" }) && LyricsStatus.Text.Contains("纯文本"));
+        }
+        finally { await File.WriteAllTextAsync(sidecar, original); }
+        await LoadLyricsAsync(track);
         var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         lyricsBeforeCommit = () => { entered.TrySetResult(); return release.Task; };

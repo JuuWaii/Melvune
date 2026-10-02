@@ -375,6 +375,20 @@ await Test("PCM read-ahead supports backward seeks and bounded memory", async ()
     using var cancelled = new CancellationTokenSource(); cancelled.Cancel();
     try { await cache.ReadAtAsync(0, output, cancelled.Token); throw new Exception("Cancellation ignored"); } catch (OperationCanceledException) { }
 });
+await Test("lyrics keep CR, LF and CRLF rows separate for timed and plain text", () =>
+{
+    foreach (string newline in new[] { "\r", "\n", "\r\n" })
+    {
+        var timed = Lyrics.Parse(string.Join(newline, "[ar:fixture]", "[offset:150]", "[00:01.05]第一句", "[00:03.125]第二句"), -50);
+        Check(timed.IsTimed && timed.Lines.Count == 2 && timed.Lines[0].Text == "第一句" && timed.Lines[1].Text == "第二句");
+        Check(Math.Abs(timed.Lines[0].Seconds - .85) < 1e-9 && Math.Abs(timed.Lines[1].Seconds - 2.925) < 1e-9);
+        var plain = Lyrics.Parse(string.Join(newline, "[ti:fixture]", "第一句", "第二句"));
+        Check(!plain.IsTimed && plain.Lines.Select(line => line.Text).SequenceEqual(new[] { "第一句", "第二句" }));
+    }
+    var mixed = Lyrics.Parse("[00:01]第一句\r\n[00:02]第二句\r[00:03]第三句\n[00:04]第四句");
+    Check(mixed.Lines.Select(line => line.Text).SequenceEqual(new[] { "第一句", "第二句", "第三句", "第四句" }));
+    return Task.CompletedTask;
+});
 await Test("lyrics timestamps translations offsets and seeking", () =>
 {
     var lyrics = Lyrics.Parse("[ar:Artist]\n[offset:100]\n[00:20.25]later\n[00:01.00][00:03.000]first\n[00:01.00]translation", 200);
@@ -898,6 +912,51 @@ await Test("local lyrics decode Unicode and legacy Chinese encodings without rep
     return Task.CompletedTask;
 });
 
+await Test("local lyric files preserve encoding, newline, offset and bilingual timeline combinations", async () =>
+{
+    string root = Path.Combine(testDirectory, "lyric-matrix");
+    Directory.CreateDirectory(root);
+    string audioFile = Path.Combine(root, "fixture.wav"), lyricFile = Path.Combine(root, "fixture.lrc");
+    try
+    {
+        await File.WriteAllBytesAsync(audioFile, [1]);
+        var source = await LocalMusicSource.ScanAsync(new(Guid.NewGuid(), root), default,
+            (_, _) => Task.FromResult(new LocalMusicMetadata("fixture", "fixture", 20)));
+        var reference = source.Tracks.Single().Reference;
+        Encoding[] encodings = [new UTF8Encoding(false, true), new UTF8Encoding(true, true),
+            new UnicodeEncoding(false, true, true), new UnicodeEncoding(true, true, true),
+            new UTF32Encoding(false, true, true), new UTF32Encoding(true, true, true),
+            CodePagesEncodingProvider.Instance.GetEncoding(54936, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback)!,
+            CodePagesEncodingProvider.Instance.GetEncoding(936, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback)!];
+        foreach (var encoding in encodings)
+        foreach (string newline in new[] { "\r", "\n", "\r\n" })
+        {
+            foreach (int offset in new[] { -200, 0, 150 })
+            {
+                string text = string.Join(newline, "[ar:fixture]", $"[offset:{offset}]",
+                    "[00:01.05][00:03:125]第一句", "[00:01.05]翻译", "[00:10]尾句");
+                await File.WriteAllBytesAsync(lyricFile, encoding.GetPreamble().Concat(encoding.GetBytes(text)).ToArray());
+                var actual = await source.GetLyricsAsync(reference, default);
+                Check(actual.IsTimed && actual.Lines.Count == 3 && actual.Lines[0].Text == "第一句\n翻译"
+                    && actual.Lines[1].Text == "第一句" && actual.Lines[2].Text == "尾句");
+                double[] times = [1.05 - offset / 1000d, 3.125 - offset / 1000d, 10 - offset / 1000d];
+                for (int i = 0; i < times.Length; i++)
+                {
+                    Check(Math.Abs(actual.Lines[i].Seconds - times[i]) < 1e-9);
+                    Check(actual.FindLine(actual.Lines[i].Seconds - .001) == i - 1 && actual.FindLine(actual.Lines[i].Seconds) == i);
+                }
+            }
+            string plain = string.Join(newline, "[ti:fixture]", "第一句", "第二句");
+            await File.WriteAllBytesAsync(lyricFile, encoding.GetPreamble().Concat(encoding.GetBytes(plain)).ToArray());
+            var plainLyrics = await source.GetLyricsAsync(reference, default);
+            Check(!plainLyrics.IsTimed && plainLyrics.Lines.Select(line => line.Text).SequenceEqual(new[] { "第一句", "第二句" }));
+        }
+    }
+    finally
+    {
+        File.Delete(lyricFile); File.Delete(audioFile); Directory.Delete(root);
+    }
+});
 await Test("local incremental scans read changed metadata and retain unchanged identities", async () =>
 {
     string root = Path.Combine(Path.GetTempPath(), "fnmusic-incremental-" + Guid.NewGuid().ToString("N"));

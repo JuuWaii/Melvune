@@ -14,7 +14,7 @@ public sealed record Lyrics(IReadOnlyList<LyricLine> Lines, bool IsTimed)
         var offsetMatch = Regex.Match(text, @"\[offset:([+-]?\d{1,8})\]", RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
         double offset = offsetMatch.Success ? double.Parse(offsetMatch.Groups[1].Value, CultureInfo.InvariantCulture) : 0;
         var timed = new List<LyricLine>(); var plain = new List<LyricLine>();
-        foreach (string row in text.Replace("\r", "").Split('\n'))
+        foreach (string row in text.Replace("\r\n", "\n", StringComparison.Ordinal).Replace('\r', '\n').Split('\n'))
         {
             var matches = stamps.Matches(row);
             if (matches.Count == 0)
