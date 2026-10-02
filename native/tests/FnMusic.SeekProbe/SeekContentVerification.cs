@@ -40,19 +40,22 @@ internal static class SeekContentVerification
                 bool readAhead = args.Contains("--read-ahead", StringComparer.Ordinal);
                 int[] positions = args.Contains("--near-seeks", StringComparer.Ordinal)
                     ? [5, 6, 7, 8, 7, 6, 0, 1, 579] : [571, 31, 451, 5];
-                await VerifyAsync(path, format, decodedReference, false, readAhead, positions, results);
+                bool versioned = args.Contains("--etag", StringComparer.Ordinal);
+                await VerifyAsync(path, format, decodedReference, false, readAhead, versioned, positions, results);
                 if (args.Contains("--fast-seek", StringComparer.Ordinal))
-                    await VerifyAsync(path, format, decodedReference, true, readAhead, positions, results);
+                    await VerifyAsync(path, format, decodedReference, true, readAhead, versioned, positions, results);
             }
             if (results.Any(result => !result.Passed)) throw new InvalidOperationException("Decoded audio alignment failed.");
         }
         catch (Exception exception) { error = exception.GetType().Name; throw; }
         finally
         {
-            string report = args.Contains("--fast-seek", StringComparer.Ordinal) ? "seek-content-comparison.json" : "seek-content-verification.json";
+            string report = args.Contains("--fast-seek", StringComparer.Ordinal) ? "seek-content-comparison.json"
+                : args.Contains("--etag", StringComparer.Ordinal) ? "seek-content-etag.json" : "seek-content-verification.json";
             await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, report),
                 JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, error, sampleRate = Rate, seconds = Seconds,
                     decoder = GetDecoderIdentity(), readAhead = args.Contains("--read-ahead", StringComparer.Ordinal),
+                    strongVersion = args.Contains("--etag", StringComparer.Ordinal),
                     consumer = "MediaPlayer with MediaStreamSource sample observation",
                     gate = "stable aligned audio within 50ms; correlation >0.8; offset <=50ms; all later observed frames aligned", results }));
             // Only this probe's randomly named, synthetic temporary directory.
@@ -148,9 +151,9 @@ internal static class SeekContentVerification
             sha256 = Convert.ToHexString(SHA256.HashData(file)) };
     }
 
-    private static async Task VerifyAsync(string path, string format, short[] reference, bool fast, bool readAhead, int[] positions, List<Result> results)
+    private static async Task VerifyAsync(string path, string format, short[] reference, bool fast, bool readAhead, bool versioned, int[] positions, List<Result> results)
     {
-        using var handler = new RangeHandler(path);
+        using var handler = new RangeHandler(path, versioned);
         using var client = new HttpClient(handler, false);
         using var input = await HttpRangeStream.OpenAsync(client, new Uri("https://seek.invalid/audio"), CancellationToken.None);
         SeekablePlayback? production = null;

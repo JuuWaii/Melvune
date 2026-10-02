@@ -1136,6 +1136,9 @@ await Test("range stream rejects a file changing size between requests", async (
     using var stream = await HttpRangeStream.OpenAsync(new HttpClient(handler), endpoint.MusicUri, default);
     await Fails(MusicFailure.InvalidResponse, async () => { _ = await stream.ReadAsync(new byte[10]); });
 });
+await Test("range stream rejects changed, weak or missing pinned versions without publishing bytes", RangeRepresentationVerification.ChangedVersionAsync);
+await Test("range stream binds strong representation versions across cache blocks", RangeRepresentationVerification.StrongVersionAsync);
+await Test("range stream preserves weak or absent validator compatibility without conditional requests", RangeRepresentationVerification.UnavailableVersionAsync);
 await Test("range stream discards a completed block after caller cancellation", RangeStreamVerification.CallerCancellationAsync);
 await Test("range stream discards a completed block after disposal", RangeStreamVerification.DisposalAsync);
 await Test("range stream disposal wakes a seek waiting behind a delayed read", RangeStreamVerification.QueuedSeekAsync);

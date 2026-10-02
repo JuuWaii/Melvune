@@ -219,7 +219,7 @@ static async Task VerifyBlockedOpenCancellation(string path, bool body)
     }
 }
 
-sealed class RangeHandler(string path) : HttpMessageHandler
+sealed class RangeHandler(string path, bool versioned = false) : HttpMessageHandler
 {
     private long bytesRead;
     public long BytesRead => Interlocked.Read(ref bytesRead);
@@ -237,6 +237,10 @@ sealed class RangeHandler(string path) : HttpMessageHandler
         var range = request.Headers.Range?.Ranges.Single() ?? throw new Exception("Range required.");
         var from = range.From ?? throw new Exception("Explicit start required.");
         var to = range.To ?? throw new Exception("Explicit end required.");
+        var version = new EntityTagHeaderValue("\"synthetic-version\"");
+        if (versioned && (from != 0 || to != 0) &&
+            (request.Headers.IfMatch.Count != 1 || request.Headers.IfMatch.Single().IsWeak || request.Headers.IfMatch.Single().Tag != version.Tag))
+            return new HttpResponseMessage(HttpStatusCode.PreconditionFailed);
         using var file = File.OpenRead(path);
         file.Position = from;
         var bytes = new byte[checked((int)(to - from + 1))];
@@ -246,6 +250,7 @@ sealed class RangeHandler(string path) : HttpMessageHandler
         { Content = BlockBody ? new StreamContent(new BlockedBody(WaitBlocked)) : new ByteArrayContent(bytes) };
         response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
         response.Content.Headers.ContentRange = new ContentRangeHeaderValue(from, to, file.Length);
+        if (versioned) response.Headers.ETag = version;
         return response;
     }
     private async Task WaitBlocked(CancellationToken token)

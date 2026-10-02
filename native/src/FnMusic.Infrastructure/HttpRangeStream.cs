@@ -11,6 +11,7 @@ public sealed class HttpRangeStream : Stream
     private readonly HttpClient client;
     private readonly Uri source;
     private readonly long length;
+    private readonly EntityTagHeaderValue? versionTag;
     private readonly SemaphoreSlim gate = new(1);
     private readonly CancellationTokenSource lifetime = new();
     private byte[] block = [];
@@ -18,8 +19,8 @@ public sealed class HttpRangeStream : Stream
     private volatile bool disposed;
     public string ContentType { get; }
 
-    private HttpRangeStream(HttpClient client, Uri source, long length, string contentType)
-    { this.client = client; this.source = source; this.length = length; ContentType = contentType; }
+    private HttpRangeStream(HttpClient client, Uri source, long length, string contentType, EntityTagHeaderValue? versionTag)
+    { this.client = client; this.source = source; this.length = length; ContentType = contentType; this.versionTag = versionTag; }
 
     // 接管专用 HttpClient，调用者不得复用它发送其他主机请求。
     public static async Task<HttpRangeStream> OpenAsync(HttpClient client, Uri source, CancellationToken ct)
@@ -36,18 +37,23 @@ public sealed class HttpRangeStream : Stream
             string type = response.Content.Headers.ContentType?.MediaType ?? "application/octet-stream";
             if (!type.StartsWith("audio/", StringComparison.OrdinalIgnoreCase) && type != "application/octet-stream")
                 throw new MusicApiException(MusicFailure.InvalidResponse);
-            return new HttpRangeStream(client, source, size, type);
+            var tag = response.Headers.ETag;
+            // Weak validators do not identify identical bytes. Bind only a strong
+            // version; a Last-Modified date alone does not prove byte identity.
+            return new HttpRangeStream(client, source, size, type, tag is { IsWeak: false } && tag.Tag != "*" ? tag : null);
         }
         catch { client.Dispose(); throw; }
     }
 
-    private static void CheckResponse(HttpResponseMessage response, long from, long to, long? expectedLength = null)
+    private static void CheckResponse(HttpResponseMessage response, long from, long to, long? expectedLength = null, EntityTagHeaderValue? expectedVersion = null)
     {
         if (response.StatusCode == HttpStatusCode.Unauthorized) throw new MusicApiException(MusicFailure.Unauthorized);
         if ((int)response.StatusCode is >= 300 and < 400) throw new MusicApiException(MusicFailure.RedirectRejected);
         var range = response.Content.Headers.ContentRange;
         if (response.StatusCode != HttpStatusCode.PartialContent || range?.Unit != "bytes" || range.From != from || range.To != to ||
             range.Length is null || range.Length <= to || (expectedLength is not null && range.Length != expectedLength))
+            throw new MusicApiException(MusicFailure.InvalidResponse);
+        if (expectedVersion is not null && (response.Headers.ETag is not { IsWeak: false } actualVersion || actualVersion.Tag != expectedVersion.Tag))
             throw new MusicApiException(MusicFailure.InvalidResponse);
     }
 
@@ -67,8 +73,12 @@ public sealed class HttpRangeStream : Stream
                 long end = Math.Min(length - 1, start + BlockSize - 1);
                 using var request = new HttpRequestMessage(HttpMethod.Get, source);
                 request.Headers.Range = new RangeHeaderValue(start, end);
+                // Continue the opened representation, never concatenate another
+                // same-sized revision. Recheck the response even if a proxy ignores
+                // the conditional request. No validator value is logged or stored.
+                if (versionTag is not null) request.Headers.IfMatch.Add(versionTag);
                 using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, timeout.Token).ConfigureAwait(false);
-                CheckResponse(response, start, end, length);
+                CheckResponse(response, start, end, length, versionTag);
                 byte[] next = new byte[checked((int)(end - start + 1))];
                 using var input = await response.Content.ReadAsStreamAsync(timeout.Token).ConfigureAwait(false);
                 await input.ReadExactlyAsync(next, timeout.Token).ConfigureAwait(false);
