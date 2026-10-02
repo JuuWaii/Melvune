@@ -41,6 +41,7 @@ public sealed partial class MainWindow
         NasServerSettings? server = null;
         NasDefaultLibraryAccess? access = null;
         NasSharedLibrary? selected = null;
+        string? selectedLibraryId = null;
         IReadOnlyList<NasSharedLibrary> libraries = [];
         bool librariesReady = false;
         string refreshWarning = "";
@@ -111,7 +112,9 @@ public sealed partial class MainWindow
         void RenderSelected()
         {
             selected = (picker.SelectedItem as SharedLibraryRow)?.Value;
-            currentPath.Text = selected?.Path ?? (librariesReady ? "尚无素材库。" : "素材库读取失败，请刷新重试。");
+            currentPath.Text = selected?.Path ?? (librariesReady
+                ? selectedLibraryId is null ? "尚无素材库。" : "所选素材库已不存在，请重新选择。"
+                : "素材库读取失败，请刷新重试。");
             preference.SelectedIndex = selected is null ? 1 : Array.IndexOf(preferences, selected.MetadataPreference);
             autoLyric.IsChecked = selected?.AutoDownloadLyric ?? false; confirmDelete.IsChecked = false;
             refreshReconnectSelection();
@@ -119,6 +122,7 @@ public sealed partial class MainWindow
         }
         async Task Refresh(string? selectedId = null)
         {
+            string? requestedId = selectedId ?? selectedLibraryId;
             admin = await api.IsAdministratorAsync(ct);
             role.Text = admin ? "管理员设置 · 保存与刷新直接同步飞牛服务器" : "当前账号仅查看素材库；管理设置需要飞牛管理员权限。";
             var failed = new List<string>();
@@ -142,7 +146,9 @@ public sealed partial class MainWindow
             refreshWarning = failed.Count == 0 ? "" : "部分设置读取失败：" + string.Join("、", failed) + "。请刷新重试；其他已读取项仍可使用。";
             rendering = true;
             var rows = libraries.Select(item => new SharedLibraryRow(item, string.IsNullOrWhiteSpace(item.Library.Name) ? item.Path : item.Library.Name)).ToArray();
-            picker.ItemsSource = rows; picker.SelectedItem = rows.FirstOrDefault(item => item.Value.Library.Id == selectedId) ?? rows.FirstOrDefault();
+            picker.ItemsSource = rows;
+            picker.SelectedItem = requestedId is null ? rows.FirstOrDefault() : rows.FirstOrDefault(item => item.Value.Library.Id == requestedId);
+            selectedLibraryId = (picker.SelectedItem as SharedLibraryRow)?.Value.Library.Id ?? requestedId;
             RenderSelected();
             serverName.Text = server?.Name ?? "";
             language.Text = server is null ? (admin ? "服务器设置读取失败，请刷新重试。" : "需要管理员权限。") : "服务端语言：" + server.Language + "（保留现有值）";
@@ -171,6 +177,7 @@ public sealed partial class MainWindow
         {
             if (rendering) return;
             var choice = (picker.SelectedItem as SharedLibraryRow)?.Value;
+            selectedLibraryId = choice?.Library.Id;
             await Run(async () =>
             {
                 if (choice is not null) selected = await api.GetSharedLibraryAsync(choice.Library, ct); else selected = null;

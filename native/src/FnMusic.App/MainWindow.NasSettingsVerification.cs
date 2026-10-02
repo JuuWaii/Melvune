@@ -105,10 +105,35 @@ public sealed partial class MainWindow
                 await Task.Delay(100);
                 await Click("创建素材库");
                 verify("nas_settings_library_create", handler.Libraries.Count == 2);
+                var picker = library.Children.OfType<ComboBox>().Single(item => item.Header?.ToString() == "素材库");
+                var preference = library.Children.OfType<ComboBox>().Single(item => item.Header?.ToString() == "元数据优先策略");
+                handler.Libraries["created"] = ("/music/new", false, "cloud_preferred");
+                int libraryWrites = handler.Writes;
+                await Click("保存素材库设置");
+                verify("nas_settings_library_conflict_invalidates_snapshot", handler.Writes == libraryWrites && status.Text.Contains("变化")
+                    && !buttons.Single(button => button.Content.ToString() == "保存素材库设置").IsEnabled);
+                await Click("刷新飞牛设置");
+                verify("nas_settings_library_conflict_refresh_preserves_selection", (picker.SelectedItem as SharedLibraryRow)?.Value.Library.Id == "created"
+                    && preference.SelectedIndex == 0 && library.Children.OfType<CheckBox>().First().IsChecked == false);
+                handler.FailedRead = "shared-library/list"; await Click("刷新飞牛设置");
+                verify("nas_settings_library_failed_refresh_clears_editable_selection", picker.SelectedItem is null
+                    && !buttons.Single(button => button.Content.ToString() == "保存素材库设置").IsEnabled);
+                handler.FailedRead = null; await Click("刷新飞牛设置");
+                verify("nas_settings_library_failed_refresh_recovers_same_selection", (picker.SelectedItem as SharedLibraryRow)?.Value.Library.Id == "created");
+                var removedLibrary = handler.Libraries["created"];
+                handler.Libraries.Remove("created"); await Click("刷新飞牛设置");
+                verify("nas_settings_library_disappearance_does_not_select_another", picker.SelectedItem is null
+                    && library.Children.OfType<TextBlock>().First().Text.Contains("已不存在")
+                    && !buttons.Single(button => button.Content.ToString() == "扫描所选素材库").IsEnabled);
+                handler.Libraries["created"] = removedLibrary; await Click("刷新飞牛设置");
+                verify("nas_settings_library_return_recovers_selection", (picker.SelectedItem as SharedLibraryRow)?.Value.Library.Id == "created");
                 var confirmation = library.Children.OfType<CheckBox>().Last();
                 ((IToggleProvider)new CheckBoxAutomationPeer(confirmation).GetPattern(PatternInterface.Toggle)).Toggle();
                 await Click("移除素材库");
                 verify("nas_settings_library_remove", handler.Libraries.Count == 1 && handler.Libraries.ContainsKey("initial"));
+                verify("nas_settings_library_delete_requires_explicit_selection", picker.SelectedItem is null
+                    && !buttons.Single(button => button.Content.ToString() == "扫描所选素材库").IsEnabled);
+                picker.SelectedIndex = 0; await Task.Delay(150);
                 await Click("扫描所选素材库");
                 verify("nas_settings_scan_request_only", status.Text.Contains("请求已提交"));
                 tabs.SelectedIndex = 1; await Task.Delay(150);
