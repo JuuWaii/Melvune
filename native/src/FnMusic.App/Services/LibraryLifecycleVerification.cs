@@ -39,7 +39,7 @@ internal static partial class LibraryLifecycleVerification
 
     public static async Task RunAsync()
     {
-        var checks = new Dictionary<string, bool>(); var scans = new List<object>();
+        var checks = new Dictionary<string, bool>(); var scans = new List<object>(); var scanObservations = new List<object>();
         string stage = "fixture", error = ""; Fixture? fixture = null;
         NasSharedLibrary? owned = null; bool attempted = false, cleaned = false;
         NasPlaylistSnapshot? ownedPlaylist = null;
@@ -51,6 +51,8 @@ internal static partial class LibraryLifecycleVerification
         var existingTaskIds = new HashSet<(string, long)>();
         using var connection = new ConnectionViewModel(); using var observer = new ConnectionViewModel();
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(8));
+        using var scanLifetime = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
+        Task<(object? Result, Exception? Error)>? reconnectObservation = null;
         void Verify(string name, bool value) { checks[name] = value; Require(value); }
         try
         {
@@ -75,7 +77,7 @@ internal static partial class LibraryLifecycleVerification
             Verify(stage, Owned(owned, fixture, before.Select(item => item.Library.Id).ToHashSet()));
             Verify("second_client_observes_created_library", await other.GetSharedLibraryAsync(owned.Library, timeout.Token) == owned);
             stage = "creation_scan_completed";
-            scans.Add(await WaitForScanAsync(api, owned.Library.Id, baseline, fixture.FileCount, timeout.Token)); Verify(stage, true);
+            scans.Add(await WaitForScanAsync(api, owned.Library.Id, baseline, fixture.FileCount, stage, scanObservations, timeout.Token)); Verify(stage, true);
             stage = "indexed_files_and_bytes_before_reconnect";
             var indexedBefore = await ReadFixtureFilesAsync(api, fixture, fixture.OriginalPath, timeout.Token);
             await VerifyFixtureBytesAsync(api, indexedBefore, fixture, timeout.Token); Verify(stage, true);
@@ -106,12 +108,6 @@ internal static partial class LibraryLifecycleVerification
             owned = await api.UpdateSharedLibraryAsync(owned, false, "local_only", timeout.Token);
             Verify("fixture_options_restored", !owned.AutoDownloadLyric);
 
-            baseline = (await api.ListBackgroundTasksAsync(timeout.Token)).Select(task => (task.Id, task.CreatedAt)).ToHashSet();
-            stage = "explicit_scan_submitted";
-            await api.ScanSharedLibraryAsync(owned.Library, timeout.Token); Verify(stage, true);
-            stage = "explicit_scan_completed";
-            scans.Add(await WaitForScanAsync(api, owned.Library.Id, baseline, fixture.FileCount, timeout.Token)); Verify(stage, true);
-
             stage = "replacement_preflight_matches";
             var preflight = await api.CheckLibraryReconnectAsync(owned, fixture.ReplacementPath, timeout.Token);
             // Do not silently confirm unmatched copies or server confirmation requirements.
@@ -125,9 +121,9 @@ internal static partial class LibraryLifecycleVerification
             Verify("second_client_observes_reconnected_library", await other.GetSharedLibraryAsync(owned.Library, timeout.Token) == owned);
             stage = "reconnect_scan_completed";
             if (!result.ScanStarted) await api.ScanSharedLibraryAsync(owned.Library, timeout.Token);
-            scans.Add(await WaitForScanAsync(api, owned.Library.Id, baseline, fixture.FileCount, timeout.Token)); Verify(stage, true);
+            reconnectObservation = ObserveScanAsync(api, owned.Library.Id, baseline, fixture.FileCount, stage, scanObservations, scanLifetime.Token);
             stage = "indexed_identity_and_bytes_after_reconnect";
-            var indexedAfter = await ReadFixtureFilesAsync(api, fixture, fixture.ReplacementPath, timeout.Token);
+            var indexedAfter = await WaitForFixtureFilesAsync(api, fixture, fixture.ReplacementPath, timeout.Token);
             Verify(stage, indexedBefore.Select(file => (file.Track.Reference, Name(file.Path)))
                 .SequenceEqual(indexedAfter.Select(file => (file.Track.Reference, Name(file.Path)))));
             await VerifyFixtureBytesAsync(api, indexedAfter, fixture, timeout.Token);
@@ -139,11 +135,29 @@ internal static partial class LibraryLifecycleVerification
             var restored = (await new LocalPlaylistStore(storePath).LoadAsync(timeout.Token)).Playlists.Single();
             Verify(stage, restored.Id == localPlaylist.Id && restored.Entries.SequenceEqual(localPlaylist.Entries)
                 && restored.Entries.All(entry => indexedAfter.Any(file => file.Track.Reference == entry.Track)));
+            stage = "reconnect_scan_completed";
+            var observedScan = await reconnectObservation;
+            if (observedScan.Error is { } scanError)
+            {
+                checks[stage] = false;
+                System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(scanError).Throw();
+            }
+            scans.Add(observedScan.Result!); Verify(stage, true);
+            // Keep explicit rescan acceptance separate from the reconnect reference checks.
+            // A missing completion record still fails the full probe, after collecting
+            // the independent evidence rather than preventing those checks from running.
+            baseline = (await api.ListBackgroundTasksAsync(timeout.Token)).Select(task => (task.Id, task.CreatedAt)).ToHashSet();
+            stage = "explicit_scan_submitted";
+            await api.ScanSharedLibraryAsync(owned.Library, timeout.Token); Verify(stage, true);
+            stage = "explicit_scan_completed";
+            scans.Add(await WaitForScanAsync(api, owned.Library.Id, baseline, fixture.FileCount, stage, scanObservations, timeout.Token)); Verify(stage, true);
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; }
         finally
         {
+            scanLifetime.Cancel();
+            if (reconnectObservation is not null) await reconnectObservation;
             bool playlistCleaned = !playlistAttempted;
             if (playlistAttempted && playlistsBefore is not null && connection.AuthenticatedClient is { } playlistApi)
             {
@@ -195,25 +209,42 @@ internal static partial class LibraryLifecycleVerification
             }
         }
         await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "library-lifecycle-verification.json"),
-            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, scans }));
+            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, scans, scanObservations }));
+    }
+
+    private static async Task<(object? Result, Exception? Error)> ObserveScanAsync(NasApiClient api, string libraryId,
+        HashSet<(string, long)> baseline, int files, string stage, List<object> observations, CancellationToken ct)
+    {
+        try { return (await WaitForScanAsync(api, libraryId, baseline, files, stage, observations, ct), null); }
+        catch (Exception error) { return (null, error); }
     }
 
     private static async Task<object> WaitForScanAsync(NasApiClient api, string libraryId,
-        HashSet<(string, long)> baseline, int files, CancellationToken ct)
+        HashSet<(string, long)> baseline, int files, string stage, List<object> observations, CancellationToken ct)
     {
         using var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct);
         bounded.CancelAfter(TimeSpan.FromMinutes(2));
+        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+        string? previousState = null;
         while (true)
         {
-            var tasks = (await api.ListBackgroundTasksAsync(bounded.Token)).Where(task => task.LibraryId == libraryId
-                && task.Type == "fileScan" && !baseline.Contains((task.Id, task.CreatedAt))).ToArray();
+            var all = await api.ListBackgroundTasksAsync(bounded.Token);
+            var associated = all.Where(task => task.LibraryId == libraryId && task.Type == "fileScan").ToArray();
+            var states = associated.Select(task => new { task.Id, task.CreatedAt, IsBaseline = baseline.Contains((task.Id, task.CreatedAt)),
+                task.Total, task.SuccessCount, task.FailCount, task.CanceledCount, task.Done, task.Cancelling, task.Canceled }).ToArray();
+            string state = JsonSerializer.Serialize(new { TotalTasks = all.Count, Associated = states });
+            if (state != previousState && observations.Count < 150)
+                observations.Add(new { Stage = stage, ElapsedMilliseconds = elapsed.ElapsedMilliseconds, TotalTasks = all.Count, Associated = states });
+            previousState = state;
+            var tasks = associated.Where(task => !baseline.Contains((task.Id, task.CreatedAt))).ToArray();
             Require(tasks.Length <= 1);
             if (tasks.SingleOrDefault() is { Done: true } task)
             {
                 Require(!task.Cancelling && !task.Canceled && task.FailCount == 0 && task.CanceledCount == 0 && task.Total == files && task.SuccessCount == files);
                 return new { task.Type, task.Total, task.SuccessCount, task.FailCount, task.CanceledCount, task.Done };
             }
-            await Task.Delay(TimeSpan.FromSeconds(2), bounded.Token);
+            // Short three-file scans may complete between two-second samples.
+            await Task.Delay(elapsed.Elapsed < TimeSpan.FromSeconds(10) ? TimeSpan.FromMilliseconds(250) : TimeSpan.FromSeconds(2), bounded.Token);
         }
     }
 }

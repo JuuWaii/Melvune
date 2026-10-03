@@ -7,6 +7,18 @@ namespace FnMusic.App.Services;
 internal static partial class LibraryLifecycleVerification
 {
     private static string Name(string path) => path[(path.LastIndexOf('/') + 1)..];
+    private static async Task<IReadOnlyList<(MusicTrack Track, string Path)>> WaitForFixtureFilesAsync(
+        NasApiClient api, Fixture fixture, string directory, CancellationToken ct)
+    {
+        using var bounded = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        bounded.CancelAfter(TimeSpan.FromSeconds(30));
+        while (true)
+        {
+            try { return await ReadFixtureFilesAsync(api, fixture, directory, bounded.Token); }
+            catch (InvalidOperationException) when (!bounded.IsCancellationRequested)
+            { await Task.Delay(TimeSpan.FromMilliseconds(500), bounded.Token); }
+        }
+    }
     private static async Task<IReadOnlyList<(MusicTrack Track, string Path)>> ReadFixtureFilesAsync(
         NasApiClient api, Fixture fixture, string directory, CancellationToken ct)
     {
