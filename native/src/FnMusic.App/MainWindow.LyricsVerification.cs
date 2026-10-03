@@ -37,8 +37,8 @@ public sealed partial class MainWindow
             verify("lyrics_replaced_source_discards_late_result", currentLyrics.Lines.Count == 0 && LyricsList.ItemsSource is null
                 && LyricsStatus.Text.Contains("来源已变化"));
             var currentAudio = music.Player.Source;
-            LyricsPanel.Visibility = Microsoft.UI.Xaml.Visibility.Collapsed;
-            Lyrics_Click(this, new Microsoft.UI.Xaml.RoutedEventArgs());
+            await CloseNowPlayingAsync();
+            await OpenNowPlayingAsync();
             for (int i = 0; i < 100 && currentLyrics.Lines.Count == 0; i++) await Task.Delay(20);
             verify("lyrics_replaced_source_retry_reads_current_file", currentLyrics.Lines.Count == 1 && currentLyrics.Lines[0].Text == "刷新后的歌词"
                 && !lyricsNeedsRetry && ReferenceEquals(currentAudio, music.Player.Source));
@@ -67,7 +67,8 @@ public sealed partial class MainWindow
             var current = currentLyrics;
             release.TrySetResult(); await pending;
             verify("lyrics_changed_track_discards_late_result", ReferenceEquals(current, currentLyrics)
-                && currentLyrics.Lines[0].Text == "合成歌词验证" && ReferenceEquals(NowCover.DataContext, changed) && NowAlbum.Text == "新的专辑");
+                && currentLyrics.Lines[0].Text == "合成歌词验证" && ReferenceEquals(NowCover.DataContext, changed) && NowAlbum.Text == "新的专辑"
+                && FullNowTitle.Text == changed.Title && ReferenceEquals(FullNowCover.DataContext, changed));
         }
         finally
         {
@@ -93,6 +94,10 @@ public sealed partial class MainWindow
             release.TrySetResult(); await pending;
             verify("lyrics_stop_discards_late_result", currentLyrics.Lines.Count == 0 && LyricsList.ItemsSource is null
                 && LyricsStatus.Text == stoppedStatus && NowCover.DataContext is null);
+            await OpenNowPlayingAsync();
+            verify("fullscreen_stopped_presentation_has_empty_state", FullNowTitle.Text == "尚未播放歌曲" && FullNowArtist.Text.Length == 0
+                && FullNowCover.Source is null && LyricsStatus.Text.Contains("播放歌曲后"));
+            await CloseNowPlayingAsync();
         }
         finally { lyricsBeforeCommit = null; release.TrySetResult(); }
     }

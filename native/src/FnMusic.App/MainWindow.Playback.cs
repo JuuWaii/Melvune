@@ -84,6 +84,7 @@ public sealed partial class MainWindow
     private async Task ShowLibraryAsync()
     {
         if (!RequireRemoteCapability(MusicSourceCapabilities.Browse)) return;
+        await CloseNowPlayingAsync();
         localView = false;
 #if DEBUG
         if (IsSyntheticPreview) { SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible; await SwitchCollectionAsync(null); return; }
@@ -94,8 +95,9 @@ public sealed partial class MainWindow
         await LoadDevicesAsync();
     }
     private async void Library_Click(object sender, RoutedEventArgs e) => await ShowLibraryAsync();
-    private void Settings_Click(object sender, RoutedEventArgs e)
-    { LibraryPanel.Visibility = Visibility.Collapsed; SettingsPanel.Visibility = Visibility.Visible; }
+    private async void Settings_Click(object sender, RoutedEventArgs e) => await ShowSettingsPanelAsync();
+    private async Task ShowSettingsPanelAsync()
+    { await CloseNowPlayingAsync(); LibraryPanel.Visibility = Visibility.Collapsed; SettingsPanel.Visibility = Visibility.Visible; AnimateViewEntry(SettingsPanel); }
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     { if (localView) await LoadLocalPageAsync(1, true); else await LoadPageAsync(1); }
     private async void Previous_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page - 1);
@@ -122,7 +124,6 @@ public sealed partial class MainWindow
     private async Task LoadPageAsync(int requestedPage)
     {
         if (closed) return;
-        RevealBrowseContent();
         if (localView) { await LoadLocalPageAsync(requestedPage); return; }
         if (!RequireRemoteCapability(favoritesView ? MusicSourceCapabilities.ReadFavorites
             : collectionKind is null && searchQuery.Length > 0 ? MusicSourceCapabilities.Search : MusicSourceCapabilities.Browse)) return;
@@ -270,6 +271,16 @@ public sealed partial class MainWindow
         catch (Exception) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "音频加载失败，请检查网络、登录状态或选择其他曲目。"; }
     }
     private void Pause_Click(object sender, RoutedEventArgs e) { music.Player.Pause(); if (mediaReady) PlaybackStatus.Text = "已暂停"; }
+    private async void PlayPause_Click(object sender, RoutedEventArgs e)
+    {
+        if (mediaReady)
+        {
+            if (music.Player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing) Pause_Click(sender, e);
+            else Resume_Click(sender, e);
+        }
+        else if (queue.Current is { } current) await PlayTrackAsync(current);
+        else if (LyricsPanel.Visibility != Visibility.Visible) PlaySelected_Click(sender, e);
+    }
     private void UpdateQueueStatus() => QueueStatus.Text = queue.Count == 0 ? "播放队列为空" :
         queue.Current is null ? $"队列 {queue.Count} 首 · 未选择播放曲目" :
         $"队列 {queue.Index + 1}/{queue.Count} · 来自开始播放时的{queueOrigin}";
@@ -336,6 +347,15 @@ public sealed partial class MainWindow
     private void UpdateProgress()
     {
         if (closed) return;
+        bool playing = mediaReady && music.Player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing;
+        string playGlyph = playing ? "\uE769" : "\uE768";
+        if (PlayPauseIcon.Glyph != playGlyph)
+        {
+            PlayPauseIcon.Glyph = playGlyph;
+            string action = playing ? "暂停" : "播放";
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(PlayPauseButton, action);
+            ToolTipService.SetToolTip(PlayPauseButton, action);
+        }
         if (!mediaReady)
         {
             updatingProgress = true;
@@ -410,5 +430,5 @@ public sealed partial class MainWindow
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
     }
     private void ClosePlayback()
-    { closed = true; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { closed = true; StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

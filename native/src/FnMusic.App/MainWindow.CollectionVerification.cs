@@ -17,6 +17,7 @@ public sealed partial class MainWindow
         { stage = name; checks[name] = value; if (!value) throw new InvalidOperationException(); }
         try
         {
+            motionPreferenceOverride = false;
             music.Player.IsMuted = true;
             if (!Environment.GetCommandLineArgs().Contains("--preview-collections")) throw new InvalidOperationException();
             SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
@@ -163,13 +164,14 @@ public sealed partial class MainWindow
             Verify("local_replacement_cover_loads", NowCover.Source is not null);
             Verify("local_lyrics_loaded", currentLyrics.IsTimed && currentLyrics.Lines.Count == 3);
             local = await VerifyLyricsSourceChangesAsync(Verify, local, TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
-            LyricsPanel.Visibility = Visibility.Visible;
+            await OpenNowPlayingAsync();
             music.Player.Pause();
             pendingSeek = 20; CommitSeek();
             for (int i = 0; i < 80 && (submittedSeek is not null || Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - 20) > 2); i++) await Task.Delay(100);
             Verify("local_seek", music.Player.PlaybackSession.CanSeek && submittedSeek is null && Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - 20) < 2);
             UpdateLyricsPosition();
             Verify("lyrics_follow_seek", activeLyric >= 1 && LyricsList.SelectedIndex == activeLyric);
+            await VerifyFullscreenPresentationAsync(Verify);
             foreach (int target in new[] { 5, 45, 10 })
             {
                 var timer = System.Diagnostics.Stopwatch.StartNew();
@@ -204,6 +206,7 @@ public sealed partial class MainWindow
             await Task.Delay(100);
             Verify("system_theme_notification_restores_preference", Root.RequestedTheme == systemRequestedTheme);
             await VerifyDialogThemeAsync(Verify);
+            await CloseNowPlayingAsync();
             var originalSize = AppWindow.Size;
             AppWindow.Resize(new global::Windows.Graphics.SizeInt32(980, 780));
             var resized = AppWindow.Size;
@@ -217,17 +220,21 @@ public sealed partial class MainWindow
             Root.RequestedTheme = ElementTheme.Light; UpdateTitleBarTheme();
             Verify("light_titlebar", AppWindow.TitleBar.BackgroundColor?.R == 243 && AppWindow.TitleBar.ButtonForegroundColor?.R == 0);
             ApplySystemTheme();
+            await OpenNowPlayingAsync();
             UpdateAdaptiveLayout(800);
             Verify("compact_player_rows", Microsoft.UI.Xaml.Controls.Grid.GetRow(TransportPanel) == 1 && Microsoft.UI.Xaml.Controls.Grid.GetColumnSpan(TransportPanel) == 3);
-            Verify("compact_lyrics_excludes_hidden_list", Microsoft.UI.Xaml.Controls.Grid.GetColumn(LyricsPanel) == 0 && !TrackList.IsEnabled && !CollectionList.IsEnabled);
+            Verify("compact_lyrics_readable_column", Microsoft.UI.Xaml.Controls.Grid.GetColumn(FullLyricsText) == 0
+                && Microsoft.UI.Xaml.Controls.Grid.GetColumnSpan(FullLyricsText) == 2 && FullArtworkPanel.Visibility == Visibility.Collapsed);
             UpdateCollectionView();
-            Verify("compact_navigation_reveals_browser", LyricsPanel.Visibility == Visibility.Collapsed && TrackList.IsEnabled);
-            LyricsPanel.Visibility = Visibility.Collapsed;
+            Verify("browse_refresh_keeps_fullscreen", LyricsPanel.Visibility == Visibility.Visible && LibraryPanel.Visibility == Visibility.Collapsed);
+            await CloseNowPlayingAsync();
             UpdateAdaptiveLayout(800);
             Verify("compact_browse_restored", TrackList.IsEnabled && CollectionList.IsEnabled);
-            LyricsPanel.Visibility = Visibility.Visible;
+            await OpenNowPlayingAsync();
             UpdateAdaptiveLayout(1360);
-            Verify("wide_layout_restored", Microsoft.UI.Xaml.Controls.Grid.GetRow(TransportPanel) == 0 && Microsoft.UI.Xaml.Controls.Grid.GetColumn(LyricsPanel) == 1 && TrackList.IsEnabled);
+            Verify("wide_lyrics_two_columns", Microsoft.UI.Xaml.Controls.Grid.GetRow(TransportPanel) == 0
+                && Microsoft.UI.Xaml.Controls.Grid.GetColumn(FullLyricsText) == 1 && FullArtworkPanel.Visibility == Visibility.Visible);
+            await CloseNowPlayingAsync();
             UpdateAdaptiveLayout(Root.ActualWidth);
             var activeLocalAudio = music.Player.Source;
             var localItems = TrackList.ItemsSource;
@@ -293,9 +300,11 @@ public sealed partial class MainWindow
             await VerifyMultiLibraryWindowAsync(Verify);
             await VerifyNasPlaylistWindowAsync(Verify);
             await VerifyNasSettingsWindowAsync(Verify);
+            await VerifyUiMotionAsync(Verify);
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; }
+        finally { motionPreferenceOverride = null; }
         await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "collection-window-verification.json"),
             JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, timings }));
     }

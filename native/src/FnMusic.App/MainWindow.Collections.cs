@@ -15,7 +15,6 @@ public sealed partial class MainWindow
     private void UpdateCollectionView()
     {
         UpdateSourceCommands();
-        RevealBrowseContent();
         LocalLibraryFilters.Visibility = localView ? Visibility.Visible : Visibility.Collapsed;
         bool listing = collectionKind is not null && collection is null;
         CollectionList.Visibility = CollectionOpen.Visibility = listing ? Visibility.Visible : Visibility.Collapsed;
@@ -36,6 +35,7 @@ public sealed partial class MainWindow
         collectionKind = kind; collection = null; collectionListPage = 1;
         SearchInput.Text = searchQuery = "";
         UpdateCollectionView();
+        AnimateViewEntry(LibraryPanel);
         await LoadPageAsync(1);
     }
     private async void Songs_Click(object sender, RoutedEventArgs e) => await SwitchCollectionAsync(null);
@@ -45,6 +45,7 @@ public sealed partial class MainWindow
     { await ReturnToCollectionListAsync(); }
     private async Task ReturnToCollectionListAsync()
     {
+        AnimateViewEntry(LibraryPanel);
         if (parentArtist is not null && collection is null)
         {
             collection = parentArtist; parentArtist = null; collectionKind = CollectionKind.Artist;
@@ -56,6 +57,7 @@ public sealed partial class MainWindow
     private async Task ShowArtistAlbumsAsync()
     {
         if (collectionKind != CollectionKind.Artist || collection is null) return;
+        AnimateViewEntry(LibraryPanel);
         parentArtist = collection; artistTrackPage = page; artistListPage = collectionListPage;
         collectionKind = CollectionKind.Album; collection = null; collectionListPage = 1;
         UpdateCollectionView(); await LoadPageAsync(1);
@@ -66,6 +68,7 @@ public sealed partial class MainWindow
     { if (e.ClickedItem is MusicCollection item) await OpenCollectionAsync(item); }
     private async Task OpenCollectionAsync(MusicCollection item)
     {
+        AnimateViewEntry(LibraryPanel);
         collectionListPage = page; collection = item;
         UpdateCollectionView(); await LoadPageAsync(1);
     }

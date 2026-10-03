@@ -38,6 +38,14 @@ public sealed partial class MainWindow
         PlaybackStatus.Text = "合成音频交互验证，默认静音。";
         music.Player.IsMuted = true; MuteToggle.IsChecked = true;
         await LoadDevicesAsync();
+        if (Environment.GetCommandLineArgs().Contains("--preview-now-playing") && TrackList.SelectedItem is MusicTrack selected)
+        {
+            await StartQueueAsync(selected);
+            for (int i = 0; i < 100 && !mediaReady; i++) await Task.Delay(20);
+            Pause_Click(this, new RoutedEventArgs());
+            UpdateProgress();
+            await OpenNowPlayingAsync();
+        }
     }
     private static async Task<TrackPage> GetSyntheticPageAsync(string query, int requestedPage, bool onlyFavorites = false)
     {

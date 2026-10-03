@@ -25,9 +25,11 @@ public sealed partial class MainWindow
     private async void LocalMusic_Click(object sender, RoutedEventArgs e) => await ShowLocalMusicAsync();
     private async Task ShowLocalMusicAsync()
     {
+        await CloseNowPlayingAsync();
         localView = true; favoritesView = false; parentArtist = null; collectionKind = null; collection = null;
         SearchInput.Text = searchQuery = ""; UpdateCollectionView();
         SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
+        AnimateViewEntry(LibraryPanel);
         await LoadPageAsync(1);
     }
 
