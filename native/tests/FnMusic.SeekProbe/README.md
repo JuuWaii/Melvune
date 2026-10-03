@@ -74,3 +74,9 @@ Range 模式额外验证打开媒体时分别阻塞 HTTP 响应头和响应正�
 后续正式构建已使用固定提交的 MP3 预滚补丁库，20/20 内容矩阵通过；旧版原码对照仍为 17/20。首次构建须还原包后运行 `python scripts/build-native-decoder.py`，见 [修复及证据](../../../docs/NATIVE_MP3_PREROLL.md)。报告新增实际加载的 DLL 版本及 SHA-256。追加 `--near-seeks` 使用 5、6、7、8、7、6、0、1、579 秒序列；`--read-ahead` 额外启用实验读取缓冲，默认配置仍保持原设置。短距测试发现并修正曲首匹配器粗搜索相位问题，五个已知 PCM 及错误时间控制通过，诊断门槛未改变。
 
 `--verify-content --etag` 使受控 Range 服务端返回强 ETag，并要求后续块读取携带匹配的 If-Match，覆盖正式输入的文件版本绑定。该模式输出 `seek-content-etag.json`，当前五格式、四定位点的 20 项通过。无标签模式仍用于兼容回归；更换同大小文件、丢失或降级标签等拒绝场景在基础 RangeRepresentationVerification 中验证，见 NATIVE_STREAM_RELIABILITY.md。
+
+## 采样率和声道布局
+
+2026-10-03 增加 `--sample-rate=44100|48000` 与 `--channels=1|2`，默认仍为 48 kHz 单声道。例如 `--verify-content --sample-rate=44100 --channels=2`。不同布局分别保存为 `seek-content-verification-44100-2ch.json` 等文件，不覆盖默认报告；可与格式、ETag 和短距参数组合。
+
+双声道源的两个通道使用不同的确定性噪声及复杂度变化。独立顺序解码参考保留两个通道，观察 PCM 按实际通道提取；每个通道都必须在 50 毫秒内取得至少两帧正确内容，后续帧全部符合原来的相关度与时间误差门槛，报告逐帧记录 Channel。没有将双声道平均成单声道或只检查左通道。解码输出的采样率或通道数与预期不一致时明确失败。

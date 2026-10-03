@@ -11,15 +11,19 @@ using Windows.Storage.Streams;
 
 internal static class SeekContentVerification
 {
-    private const int Rate = 48000, Seconds = 600;
-    private sealed record Marker(double Timestamp, float[] Samples);
+    private const int Seconds = 600;
+    private static int Rate = 48000, Channels = 1;
+    private sealed record Marker(double Timestamp, float[] Samples, int Channel = 0);
     private sealed record Alignment(double OffsetMilliseconds, double Correlation);
-    private sealed record FrameResult(double Timestamp, double OffsetMilliseconds, double Correlation, bool Aligned);
+    private sealed record FrameResult(double Timestamp, double OffsetMilliseconds, double Correlation, bool Aligned, int Channel);
     private sealed record Result(string Format, bool FastSeek, int Target, double Timestamp,
         double? TransientMilliseconds, long Milliseconds, long BytesRead, long EncodedBytes, FrameResult[] Frames, bool Passed);
 
     public static async Task RunAsync(string[] args)
     {
+        Rate = int.Parse(args.FirstOrDefault(value => value.StartsWith("--sample-rate=", StringComparison.Ordinal))?.Split('=')[1] ?? "48000");
+        Channels = int.Parse(args.FirstOrDefault(value => value.StartsWith("--channels=", StringComparison.Ordinal))?.Split('=')[1] ?? "1");
+        if (Rate is not (44100 or 48000) || Channels is not (1 or 2)) throw new ArgumentException("Unsupported content fixture layout.");
         string temporaryRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(Path.GetTempPath())) + Path.DirectorySeparatorChar;
         string directory = Path.GetFullPath(Path.Combine(temporaryRoot, $"fnmusic-content-{Guid.NewGuid():N}"));
         Directory.CreateDirectory(directory);
@@ -28,7 +32,7 @@ internal static class SeekContentVerification
         try
         {
             var reference = CreateReference(Path.Combine(directory, "reference.wav"));
-            VerifyMatcher(reference);
+            foreach (var channel in reference) VerifyMatcher(channel);
             string requested = args.FirstOrDefault(value => value.StartsWith("--format=", StringComparison.Ordinal))?[9..] ?? "all";
             var formats = requested == "all" ? new[] { "wav", "flac", "mp3-cbr", "mp3-vbr", "ogg" } : new[] { requested };
             if (formats.Any(format => format is not ("wav" or "flac" or "mp3-cbr" or "mp3-vbr" or "ogg")))
@@ -52,8 +56,9 @@ internal static class SeekContentVerification
         {
             string report = args.Contains("--fast-seek", StringComparer.Ordinal) ? "seek-content-comparison.json"
                 : args.Contains("--etag", StringComparer.Ordinal) ? "seek-content-etag.json" : "seek-content-verification.json";
+            if (Rate != 48000 || Channels != 1) report = report[..^5] + $"-{Rate}-{Channels}ch.json";
             await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, report),
-                JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, error, sampleRate = Rate, seconds = Seconds,
+                JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, error, sampleRate = Rate, channels = Channels, seconds = Seconds,
                     decoder = GetDecoderIdentity(), readAhead = args.Contains("--read-ahead", StringComparer.Ordinal),
                     strongVersion = args.Contains("--etag", StringComparer.Ordinal),
                     consumer = "MediaPlayer with MediaStreamSource sample observation",
@@ -66,29 +71,33 @@ internal static class SeekContentVerification
         }
     }
 
-    private static short[] CreateReference(string path)
+    private static short[][] CreateReference(string path)
     {
-        var samples = new short[Rate * Seconds];
-        uint state = 0x1234abcd;
-        double filtered = 0;
+        var samples = Enumerable.Range(0, Channels).Select(_ => new short[Rate * Seconds]).ToArray();
+        var states = Enumerable.Range(0, Channels).Select(channel => 0x1234abcdU + (uint)channel * 0x1e3779b9U).ToArray();
+        var filtered = new double[Channels];
         using var file = File.Create(path);
         using var writer = new BinaryWriter(file);
-        int size = samples.Length * sizeof(short);
+        int size = Rate * Seconds * Channels * sizeof(short);
         writer.Write("RIFF"u8); writer.Write(size + 36); writer.Write("WAVEfmt "u8);
-        writer.Write(16); writer.Write((short)1); writer.Write((short)1);
-        writer.Write(Rate); writer.Write(Rate * 2); writer.Write((short)2); writer.Write((short)16);
+        writer.Write(16); writer.Write((short)1); writer.Write((short)Channels);
+        writer.Write(Rate); writer.Write(Rate * Channels * 2); writer.Write((short)(Channels * 2)); writer.Write((short)16);
         writer.Write("data"u8); writer.Write(size);
-        for (int index = 0; index < samples.Length; index++)
+        for (int index = 0; index < Rate * Seconds; index++)
         {
-            state ^= state << 13; state ^= state >> 17; state ^= state << 5;
-            double noise = (state / (double)uint.MaxValue - .5) * 2;
-            // Every time position is distinguishable; alternating bandwidth/amplitude
-            // gives VBR a nonuniform byte/time relation without silent marker windows.
-            bool complex = index / Rate % 40 < 10;
-            double alpha = complex ? .7 : .12;
-            filtered += alpha * (noise - filtered);
-            samples[index] = (short)(filtered * (complex ? 16000 : 2500));
-            writer.Write(samples[index]);
+            for (int channel = 0; channel < Channels; channel++)
+            {
+                uint state = states[channel];
+                state ^= state << 13; state ^= state >> 17; state ^= state << 5; states[channel] = state;
+                double noise = (state / (double)uint.MaxValue - .5) * 2;
+                // Every position/channel is distinguishable; alternating complexity
+                // gives VBR a nonuniform byte/time relation without silent markers.
+                bool complex = (index / Rate + channel * 13) % 40 < 10;
+                double alpha = complex ? .7 : .12;
+                filtered[channel] += alpha * (noise - filtered[channel]);
+                samples[channel][index] = (short)(filtered[channel] * (complex ? 16000 : 2500));
+                writer.Write(samples[channel][index]);
+            }
         }
         return samples;
     }
@@ -118,7 +127,7 @@ internal static class SeekContentVerification
         return path;
     }
 
-    private static async Task<short[]> DecodeReferenceAsync(string path, string directory)
+    private static async Task<short[][]> DecodeReferenceAsync(string path, string directory)
     {
         // Linear decoding of the entire encoded file is an independent content oracle:
         // no seeking and no assumptions about MP3/Vorbis lossy sample differences.
@@ -126,7 +135,7 @@ internal static class SeekContentVerification
         var start = new ProcessStartInfo(FfmpegPcmDecoder.FindExecutable())
         { UseShellExecute = false, CreateNoWindow = true, RedirectStandardError = true };
         foreach (string argument in new[] { "-hide_banner", "-loglevel", "error", "-nostdin", "-y", "-i", path,
-            "-map", "0:a:0", "-ac", "1", "-ar", Rate.ToString(), "-f", "s16le", pcm }) start.ArgumentList.Add(argument);
+            "-map", "0:a:0", "-ac", Channels.ToString(), "-ar", Rate.ToString(), "-f", "s16le", pcm }) start.ArgumentList.Add(argument);
         using var process = Process.Start(start) ?? throw new IOException("Linear reference decoder did not start.");
         var stderr = process.StandardError.ReadToEndAsync();
         try { await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(45)); }
@@ -134,11 +143,16 @@ internal static class SeekContentVerification
         await stderr;
         if (process.ExitCode != 0) throw new IOException("Linear reference decoding failed.");
         using var file = File.OpenRead(pcm);
-        if (file.Length % 2 != 0 || file.Length < Rate * 2L * (Seconds - 1) || file.Length > Rate * 2L * (Seconds + 1))
+        if (file.Length % (2 * Channels) != 0 || file.Length < Rate * 2L * Channels * (Seconds - 1) || file.Length > Rate * 2L * Channels * (Seconds + 1))
             throw new IOException("Linear reference duration is invalid.");
         var samples = new short[checked((int)(file.Length / 2))];
         file.ReadExactly(MemoryMarshal.AsBytes(samples.AsSpan()));
-        return samples;
+        return Enumerable.Range(0, Channels).Select(channel =>
+        {
+            var values = new short[samples.Length / Channels];
+            for (int index = 0; index < values.Length; index++) values[index] = samples[index * Channels + channel];
+            return values;
+        }).ToArray();
     }
 
     private static object? GetDecoderIdentity()
@@ -151,7 +165,7 @@ internal static class SeekContentVerification
             sha256 = Convert.ToHexString(SHA256.HashData(file)) };
     }
 
-    private static async Task VerifyAsync(string path, string format, short[] reference, bool fast, bool readAhead, bool versioned, int[] positions, List<Result> results)
+    private static async Task VerifyAsync(string path, string format, short[][] reference, bool fast, bool readAhead, bool versioned, int[] positions, List<Result> results)
     {
         using var handler = new RangeHandler(path, versioned);
         using var client = new HttpClient(handler, false);
@@ -202,8 +216,8 @@ internal static class SeekContentVerification
                     if (sample is null || (sample.Timestamp + sample.Duration).TotalSeconds <= target || sample.Timestamp.TotalSeconds > target + .5) return;
                     try
                     {
-                        var marker = ReadMarker(sample, descriptor, target);
-                        if (marker is not null) { markers.Add(marker); pending.TrySetResult(marker); }
+                        var captured = ReadMarkers(sample, descriptor, target);
+                        if (captured.Length > 0) { markers.AddRange(captured); pending.TrySetResult(captured[0]); }
                     }
                     catch (Exception exception) { pending.TrySetException(exception); }
                 }
@@ -234,17 +248,24 @@ internal static class SeekContentVerification
                     Marker[] captured; lock (gate) captured = markers.ToArray();
                     var frames = captured.Select(frame =>
                     {
-                        var match = Match(reference, frame, frame.Timestamp);
+                        var match = Match(reference[frame.Channel], frame, frame.Timestamp);
                         return new FrameResult(frame.Timestamp, match.OffsetMilliseconds, match.Correlation,
-                            match.Correlation > .8 && Math.Abs(match.OffsetMilliseconds) <= 50);
+                            match.Correlation > .8 && Math.Abs(match.OffsetMilliseconds) <= 50, frame.Channel);
                     }).ToArray();
                     // A deliberately displaced timeline must not pass the same matcher.
                     var control = captured.Last();
-                    var displaced = Match(reference, control, control.Timestamp + 20);
+                    var displaced = Match(reference[control.Channel], control, control.Timestamp + 20);
                     if (displaced.Correlation > .8) throw new InvalidOperationException("Negative alignment control passed.");
-                    int recovery = Array.FindIndex(frames, frame => frame.Aligned);
-                    double? transient = recovery < 0 ? null : (frames[recovery].Timestamp - position) * 1000;
-                    bool passed = transient is <= 50 && frames.Skip(recovery).Count() >= 2 && frames.Skip(recovery).All(frame => frame.Aligned);
+                    var recoveries = Enumerable.Range(0, Channels).Select(channel =>
+                    {
+                        var observedChannel = frames.Where(frame => frame.Channel == channel).ToArray();
+                        int recovery = Array.FindIndex(observedChannel, frame => frame.Aligned);
+                        double? delay = recovery < 0 ? null : (observedChannel[recovery].Timestamp - position) * 1000;
+                        bool passed = delay is <= 50 && observedChannel.Skip(recovery).Count() >= 2 && observedChannel.Skip(recovery).All(frame => frame.Aligned);
+                        return (Delay: delay, Passed: passed);
+                    }).ToArray();
+                    double? transient = recoveries.Any(value => value.Delay is null) ? null : recoveries.Max(value => value.Delay);
+                    bool passed = recoveries.All(value => value.Passed);
                     results.Add(new(format, fast, position, marker.Timestamp, transient, elapsed, bytes, input.Length, frames, passed));
                     Console.WriteLine($"{(passed ? "PASS" : "FAIL")} {format} {(fast ? "fast" : "accurate")} content {position}s: transient {transient?.ToString("F3") ?? "unresolved"}ms, {frames.Count(frame => frame.Aligned)}/{frames.Length} aligned frames, {elapsed}ms, read {bytes}");
                 }
@@ -260,28 +281,32 @@ internal static class SeekContentVerification
         await completed;
     }
 
-    private static Marker? ReadMarker(MediaStreamSample sample, AudioStreamDescriptor descriptor, int target)
+    private static Marker[] ReadMarkers(MediaStreamSample sample, AudioStreamDescriptor descriptor, int target)
     {
         var properties = descriptor.EncodingProperties;
-        if (properties.SampleRate != Rate || properties.ChannelCount != 1 || properties.Subtype is not ("PCM" or "Float"))
-            throw new NotSupportedException("Content probe requires mono 48 kHz decoded PCM.");
+        if (properties.SampleRate != Rate || properties.ChannelCount != Channels || properties.Subtype is not ("PCM" or "Float"))
+            throw new NotSupportedException("Decoded PCM differs from the requested content fixture layout.");
         int width = checked((int)properties.BitsPerSample / 8);
         if (width is not (2 or 4)) throw new NotSupportedException("Unsupported PCM width.");
         var buffer = sample.Buffer ?? throw new IOException("Sample has no buffer.");
         int skip = Math.Max(0, (int)Math.Ceiling((target - sample.Timestamp.TotalSeconds) * Rate));
-        int count = Math.Min(2048, checked((int)buffer.Length / width) - skip);
-        if (count < 256) return null;
-        var bytes = new byte[count * width];
+        int count = Math.Min(2048, checked((int)buffer.Length / (width * Channels)) - skip);
+        if (count < 256) return [];
+        var bytes = new byte[count * width * Channels];
         using (var reader = DataReader.FromBuffer(buffer))
-        { if (skip > 0) reader.ReadBuffer(checked((uint)(skip * width))); reader.ReadBytes(bytes); }
-        var values = new float[count];
-        for (int i = 0; i < count; i++)
+        { if (skip > 0) reader.ReadBuffer(checked((uint)(skip * width * Channels))); reader.ReadBytes(bytes); }
+        return Enumerable.Range(0, Channels).Select(channel =>
         {
-            values[i] = properties.Subtype == "Float" ? BitConverter.ToSingle(bytes, i * width)
-                : width == 2 ? BitConverter.ToInt16(bytes, i * width) / 32768f : BitConverter.ToInt32(bytes, i * width) / 2147483648f;
-            if (!float.IsFinite(values[i])) throw new IOException("Decoded marker is not finite PCM.");
-        }
-        return new(sample.Timestamp.TotalSeconds + skip / (double)Rate, values);
+            var values = new float[count];
+            for (int i = 0; i < count; i++)
+            {
+                int offset = (i * Channels + channel) * width;
+                values[i] = properties.Subtype == "Float" ? BitConverter.ToSingle(bytes, offset)
+                    : width == 2 ? BitConverter.ToInt16(bytes, offset) / 32768f : BitConverter.ToInt32(bytes, offset) / 2147483648f;
+                if (!float.IsFinite(values[i])) throw new IOException("Decoded marker is not finite PCM.");
+            }
+            return new Marker(sample.Timestamp.TotalSeconds + skip / (double)Rate, values, channel);
+        }).ToArray();
     }
 
     private static Alignment Match(short[] reference, Marker marker, double timestamp)
