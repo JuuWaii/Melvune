@@ -56,14 +56,16 @@ MusicTrack 新增独立于 TrackReference 的多个库 ID，LibraryReference 同
 
 修复前专辑详情入口回归实际失败；修复后 172 项窗口检查全部通过，最终报告时间 2026-10-01T17:50:54.8119964+08:00。新增专辑详情、收藏、只有 Search 能力时的空查询，以及注销来源后的直接搜索调用四项检查。Debug/Release 构建零警告、零错误。该验证控制 Provider 能力并调用正式搜索入口，不是新的真实账号登录证据；已交付 preview.6 固定快照的源码为 09b1ee6，不含本节后续修复。
 
-## 2026-09-29 真实账号验收工具（待执行）
+## 真实账号验收工具与 2026-10-03 运行结果
 
 用户已提供具有全部歌曲访问和禁止访问的两个专用测试账号。新增仅 Debug 的 `--verify-native-accounts`，使用与正式界面相同的 ConnectionViewModel 登录/切换/退出逻辑，但将配置、来源映射和 DPAPI 会话隔离到可执行目录下的随机 fixture，结束后清理。分别登录两个账号、核对曲目访问范围与来源注销、切回原账号保持身份、模拟旧配置缺少归属后重新登录，并通过独立子进程验证两种账号的会话恢复。报告只有固定检查项和异常类型，不含地址、账号、密码或令牌。真实用户配置不会被该探针覆盖。
 
-携带凭据启动验证的命令被自动审批策略拒绝，尚无真实通过报告；不能把编译或测试账号已存在视为账号隔离验证完成。已提供本机交互启动脚本，可由用户手动运行（PowerShell 7）：
+此前携带凭据的自动启动被审批策略拒绝；2026-10-03 用户重新明确授权输入测试账号后，使用同一交互脚本执行成功。脚本兼容 Windows PowerShell 5.1 和 PowerShell 7：
 
 ```powershell
-./scripts/verify-native-accounts.ps1 -Executable ./.review-audit/account-ui/FnMusic.App.exe
+./scripts/verify-native-accounts.ps1 -Executable ./.review-audit/library-reference-independent-app/FnMusic.App.exe
 ```
 
-脚本在终端询问地址和账号，并通过隐藏输入读取密码。凭据只传入测试进程环境，不写入文件或报告；恢复子进程不继承这些测试凭据。完成后输出 `account-verification.json` 的脱敏结果。当前脚本语法已检查，验证器已构建；真实登录和跨进程恢复仍待运行。Release 包不包含这些 Debug 入口。此探针验证真实服务与正式视图模型流程，不代替手动登录界面的键鼠验收。
+脚本在终端询问地址和账号，并通过隐藏输入读取密码。凭据只传入测试进程环境，不写入文件或报告；恢复子进程不继承这些测试凭据。完成后输出 `account-verification.json` 的脱敏结果。修复 Windows PowerShell 5.1 缺少 ArgumentList 属性造成的 Null 错误，使用固定 Arguments 和兼容的 EnvironmentVariables，并清理输入途中失败时已创建的 SecureString。独立无网络合成子进程验证固定参数、环境传递、父进程环境保持和输入中断清理通过。
+
+真实报告时间 `2026-10-03T01:10:38.1382987+00:00`，stage 为 complete，12 项全部通过：有权限账号读到歌曲、来源注册、独立进程恢复、切到无权限账号读不到歌曲、旧来源注销、异源曲目在播放前拒绝、无权限账号独立进程恢复、切回来源身份保持、旧配置要求重新认证、重新认证保持身份、退出后不恢复和随机测试配置清理。报告位于 `.review-audit/library-reference-independent-app/account-verification.json`。Release 包不包含这些 Debug 入口；这是实际服务与正式视图模型流程验收，完整登录界面的键鼠交互仍保留。

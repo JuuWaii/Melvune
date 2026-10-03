@@ -120,12 +120,15 @@ function reviewedDecoderVersion(file, match, content) {
     return prefix.endsWith('Microsoft.VC.') && /^\.(?:CRT|Tools)\./.test(suffix);
   }
   if (match[0] !== [2, 1, 0, 1].join('.')) return false;
-  if (['docs/NATIVE_MP3_PREROLL.md', 'docs/NATIVE_DECODER_DEPENDENCIES.md'].includes(file)) {
+  if (['docs/NATIVE_MP3_PREROLL.md', 'docs/NATIVE_DECODER_DEPENDENCIES.md', 'docs/PREVIEW7_ACCEPTANCE.md'].includes(file)) {
     return /DLL (?:文件)?版本(?:为)?\s*`$/.test(prefix) && suffix.startsWith('`');
   }
   if (file === 'scripts/build-native-decoder.py') {
     return (prefix.endsWith('LIB_VERSION_STR="') && suffix.startsWith('"')) ||
       (prefix.endsWith("'version': '") && suffix.startsWith("-fnmusic-mp3-preroll'"));
+  }
+  if (file === 'scripts/check-preview.ps1') {
+    return prefix.endsWith("$decoder.version -ne '") && suffix.startsWith("-fnmusic-mp3-preroll'");
   }
   return false;
 }

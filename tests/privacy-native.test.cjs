@@ -64,6 +64,19 @@ test('fixed MSVC component numbers do not exempt the same value in an endpoint',
   assert.equal(scan({ [name]: JSON.stringify({ fileName: component, endpoint: 'https://' + version }) }).status, 1);
 });
 
+test('preview decoder metadata exemptions reject the same digits in endpoints or other fields', () => {
+  const version = [2, 1, 0, 1].join('.');
+  const fixtures = {
+    'docs/PREVIEW7_ACCEPTANCE.md': 'MP3 预滚 DLL 版本 `' + version + '`',
+    'scripts/check-preview.ps1': "$decoder.version -ne '" + version + "-fnmusic-mp3-preroll'"
+  };
+  for (const [name, metadata] of Object.entries(fixtures)) {
+    assert.equal(scan({ [name]: metadata }).status, 0);
+    assert.equal(scan({ [name]: metadata + '\nhttps://' + version }).status, 1);
+    assert.equal(scan({ [name]: metadata + '\nendpoint = "' + version + '"' }).status, 1);
+  }
+});
+
 test('Python build inputs are scanned for credentials without printing values', () => {
   const value = 'q'.repeat(20);
   const result = scan({ 'scripts/build-native-decoder.py': 'api_key = "' + value + '"' });
