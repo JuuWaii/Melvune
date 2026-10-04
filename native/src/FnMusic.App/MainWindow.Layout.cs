@@ -10,6 +10,7 @@ public sealed partial class MainWindow
         if (width <= 0 || closed) return;
         activePlaylistPage?.Adapt(Root.ActualHeight - PlayerBar.ActualHeight);
         bool compact = width < 1100;
+        fullPageView?.Adapt(Root.ActualHeight);
         SidebarColumn.Width = new GridLength(compact ? 176 : 220);
         NowPlayingColumn.Width = compact ? new GridLength(1, GridUnitType.Star) : new GridLength(270);
         Grid.SetColumnSpan(NowPlayingDetails, compact ? 2 : 1);
@@ -34,5 +35,6 @@ public sealed partial class MainWindow
         Grid.SetColumnSpan(FullLyricsText, textOnly ? 2 : 1);
         double artworkSize = Math.Clamp(Math.Min(width * .34, Root.ActualHeight - 460), 120, 480);
         FullArtworkPanel.Width = FullArtworkPanel.Height = artworkSize;
+        UpdateQueuePaneLayout();
     }
 }

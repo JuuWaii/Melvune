@@ -51,5 +51,7 @@ public sealed partial class MainWindow
         ToolTipService.SetToolTip(SearchAction, SearchAction.IsEnabled ? null : "当前来源未连接或不支持搜索。");
         UpdateFavoriteButton();
         activePlaylistPage?.SourceChanged?.Invoke();
+        fullPageView?.SourceChanged?.Invoke();
+        queuePage?.SourceChanged?.Invoke();
     }
 }

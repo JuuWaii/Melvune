@@ -20,11 +20,15 @@ public sealed partial class MainWindow
         public bool TaskExists = true, TaskDone, TaskCancelling;
         public bool ReconnectMatch = true;
         public string? FailedRead;
+        public Task? PausedRead;
+        public TaskCompletionSource ReadEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public readonly Dictionary<string, (string Path, bool Lyric, string Metadata)> Libraries = new() { ["initial"] = ("/music/initial", false, "cloud_preferred") };
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             object Library(string id) => new { guid = id, name = id, path = Libraries[id].Path, autoDownloadLyric = Libraries[id].Lyric, metadataPreference = Libraries[id].Metadata };
             string path = request.RequestUri!.AbsolutePath; object? data = null;
+            if (request.Method == HttpMethod.Get && path.EndsWith("user/me") && PausedRead is { } paused)
+            { ReadEntered.TrySetResult(); await paused; }
             if (request.Method == HttpMethod.Get && FailedRead is not null && path.EndsWith(FailedRead))
                 return new(HttpStatusCode.ServiceUnavailable);
             if (request.Method == HttpMethod.Post)
@@ -72,19 +76,31 @@ public sealed partial class MainWindow
         settingsTestClient = api;
         ViewModel.PlaybackRouter.Register(new NasPlaybackSource(api));
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        settingsDialogOpened = async dialog =>
+        settingsPageOpened = async view =>
         {
             try
             {
-                var editor = (ScrollViewer)dialog.Content; var panel = (StackPanel)editor.Content;
+                var editor = view.Editor; var panel = view.Fields;
                 var tabs = panel.Children.OfType<Pivot>().Single();
                 StackPanel Tab(int index) => (StackPanel)((PivotItem)tabs.Items[index]).Content;
                 var library = Tab(0); var server = Tab(1); var access = Tab(2); var tasks = Tab(3); var reconnect = Tab(4);
-                var status = panel.Children.OfType<TextBlock>().Last();
-                var buttons = panel.Children.OfType<Button>().Concat(new[] { library, server, access, tasks, reconnect }.SelectMany(p => p.Children.OfType<Button>())).ToArray();
+                var status = view.Status;
+                var buttonTabs = new Dictionary<Button, int>();
+                var buttons = view.Actions.Children.OfType<Button>().ToList();
+                for (int index = 0; index < tabs.Items.Count; index++)
+                {
+                    tabs.SelectedIndex = index;
+                    var tabButtons = view.Actions.Children.OfType<StackPanel>().SelectMany(p => p.Children.OfType<Button>()).ToArray();
+                    foreach (var button in tabButtons) { buttons.Add(button); buttonTabs.Add(button, index); }
+                }
+                tabs.SelectedIndex = 0;
+                verify("nas_settings_full_page_no_dialog", ReferenceEquals(fullPageView, view) && FullPageHost.Visibility == Microsoft.UI.Xaml.Visibility.Visible
+                    && !NormalContent.IsEnabled && !themedDialogOpen && view.IsForm && Microsoft.UI.Xaml.Controls.Grid.GetRow(view.Editor) == 2);
+                await VerifyFullPageLayoutAsync(verify, view, "nas_settings");
                 async Task Click(string label)
                 {
                     var button = buttons.Single(item => item.Content.ToString() == label);
+                    if (buttonTabs.TryGetValue(button, out int index)) { tabs.SelectedIndex = index; await Task.Delay(50); }
                     if (!button.IsEnabled) throw new InvalidOperationException("Fixture control disabled: " + label);
                     ((IInvokeProvider)new ButtonAutomationPeer(button).GetPattern(PatternInterface.Invoke)).Invoke();
                     await Task.Delay(100);
@@ -205,10 +221,33 @@ public sealed partial class MainWindow
                 done.TrySetResult();
             }
             catch (Exception ex) { done.TrySetException(ex); }
-            finally { dialog.Hide(); }
+            finally { CloseFullPage(); }
         };
-        try { await ShowNasSettingsAsync(api); await done.Task.WaitAsync(TimeSpan.FromSeconds(15)); }
-        finally { ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId); settingsTestClient = null; settingsDialogOpened = null; }
+        try
+        {
+            await ShowNasSettingsAsync(api); await done.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            settingsPageOpened = null;
+            var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            handler.PausedRead = release.Task;
+            handler.ReadEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            var pending = ShowNasSettingsAsync(api);
+            await handler.ReadEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var loading = fullPageView ?? throw new InvalidOperationException();
+            verify("nas_settings_loading_full_page_can_return", !loading.Editor.IsEnabled && !loading.BlockNavigation && CloseFullPage() && loading.IsDisposed);
+            ShowQueuePage();
+            var nextPage = queuePage;
+            release.TrySetResult(); await pending;
+            verify("nas_settings_late_read_does_not_replace_next_page", ReferenceEquals(queuePage, nextPage) && nextPage is { IsDisposed: false } && fullPageView is null);
+            CloseQueuePage();
+            handler.PausedRead = null;
+            await ShowNasSettingsAsync(api);
+            var oldPage = fullPageView ?? throw new InvalidOperationException();
+            oldPage.BlockNavigation = true;
+            settingsTestClient = null;
+            ResetLibrary();
+            verify("nas_settings_account_reset_forces_page_close", oldPage.IsDisposed && fullPageView is null && FullPageHost.Visibility == Microsoft.UI.Xaml.Visibility.Collapsed);
+        }
+        finally { CloseQueuePage(force: true); CloseFullPage(force: true); ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId); settingsTestClient = null; settingsPageOpened = null; }
     }
 }
 #endif

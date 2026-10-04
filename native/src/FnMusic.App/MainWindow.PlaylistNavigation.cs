@@ -77,6 +77,7 @@ public sealed partial class MainWindow
     }
     private void ResetPlaylistNavigation()
     {
+        if (fullPageView?.RemoteSource is not null) CloseFullPage(force: true, restoreFocus: false);
         CloseTrackContextMenu();
         ++contentNavigationVersion;
         playlistNavigationWork?.Cancel();

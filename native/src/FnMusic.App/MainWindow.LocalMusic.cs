@@ -31,55 +31,7 @@ public sealed partial class MainWindow
         await LoadPageAsync(1);
     }
 
-    private async void ImportLocal_Click(object sender, RoutedEventArgs e)
-    {
-        if (localImportBusy) return;
-        localImportBusy = true;
-        try
-        {
-            var input = new TextBox { Header = "音乐文件夹完整路径", PlaceholderText = @"例如 D:\Music" };
-            var name = new TextBox { Header = "库名称", MaxLength = 120, PlaceholderText = "留空使用文件夹名称" };
-            var group = new TextBox { Header = "分组（可选）", MaxLength = 120 };
-            var panel = new StackPanel { Spacing = 12 };
-            panel.Children.Add(input); panel.Children.Add(name); panel.Children.Add(group);
-            var browse = new Button { Content = "浏览文件夹…" };
-            browse.Click += async (_, _) => await PickLocalFolderAsync(input, browse);
-            panel.Children.Add(browse);
-            panel.Children.Add(new TextBlock { Text = "保留已有音乐库。包含子文件夹，每库最多 10000 首；跳过链接和无权限目录。", TextWrapping = TextWrapping.Wrap });
-            var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "导入本地音乐库", Content = panel, PrimaryButtonText = "导入", CloseButtonText = "取消" };
-            if (await ShowThemedDialogAsync(dialog) != ContentDialogResult.Primary || closed) return;
-            if (!Path.IsPathFullyQualified(input.Text.Trim())) throw new ArgumentException();
-            string path = LocalLibraryStore.NormalizePath(input.Text.Trim());
-            var saved = await localLibraryStore.LoadAsync(localLifetime.Token);
-            var existing = saved.Libraries.FirstOrDefault(item => string.Equals(LocalLibraryStore.NormalizePath(item.Directory), path, StringComparison.OrdinalIgnoreCase));
-            var definition = existing ?? new LocalLibrary(Guid.NewGuid(), path,
-                string.IsNullOrWhiteSpace(name.Text) ? new DirectoryInfo(path).Name : name.Text.Trim(), group.Text.Trim());
-            if (string.IsNullOrWhiteSpace(definition.Name)) definition = definition with { Name = "本地音乐" };
-            if (!await NavigateMainContentAsync(LibraryPanel)) return;
-            PlaybackStatus.Text = "正在扫描本地音乐…";
-            var scanned = await ScanLocalAsync(definition.Settings, localLifetime.Token);
-            var next = saved with { Libraries = existing is null ? saved.Libraries.Append(definition).ToArray() : saved.Libraries };
-            var persisted = await localLibraryStore.SaveAsync(next, localLifetime.Token);
-            if (closed) return;
-            ApplyLocalCatalog(persisted);
-            ReplaceLocalSource(scanned);
-            selectedLocalGroup = null; selectedLocalLibrary = definition.SourceId;
-            RenderLocalFilters();
-            await ShowLocalMusicAsync();
-            if (!closed && PlaybackStatus.Text == "正在扫描本地音乐…")
-                PlaybackStatus.Text = $"导入完成，已保存音乐库，共 {scanned.Tracks.Count} 首。";
-        }
-        catch (OperationCanceledException) { }
-        catch (LocalLibraryConflictException) { if (!closed) PlaybackStatus.Text = "音乐库已在其他窗口修改，请重新导入。"; }
-        catch (Exception)
-        {
-            if (!closed)
-            {
-                PlaybackStatus.Text = "导入失败，请检查目录是否可访问、是否包含链接或超过 10000 首；原音乐库保持不变。";
-            }
-        }
-        finally { localImportBusy = false; }
-    }
+    private async void ImportLocal_Click(object sender, RoutedEventArgs e) => await ShowLocalLibraryManagementAsync(createNew: true);
 
     private async Task PickLocalFolderAsync(TextBox input, Button browse)
     {
@@ -267,7 +219,11 @@ public sealed partial class MainWindow
         var progress = new Progress<int>(count =>
         {
             if (!closed && ReferenceEquals(localScan, scan) && !scan.IsCancellationRequested)
+            {
                 LocalScanStatus.Text = $"已读取 {count} 首，正在扫描…";
+                if (fullPageView is { IsDisposed: false } view && view.CancelButton.Visibility == Visibility.Visible)
+                    view.Status.Text = LocalScanStatus.Text;
+            }
         });
         try
         {

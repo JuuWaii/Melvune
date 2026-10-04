@@ -43,7 +43,7 @@ public sealed partial class MainWindow
         var item = ResolveContextItem(list, origin, !pointer);
         if (ContextTrack(item) is not { } track) return;
         list.SelectedItem = item;
-        ShowTrackContextMenu(list, track, item is MusicTrack, pointer ? position : null);
+        ShowTrackContextMenu(list, track, item is MusicTrack && !ReferenceEquals(list, queuePage?.List), pointer ? position : null);
         args.Handled = true;
     }
     private void TrackContext_Canceled(UIElement sender, RoutedEventArgs args) => CloseTrackContextMenu();
@@ -138,6 +138,8 @@ public sealed partial class MainWindow
     private async Task PlayContextTrackAsync(ListView list, MusicTrack track)
     {
         if (!ContextPlayable(track) || !list.IsLoaded) return;
+        if (ReferenceEquals(list, queuePage?.List))
+        { if (queue.Select(track.Reference) is { } selected) await PlayTrackAsync(selected); return; }
         var tracks = list.Items.Cast<object>().Select(ContextTrack).OfType<MusicTrack>().Where(ContextPlayable).ToArray();
         if (!queue.Replace(tracks, track.Reference)) return;
         queueOrigin = ReferenceEquals(list, TrackList) ? localView ? "本地音乐当前页" : "飞牛歌曲当前页" : "歌单页面";
@@ -184,8 +186,9 @@ public sealed partial class MainWindow
     }
     private async Task WithContextPlaylistWriteAsync(Func<CancellationToken, Task> operation)
     {
-        if (contextPlaylistWriteBusy || activePlaylistPage is { BlockNavigation: true } or { Editor.IsEnabled: false }) return;
-        var view = activePlaylistPage;
+        var view = queuePage ?? fullPageView ?? activePlaylistPage;
+        if (contextPlaylistWriteBusy || view is { BlockNavigation: true } or { Editor.IsEnabled: false }
+            || activePlaylistPage is { BlockNavigation: true } || fullPageView is { BlockNavigation: true }) return;
         bool wasEnabled = view?.Editor.IsEnabled ?? true;
         contextPlaylistWriteBusy = true;
         if (view is not null) { view.BlockNavigation = true; view.Editor.IsEnabled = false; }
@@ -197,6 +200,6 @@ public sealed partial class MainWindow
             contextPlaylistWriteBusy = false;
             if (view is not null && !view.IsDisposed) { view.BlockNavigation = false; view.Editor.IsEnabled = wasEnabled; }
         }
-        if (!closed && view?.Reload is { } reload && ReferenceEquals(activePlaylistPage, view)) await reload();
+        if (!closed && view?.Reload is { } reload && (ReferenceEquals(activePlaylistPage, view) || ReferenceEquals(fullPageView, view) || ReferenceEquals(queuePage, view))) await reload();
     }
 }

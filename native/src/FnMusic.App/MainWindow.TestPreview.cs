@@ -39,6 +39,8 @@ public sealed partial class MainWindow
         music.Player.IsMuted = true; MuteToggle.IsChecked = true;
         await LoadDevicesAsync();
         await RefreshPlaylistNavigationAsync();
+        if (Environment.GetCommandLineArgs().Contains("--preview-management"))
+        { await ShowLocalLibraryManagementAsync(createNew: true); return; }
         if (Environment.GetCommandLineArgs().Contains("--preview-playlists"))
         {
             string directory = Path.Combine(AppContext.BaseDirectory, "playlist-preview-files");

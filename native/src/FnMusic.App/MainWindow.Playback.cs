@@ -281,37 +281,15 @@ public sealed partial class MainWindow
         else if (queue.Current is { } current) await PlayTrackAsync(current);
         else if (LyricsPanel.Visibility != Visibility.Visible) PlaySelected_Click(sender, e);
     }
-    private void UpdateQueueStatus() => QueueStatus.Text = queue.Count == 0 ? "播放队列为空" :
+    private void UpdateQueueStatus()
+    {
+        QueueStatus.Text = queue.Count == 0 ? "播放队列为空" :
         queue.Current is null ? $"队列 {queue.Count} 首 · 未选择播放曲目" :
         $"队列 {queue.Index + 1}/{queue.Count} · 来自开始播放时的{queueOrigin}";
-    private async void ManageQueue_Click(object sender, RoutedEventArgs e)
-    {
-        var list = new ListView { ItemsSource = queue.Tracks, DisplayMemberPath = "Title", SelectionMode = ListViewSelectionMode.Single, MaxHeight = 320 };
-        list.SelectedItem = queue.Current;
-        var remove = new Button { Content = "移除所选（当前曲目会停止）", IsEnabled = list.SelectedItem is MusicTrack };
-        var clear = new Button { Content = "清空队列并停止", IsEnabled = queue.Count > 0 };
-        var panel = new StackPanel { Spacing = 12 };
-        panel.Children.Add(list); panel.Children.Add(remove); panel.Children.Add(clear);
-        var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "播放队列", Content = panel, PrimaryButtonText = "播放所选", CloseButtonText = "关闭", IsPrimaryButtonEnabled = list.SelectedItem is MusicTrack };
-        list.SelectionChanged += (_, _) => remove.IsEnabled = dialog.IsPrimaryButtonEnabled = list.SelectedItem is MusicTrack;
-        remove.Click += (_, _) =>
-        {
-            if (list.SelectedItem is not MusicTrack selected) return;
-            if (queue.Current?.Reference == selected.Reference) Stop_Click(sender, e);
-            queue.Remove(selected.Reference);
-            list.ItemsSource = queue.Tracks; list.SelectedItem = queue.Current;
-            clear.IsEnabled = queue.Count > 0;
-            UpdateQueueStatus();
-        };
-        clear.Click += (_, _) =>
-        {
-            Stop_Click(sender, e); queue.Clear(); list.ItemsSource = queue.Tracks;
-            clear.IsEnabled = false;
-            UpdateQueueStatus();
-        };
-        if (await ShowThemedDialogAsync(dialog) == ContentDialogResult.Primary && list.SelectedItem is MusicTrack track && queue.Select(track.Reference) is { } selectedTrack)
-            await PlayTrackAsync(selectedTrack);
+        RenderQueuePage();
     }
+    private async void ManageQueue_Click(object sender, RoutedEventArgs e)
+    { if (queuePage is not null) await CloseQueuePageAsync(); else ShowQueuePage(); }
     private void Resume_Click(object sender, RoutedEventArgs e) { if (mediaReady) { music.Player.Play(); PlaybackStatus.Text = "正在播放"; } }
     private void Stop_Click(object sender, RoutedEventArgs e) { ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false; PlaybackStatus.Text = "已停止"; NowPlaying.Text = ""; }
     private void Mute_Click(object sender, RoutedEventArgs e) => music.Player.IsMuted = MuteToggle.IsChecked == true;
@@ -431,5 +409,5 @@ public sealed partial class MainWindow
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
     }
     private void ClosePlayback()
-    { closed = true; activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

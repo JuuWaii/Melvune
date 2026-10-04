@@ -25,7 +25,7 @@ public sealed partial class MainWindow
         ;
 
     private Task AnimateUiAsync(FrameworkElement element, double fromY, double toY, int milliseconds,
-        bool fade = false, bool bounce = false)
+        bool fade = false, bool bounce = false, bool horizontal = false)
     {
         if (closed) return Task.CompletedTask;
         if (uiMotions.TryGetValue(element, out var old)) old.Finish(false);
@@ -42,13 +42,15 @@ public sealed partial class MainWindow
             else element.RenderTransform = transform;
         }
         element.RenderTransformOrigin = new global::Windows.Foundation.Point(.5, .5);
+        string axis = horizontal ? nameof(CompositeTransform.TranslateX) : nameof(CompositeTransform.TranslateY);
+        void SetPosition(double value) { if (horizontal) transform.TranslateX = value; else transform.TranslateY = value; }
         if (!UiMotionEnabled || element.Visibility != Visibility.Visible)
         {
-            transform.TranslateY = toY; transform.ScaleX = transform.ScaleY = 1; element.Opacity = 1;
+            SetPosition(toY); transform.ScaleX = transform.ScaleY = 1; element.Opacity = 1;
             return Task.CompletedTask;
         }
         var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        transform.TranslateY = fromY;
+        SetPosition(fromY);
         transform.ScaleX = transform.ScaleY = bounce ? .94 : 1;
         element.Opacity = fade ? .25 : 1;
         var storyboard = new Storyboard();
@@ -63,7 +65,7 @@ public sealed partial class MainWindow
             Storyboard.SetTarget(animation, target); Storyboard.SetTargetProperty(animation, property);
             storyboard.Children.Add(animation);
         }
-        Add(transform, nameof(CompositeTransform.TranslateY), fromY, toY, milliseconds, ease);
+        Add(transform, axis, fromY, toY, milliseconds, ease);
         if (fade) Add(element, nameof(UIElement.Opacity), .25, 1, Math.Min(milliseconds, 160), new CubicEase { EasingMode = EasingMode.EaseOut });
         if (bounce)
         {
@@ -74,10 +76,10 @@ public sealed partial class MainWindow
         {
             if (finished) return;
             finished = true;
-            double y = transform.TranslateY, xScale = transform.ScaleX, yScale = transform.ScaleY, opacity = element.Opacity;
+            double y = horizontal ? transform.TranslateX : transform.TranslateY, xScale = transform.ScaleX, yScale = transform.ScaleY, opacity = element.Opacity;
             watchdog.Stop(); storyboard.Completed -= Completed; element.Unloaded -= Unloaded;
             storyboard.Stop();
-            transform.TranslateY = settle ? toY : y;
+            SetPosition(settle ? toY : y);
             transform.ScaleX = settle ? 1 : xScale; transform.ScaleY = settle ? 1 : yScale;
             element.Opacity = settle ? 1 : opacity;
             uiMotions.Remove(element);

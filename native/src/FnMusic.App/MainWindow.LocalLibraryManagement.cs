@@ -5,60 +5,137 @@ using Microsoft.UI.Xaml.Controls;
 namespace FnMusic.App;
 public sealed partial class MainWindow
 {
-    private async void ManageLocalLibraries_Click(object sender, RoutedEventArgs e)
+    private async void ManageLocalLibraries_Click(object sender, RoutedEventArgs e) => await ShowLocalLibraryManagementAsync();
+#if DEBUG
+    private Action<PlaylistPageView>? localLibraryPageOpened;
+#endif
+    private async Task ShowLocalLibraryManagementAsync(bool createNew = false)
     {
-        if (localImportBusy) return;
-        localImportBusy = true;
-        try
+        if (localImportBusy || closed) return;
+        var catalog = LocalLibraryCatalog.Empty;
+        bool rendering = false, busy = false, loaded = false;
+        var list = new ListView { DisplayMemberPath = "Name", SelectionMode = ListViewSelectionMode.Single };
+        var name = new TextBox { Header = "库名称", MaxLength = 120, PlaceholderText = "新增时留空使用文件夹名称" };
+        var group = new TextBox { Header = "分组（可选）", MaxLength = 120 };
+        var path = new TextBox { Header = "文件夹路径", MaxLength = 4096, PlaceholderText = @"例如 D:\Music" };
+        var confirm = new CheckBox { Content = "确认移除所选音乐库" };
+        var fields = new StackPanel { Spacing = 10 };
+        foreach (var child in new UIElement[] { name, group, path, confirm }) fields.Children.Add(child);
+        fields.Children.Add(new TextBlock { Text = "选择下方音乐库修改，或点击添加填写新库。修改路径会重新扫描并保留来源身份；移除仅取消导入，音乐文件与歌单条目保留。", TextWrapping = TextWrapping.Wrap });
+        var add = new Button { Content = "添加音乐库" };
+        var browse = new Button { Content = "浏览文件夹…" };
+        var save = new Button { Content = "保存" };
+        var remove = new Button { Content = "移除音乐库", IsEnabled = false };
+        var refresh = new Button { Content = "刷新音乐库" };
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        foreach (var button in new[] { add, browse, save, remove, refresh }) actions.Children.Add(button);
+        var view = new PlaylistPageView("本地音乐库管理", fields, list, actions, new TextBlock { Text = "正在读取音乐库…", TextWrapping = TextWrapping.Wrap }, localLifetime.Token) { HeaderHeightLimit = 380 };
+        view.PlayButton.Visibility = Visibility.Collapsed;
+        var ct = view.Lifetime.Token;
+        void UpdateButtons()
         {
-            var catalog = await localLibraryStore.LoadAsync(localLifetime.Token);
-            if (closed) return;
-            var picker = new ComboBox { Header = "选择音乐库", DisplayMemberPath = "Name", ItemsSource = catalog.Libraries, HorizontalAlignment = HorizontalAlignment.Stretch };
-            var name = new TextBox { Header = "库名称", MaxLength = 120 };
-            var group = new TextBox { Header = "分组（可选）", MaxLength = 120 };
-            var path = new TextBox { Header = "文件夹路径", MaxLength = 4096 };
-            var confirm = new CheckBox { Content = "确认移除所选音乐库" };
-            var panel = new StackPanel { Spacing = 12, MinWidth = 300 };
-            foreach (var child in new UIElement[] { picker, name, group, path, confirm }) panel.Children.Add(child);
-            panel.Children.Add(new TextBlock { Text = "修改路径可重新关联移动后的文件夹，保留来源和相对路径相同的歌曲引用。移除仅取消导入，不删除音乐文件或歌单条目。", TextWrapping = TextWrapping.Wrap });
-            var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "本地音乐库管理", Content = new ScrollViewer { Content = panel, MaxHeight = 500 }, PrimaryButtonText = "保存", SecondaryButtonText = "移除", CloseButtonText = "取消", IsSecondaryButtonEnabled = false };
-            void Select()
-            {
-                var item = picker.SelectedItem as LocalLibrary;
-                name.Text = item?.Name ?? ""; group.Text = item?.Group ?? ""; path.Text = item?.Directory ?? "";
-                confirm.IsChecked = false; dialog.IsPrimaryButtonEnabled = item is not null; dialog.IsSecondaryButtonEnabled = false;
-            }
-            picker.SelectionChanged += (_, _) => Select();
-            confirm.Click += (_, _) => dialog.IsSecondaryButtonEnabled = confirm.IsChecked == true && picker.SelectedItem is LocalLibrary;
-            picker.SelectedItem = catalog.Libraries.FirstOrDefault(item => item.SourceId == selectedLocalLibrary) ?? catalog.Libraries.FirstOrDefault();
-            Select();
-            var result = await ShowThemedDialogAsync(dialog);
-            if (closed || result == ContentDialogResult.None || picker.SelectedItem is not LocalLibrary selected) return;
-            LocalMusicSource? rescanned = null;
-            LocalLibraryCatalog next;
-            if (result == ContentDialogResult.Secondary)
-            {
-                if (confirm.IsChecked != true) return;
-                next = catalog with { Libraries = catalog.Libraries.Where(item => item.SourceId != selected.SourceId).ToArray() };
-            }
-            else
-            {
-                if (!Path.IsPathFullyQualified(path.Text.Trim())) throw new ArgumentException();
-                var updated = selected with { Name = name.Text.Trim(), Group = group.Text.Trim(), Directory = LocalLibraryStore.NormalizePath(path.Text.Trim()) };
-                if (!string.Equals(updated.Directory, LocalLibraryStore.NormalizePath(selected.Directory), StringComparison.OrdinalIgnoreCase))
-                    rescanned = await ScanLocalAsync(updated.Settings, localLifetime.Token);
-                next = catalog with { Libraries = catalog.Libraries.Select(item => item.SourceId == selected.SourceId ? updated : item).ToArray() };
-            }
-            var saved = await localLibraryStore.SaveAsync(next, localLifetime.Token);
-            if (closed) return;
-            ApplyLocalCatalog(saved);
-            if (rescanned is not null) ReplaceLocalSource(rescanned);
-            PlaybackStatus.Text = result == ContentDialogResult.Secondary ? "已移除音乐库，音乐文件与歌单引用保留。" : "音乐库设置已保存。";
-            if (localView) await LoadPageAsync(1);
+            save.IsEnabled = loaded && !string.IsNullOrWhiteSpace(path.Text);
+            confirm.IsEnabled = list.SelectedItem is LocalLibrary;
+            remove.IsEnabled = loaded && list.SelectedItem is LocalLibrary && confirm.IsChecked == true;
         }
-        catch (OperationCanceledException) { }
-        catch (LocalLibraryConflictException) { if (!closed) PlaybackStatus.Text = "音乐库已在其他窗口修改，请重新打开管理后重试。"; }
-        catch (Exception) { if (!closed) PlaybackStatus.Text = "音乐库设置未保存，请检查名称、目录或重复路径。原配置保留。"; }
-        finally { localImportBusy = false; }
+        void Select()
+        {
+            if (rendering) return;
+            var item = list.SelectedItem as LocalLibrary;
+            name.Text = item?.Name ?? ""; group.Text = item?.Group ?? ""; path.Text = item?.Directory ?? "";
+            confirm.IsChecked = false; UpdateButtons();
+        }
+        void Render(Guid? selectedId)
+        {
+            rendering = true; list.ItemsSource = catalog.Libraries;
+            list.SelectedItem = catalog.Libraries.FirstOrDefault(item => item.SourceId == selectedId);
+            rendering = false; Select();
+        }
+        async Task Run(Func<Task> operation, bool mutation)
+        {
+            if (busy || ct.IsCancellationRequested || (mutation && localImportBusy)) return;
+            busy = true; view.Editor.IsEnabled = false; view.BlockNavigation = mutation;
+            if (mutation) localImportBusy = true;
+            try { await operation(); }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested || mutation)
+            { if (!ct.IsCancellationRequested) view.Status.Text = "扫描已取消，原音乐库保留。"; }
+            catch (LocalLibraryConflictException)
+            { view.Status.Text = "音乐库已在其他窗口修改，请刷新核对后重试。原配置未被覆盖。"; loaded = false; }
+            catch (Exception)
+            { if (!ct.IsCancellationRequested) view.Status.Text = "操作未完成，请检查名称、目录或重复路径。原音乐库保留。"; }
+            finally
+            {
+                busy = false; view.BlockNavigation = false;
+                if (mutation) localImportBusy = false;
+                if (!view.IsDisposed) { view.Editor.IsEnabled = true; view.CancelButton.Visibility = Visibility.Collapsed; UpdateButtons(); }
+            }
+        }
+        async Task Refresh(Guid? selectedId)
+        {
+            catalog = await localLibraryStore.LoadAsync(ct); ct.ThrowIfCancellationRequested();
+            loaded = true; Render(selectedId); view.Status.Text = catalog.Libraries.Count == 0 ? "暂无音乐库，填写路径后保存以导入。" : $"已读取 {catalog.Libraries.Count} 个音乐库。";
+        }
+        list.SelectionChanged += (_, _) => Select();
+        confirm.Click += (_, _) => UpdateButtons(); path.TextChanged += (_, _) => UpdateButtons();
+        add.Click += (_, _) => { list.SelectedItem = null; Select(); view.Status.Text = "填写文件夹路径后保存以导入新音乐库。"; path.Focus(FocusState.Programmatic); };
+        browse.Click += async (_, _) => await PickLocalFolderAsync(path, browse);
+        refresh.Click += async (_, _) => await Run(() => Refresh((list.SelectedItem as LocalLibrary)?.SourceId), false);
+        view.CancelButton.Click += CancelLocalScan_Click;
+        save.Click += async (_, _) =>
+        {
+            if (!loaded || busy) return;
+            var selected = list.SelectedItem as LocalLibrary;
+            string enteredPath = path.Text.Trim(), enteredName = name.Text.Trim(), enteredGroup = group.Text.Trim();
+            await Run(async () =>
+            {
+                if (!Path.IsPathFullyQualified(enteredPath)) throw new ArgumentException();
+                string directory = LocalLibraryStore.NormalizePath(enteredPath);
+                var existing = selected ?? catalog.Libraries.FirstOrDefault(item => string.Equals(LocalLibraryStore.NormalizePath(item.Directory), directory, StringComparison.OrdinalIgnoreCase));
+                var updated = existing is null ? new LocalLibrary(Guid.NewGuid(), directory,
+                    enteredName.Length == 0 ? new DirectoryInfo(directory).Name : enteredName, enteredGroup)
+                    : existing with { Name = enteredName.Length == 0 && selected is null ? existing.Name : enteredName, Group = enteredGroup, Directory = directory };
+                if (existing is null && updated.Name.Length == 0) updated = updated with { Name = "本地音乐" };
+                LocalMusicSource? rescanned = null;
+                if (selected is null || !string.Equals(directory, LocalLibraryStore.NormalizePath(selected.Directory), StringComparison.OrdinalIgnoreCase))
+                {
+                    view.Status.Text = "正在扫描本地音乐…"; view.CancelButton.Visibility = Visibility.Visible;
+                    rescanned = await ScanLocalAsync(updated.Settings, ct
+#if DEBUG
+                        , localPageMetadataReader
+#endif
+                    );
+                    view.CancelButton.Visibility = Visibility.Collapsed;
+                }
+                var next = catalog with { Libraries = existing is null ? catalog.Libraries.Append(updated).ToArray()
+                    : catalog.Libraries.Select(item => item.SourceId == updated.SourceId ? updated : item).ToArray() };
+                catalog = await localLibraryStore.SaveAsync(next, ct); ct.ThrowIfCancellationRequested();
+                ApplyLocalCatalog(catalog);
+                if (rescanned is not null) ReplaceLocalSource(rescanned);
+                Render(updated.SourceId);
+                view.Status.Text = PlaybackStatus.Text = rescanned is null ? "音乐库设置已保存。" : $"音乐库已保存，扫描到 {rescanned.Tracks.Count} 首。";
+                if (localView) await LoadPageAsync(page);
+            }, true);
+        };
+        remove.Click += async (_, _) =>
+        {
+            if (!loaded || confirm.IsChecked != true || list.SelectedItem is not LocalLibrary selected) return;
+            await Run(async () =>
+            {
+                catalog = await localLibraryStore.SaveAsync(catalog with { Libraries = catalog.Libraries.Where(item => item.SourceId != selected.SourceId).ToArray() }, ct);
+                ct.ThrowIfCancellationRequested(); ApplyLocalCatalog(catalog); Render(null);
+                view.Status.Text = PlaybackStatus.Text = "已移除音乐库，音乐文件与歌单引用保留。";
+                if (localView) await LoadPageAsync(page);
+            }, true);
+        };
+        view.Reload = () => Run(() => Refresh((list.SelectedItem as LocalLibrary)?.SourceId), false);
+        if (!MountFullPage(view)) return;
+        await Run(async () =>
+        {
+            await Refresh(createNew ? null : selectedLocalLibrary);
+            if (!createNew && list.SelectedItem is null && catalog.Libraries.Count > 0) { list.SelectedIndex = 0; Select(); }
+        }, false);
+#if DEBUG
+        if (!view.IsDisposed) localLibraryPageOpened?.Invoke(view);
+#endif
     }
 }

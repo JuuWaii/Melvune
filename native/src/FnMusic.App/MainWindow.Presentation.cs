@@ -78,13 +78,14 @@ public sealed partial class MainWindow
     {
         CloseTrackContextMenu();
         if (nowPlayingExit is { IsCompleted: false } exit) await exit;
-        if (closed || LyricsPanel.Visibility == Visibility.Visible) return;
+        if (closed || fullPageView is not null || LyricsPanel.Visibility == Visibility.Visible) return;
         int transition = ++nowPlayingTransitionVersion;
         lyricsPreviousFocus = FocusManager.GetFocusedElement(Root.XamlRoot) as Control;
-        lyricsPreviousList = PlaylistPanel.Visibility == Visibility.Visible ? activePlaylistPage?.List : SettingsPanel.Visibility == Visibility.Visible ? null
+        lyricsPreviousList = PlaylistPanel.Visibility == Visibility.Visible ? activePlaylistPage is { IsForm: false } active ? active.List : null : SettingsPanel.Visibility == Visibility.Visible ? null
             : CollectionList.Visibility == Visibility.Visible ? CollectionList : TrackList;
         lyricsPreviousItems = lyricsPreviousList?.ItemsSource;
-        lyricsPreviousScroll = lyricsPreviousList is null ? SettingsPanel : FindPresentationScroll(lyricsPreviousList);
+        lyricsPreviousScroll = PlaylistPanel.Visibility == Visibility.Visible && activePlaylistPage is { IsForm: true } form
+            ? form.Header : lyricsPreviousList is null ? SettingsPanel : FindPresentationScroll(lyricsPreviousList);
         lyricsPreviousHorizontalOffset = lyricsPreviousScroll?.HorizontalOffset ?? 0;
         lyricsPreviousVerticalOffset = lyricsPreviousScroll?.VerticalOffset ?? 0;
         lyricsSidebarVisibility = SidebarHost.Visibility;
@@ -162,6 +163,10 @@ public sealed partial class MainWindow
     private async void NowPlayingBack_Click(object sender, RoutedEventArgs e) => await CloseNowPlayingAsync();
     private async void NowPlayingEscape_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
     {
+        if (themedDialogOpen) return;
+        if (trackContextMenu is not null) { CloseTrackContextMenu(); args.Handled = true; return; }
+        if (queuePage is not null) { args.Handled = true; await CloseQueuePageAsync(); return; }
+        if (FullPageHost.Visibility == Visibility.Visible) { CloseFullPage(); args.Handled = true; return; }
         if (LyricsPanel.Visibility != Visibility.Visible || themedDialogOpen) return;
         args.Handled = true; await CloseNowPlayingAsync();
     }

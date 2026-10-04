@@ -20,6 +20,7 @@ public sealed partial class MainWindow
         public TextBlock Status { get; }
         public Button PlayButton { get; } = new() { Content = "播放所选", IsEnabled = false };
         public Button BackButton { get; } = new() { Content = "返回" };
+        public Button CancelButton { get; } = new() { Content = "取消扫描", Visibility = Visibility.Collapsed };
         public CancellationTokenSource Lifetime { get; }
         public Guid? RemoteSource { get; init; }
         public bool BlockNavigation { get; set; }
@@ -27,6 +28,8 @@ public sealed partial class MainWindow
         public Action? SourceChanged { get; set; }
         public Func<Task>? Reload { get; set; }
         public bool IsDisposed { get; private set; }
+        public bool IsForm { get; private set; }
+        public double HeaderHeightLimit { get; init; } = 260;
         private readonly StackPanel heading = new() { Orientation = Orientation.Horizontal, Spacing = 12 };
         private readonly ScrollViewer actionScroll;
         public PlaylistPageView(string title, StackPanel fields, ListView list, StackPanel actions, TextBlock status, CancellationToken lifetime)
@@ -38,6 +41,7 @@ public sealed partial class MainWindow
             foreach (var height in new[] { GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star), GridLength.Auto, GridLength.Auto })
                 Layout.RowDefinitions.Add(new RowDefinition { Height = height });
             heading.Children.Add(BackButton);
+            heading.Children.Add(CancelButton);
             heading.Children.Add(new TextBlock { Text = title, FontSize = 24, FontWeight = global::Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
             Header = new ScrollViewer { Content = fields, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalScrollMode = ScrollMode.Disabled, MaxHeight = 260 };
@@ -63,8 +67,16 @@ public sealed partial class MainWindow
             Layout.RowSpacing = height < 380 ? 8 : 12;
             List.MinHeight = height < 380 ? 32 : 64;
             Status.MaxLines = height < 320 ? 2 : 3;
+            if (IsForm) { Header.MaxHeight = double.PositiveInfinity; return; }
             Header.MaxHeight = Math.Clamp(height - heading.ActualHeight - actionScroll.ActualHeight
-                - Status.ActualHeight - Layout.RowSpacing * 4 - List.MinHeight, 32, 260);
+                - Status.ActualHeight - Layout.RowSpacing * 4 - List.MinHeight, 32, HeaderHeightLimit);
+        }
+        public void UseFormLayout()
+        {
+            IsForm = true;
+            List.Visibility = Visibility.Collapsed; List.MinHeight = 0;
+            PlayButton.Visibility = Visibility.Collapsed;
+            Grid.SetRow(Editor, 2); Header.MaxHeight = double.PositiveInfinity;
         }
         public void Dispose()
         {
@@ -85,6 +97,8 @@ public sealed partial class MainWindow
     private async Task<bool> NavigateMainContentAsync(FrameworkElement target)
     {
         if (closed) return false;
+        if (!CloseFullPage()) return false;
+        if (!CloseQueuePage()) return false;
         CloseTrackContextMenu();
         if (activePlaylistPage is { BlockNavigation: true } busy)
         { busy.Status.Text = "正在保存，请等待核对完成后切换页面。"; return false; }

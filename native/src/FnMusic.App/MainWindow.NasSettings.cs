@@ -9,7 +9,7 @@ public sealed partial class MainWindow
     private bool nasSettingsOpen;
 #if DEBUG
     private NasApiClient? settingsTestClient;
-    private Action<ContentDialog>? settingsDialogOpened;
+    private Action<PlaylistPageView>? settingsPageOpened;
 #endif
     private bool IsCurrentSettingsClient(NasApiClient api) => ReferenceEquals(api, ViewModel.AuthenticatedClient)
 #if DEBUG
@@ -33,10 +33,7 @@ public sealed partial class MainWindow
     }
     private async Task ShowNasSettingsAsync(NasApiClient api)
     {
-        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(localLifetime.Token);
-        var ct = lifetime.Token;
-        bool busy = false, rendering = false, showing = false;
-        bool admin = await api.IsAdministratorAsync(ct);
+        bool busy = false, rendering = false, admin = false;
         if (closed || !IsCurrentSettingsClient(api)) return;
         NasServerSettings? server = null;
         NasDefaultLibraryAccess? access = null;
@@ -79,13 +76,19 @@ public sealed partial class MainWindow
         var role = new TextBlock { Text = admin ? "管理员设置 · 保存与刷新直接同步飞牛服务器" : "当前账号仅查看素材库；管理设置需要飞牛管理员权限。", TextWrapping = TextWrapping.Wrap };
         var refresh = new Button { Content = "刷新飞牛设置" };
         var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
-        panel.Children.Add(role); panel.Children.Add(tabs); panel.Children.Add(refresh); panel.Children.Add(status);
-        var editor = new ScrollViewer { Content = panel, MaxHeight = 530 };
-        var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "飞牛素材库与设置", Content = editor, CloseButtonText = "关闭" };
+        panel.Children.Add(role); panel.Children.Add(tabs);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        actions.Children.Add(refresh);
+        var sectionActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        actions.Children.Add(sectionActions);
+        var view = new PlaylistPageView("飞牛素材库与设置", panel, new ListView(), actions, status, localLifetime.Token) { RemoteSource = api.SourceInstanceId };
+        view.UseFormLayout();
+        var ct = view.Lifetime.Token;
+        var editor = view.Editor;
         Action updateTaskButtons = () => { };
         Action refreshReconnectSelection = () => { };
         Action updateReconnectButtons = () => { };
-        bool CanWriteSettings() => admin && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.ReadSettings | MusicSourceCapabilities.WriteSettings);
+        bool CanWriteSettings() => !ct.IsCancellationRequested && IsCurrentSettingsClient(api) && admin && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.ReadSettings | MusicSourceCapabilities.WriteSettings);
         var tasks = CreateNasTasksPanel(api, ct, CanWriteSettings, (operation, mutation) => Run(operation, mutation: mutation));
         updateTaskButtons = tasks.UpdateButtons;
         tabs.Items.Add(new PivotItem { Header = "后台任务", Content = tasks.Panel });
@@ -93,6 +96,18 @@ public sealed partial class MainWindow
         refreshReconnectSelection = reconnect.RefreshSelection;
         updateReconnectButtons = reconnect.UpdateButtons;
         tabs.Items.Add(new PivotItem { Header = "重新关联", Content = reconnect.Panel });
+        var sections = new[] { libraryPanel, serverPanel, accessPanel, tasks.Panel, reconnect.Panel };
+        var buttonsByTab = sections.Select(section => section.Children.OfType<Button>().ToArray()).ToArray();
+        foreach (var section in sections)
+            foreach (var button in section.Children.OfType<Button>().ToArray()) section.Children.Remove(button);
+        void SelectTabActions()
+        {
+            sectionActions.Children.Clear();
+            if (tabs.SelectedIndex >= 0 && tabs.SelectedIndex < buttonsByTab.Length)
+                foreach (var button in buttonsByTab[tabs.SelectedIndex]) sectionActions.Children.Add(button);
+        }
+        tabs.SelectionChanged += (_, _) => SelectTabActions();
+        tabs.SelectedIndex = 0; SelectTabActions();
         void UpdateButtons()
         {
             bool known = preference.SelectedIndex >= 0;
@@ -124,6 +139,7 @@ public sealed partial class MainWindow
         {
             string? requestedId = selectedId ?? selectedLibraryId;
             admin = await api.IsAdministratorAsync(ct);
+            ct.ThrowIfCancellationRequested();
             role.Text = admin ? "管理员设置 · 保存与刷新直接同步飞牛服务器" : "当前账号仅查看素材库；管理设置需要飞牛管理员权限。";
             var failed = new List<string>();
             async Task ReadSection(string label, Func<Task> read)
@@ -159,10 +175,10 @@ public sealed partial class MainWindow
         }
         async Task Run(Func<Task> operation, bool scanRequest = false, bool mutation = true)
         {
-            if (busy || ct.IsCancellationRequested) return;
+            if (busy || ct.IsCancellationRequested || !IsCurrentSettingsClient(api)) return;
             if (!ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.ReadSettings) || (mutation && !CanWriteSettings()))
             { status.Text = "当前来源不支持此设置操作，或账号没有写入权限。"; UpdateButtons(); return; }
-            busy = true; editor.IsEnabled = false; status.Text = "正在与飞牛同步…";
+            busy = true; view.BlockNavigation = mutation; editor.IsEnabled = false; status.Text = "正在与飞牛同步…";
             try { await operation(); ct.ThrowIfCancellationRequested(); status.Text = (scanRequest ? "扫描请求已提交，请在后台任务页刷新查看状态，完成后刷新曲库。" : "操作已返回；具体结果以当前页面回读状态为准。") + (refreshWarning.Length == 0 ? "" : "\n" + refreshWarning); }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
             catch (RemoteSettingsConflictException)
@@ -171,7 +187,7 @@ public sealed partial class MainWindow
             { if (ReferenceEquals(api, ViewModel.AuthenticatedClient)) await ViewModel.ExpireSessionAsync(); }
             catch (Exception)
             { selected = null; server = null; access = null; status.Text = "未能确认结果，请先刷新核对；也请检查目录授权及管理员权限。"; }
-            finally { busy = false; editor.IsEnabled = true; UpdateButtons(); if (ct.IsCancellationRequested && showing && !closed) dialog.Hide(); }
+            finally { busy = false; view.BlockNavigation = false; if (!view.IsDisposed) { editor.IsEnabled = true; UpdateButtons(); } }
         }
         picker.SelectionChanged += async (_, _) =>
         {
@@ -207,19 +223,13 @@ public sealed partial class MainWindow
             await Run(async () => { access = await api.UpdateDefaultLibraryAccessAsync(current, requested, chosen, ct); await Refresh(selected?.Library.Id); });
         };
         refresh.Click += async (_, _) => await Run(() => Refresh(selected?.Library.Id), mutation: false);
-        dialog.Closing += (_, args) => { if (busy && !ct.IsCancellationRequested && !closed) args.Cancel = true; };
-        void SessionChanged() { lifetime.Cancel(); if (showing && !busy && !closed) dialog.Hide(); }
-        ViewModel.SessionChanging += SessionChanged;
-        try
-        {
-            await Refresh();
-            status.Text = refreshWarning;
-            if (closed || !IsCurrentSettingsClient(api)) return;
+        view.SourceChanged = UpdateButtons;
+        view.Reload = () => Run(() => Refresh(selected?.Library.Id), mutation: false);
+        if (!MountFullPage(view)) return;
+        await Run(() => Refresh(), mutation: false);
+        if (closed || ct.IsCancellationRequested || !IsCurrentSettingsClient(api)) return;
 #if DEBUG
-            dialog.Opened += (_, _) => settingsDialogOpened?.Invoke(dialog);
+        settingsPageOpened?.Invoke(view);
 #endif
-            showing = true; await ShowThemedDialogAsync(dialog); showing = false;
-        }
-        finally { ViewModel.SessionChanging -= SessionChanged; lifetime.Cancel(); }
     }
 }
