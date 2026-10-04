@@ -148,7 +148,7 @@ public sealed partial class MainWindow
             coverCache.Clear();
             var coverEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var coverRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            localArtworkBeforeCommit = () => { coverEntered.TrySetResult(); return coverRelease.Task; };
+            localArtworkBeforeCommit = _ => { coverEntered.TrySetResult(); return coverRelease.Task; };
             var oldCoverRequest = LoadArtworkAsync(NowCover);
             try
             {
@@ -162,6 +162,7 @@ public sealed partial class MainWindow
             finally { localArtworkBeforeCommit = null; coverRelease.TrySetResult(); }
             await LoadArtworkAsync(NowCover);
             Verify("local_replacement_cover_loads", NowCover.Source is not null);
+            await VerifyArtworkResolutionAsync(Verify, Path.Combine(localDirectory, "000-playback.png"));
             Verify("local_lyrics_loaded", currentLyrics.IsTimed && currentLyrics.Lines.Count == 3);
             local = await VerifyLyricsSourceChangesAsync(Verify, local, TrackList.SelectedItem as MusicTrack ?? throw new InvalidOperationException());
             await OpenNowPlayingAsync();

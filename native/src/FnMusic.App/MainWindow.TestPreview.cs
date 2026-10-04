@@ -55,6 +55,8 @@ public sealed partial class MainWindow
                     await wave.CopyToAsync(file);
                 }
                 await File.WriteAllTextAsync(Path.ChangeExtension(filePath, ".lrc"), "[00:00]合成歌单歌词\n[00:10]播放与来源验证");
+                if (Environment.GetCommandLineArgs().Contains("--preview-artwork"))
+                    await File.WriteAllBytesAsync(Path.ChangeExtension(filePath, ".png"), await Services.ArtworkFixture.EncodeAsync(2000, 1000));
             }
             var local = await FnMusic.Infrastructure.LocalMusicSource.ScanAsync(new(Guid.NewGuid(), directory), default);
             ReplaceLocalSource(local);

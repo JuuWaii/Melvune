@@ -17,7 +17,7 @@ internal static class LocalFormatVerification
         var results = new List<object>();
         var checks = new Dictionary<string, bool>();
         string artwork = Path.Combine(root, "embedded-fixture.png"); created.Add(artwork);
-        await File.WriteAllBytesAsync(artwork, Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+a/noAAAAASUVORK5CYII="));
+        await File.WriteAllBytesAsync(artwork, await ArtworkFixture.EncodeAsync(2000, 1000));
         string[] formats = ["wav", "flac", "mp3", "ogg", "opus", "m4a", "aac", "wma", "aiff", "aif"];
         foreach (string format in formats)
         {
@@ -76,6 +76,9 @@ internal static class LocalFormatVerification
                         using var pixels = await decoder.GetSoftwareBitmapAsync().AsTask(deadline.Token);
                         coverDecoded = pixels.PixelWidth > 0 && pixels.PixelHeight > 0;
                     }
+                    var fullBytes = await LocalArtworkReader.ReadThumbnailAsync(source.GetFilePath(track.Reference), ArtworkDecoder.FullCoverEdge, deadline.Token);
+                    var fullCover = fullBytes is null ? null : await ArtworkDecoder.DecodeAsync(fullBytes, ArtworkDecoder.FullCoverEdge, deadline.Token);
+                    checks[format + "_embedded_full_cover_resolution"] = fullCover is { PixelWidth: 1024, PixelHeight: 512 };
                 }
                 stage = "play";
                 await audio.OpenAsync(await source.OpenAsync(track.Reference, deadline.Token), deadline.Token);

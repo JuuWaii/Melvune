@@ -2,7 +2,6 @@ using FnMusic.Core;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
-using System.Runtime.InteropServices.WindowsRuntime;
 using Windows.UI.ViewManagement;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
@@ -13,7 +12,12 @@ public sealed partial class MainWindow
 {
     private readonly UISettings systemTheme = new();
     private readonly SemaphoreSlim coverSlots = new(4);
-    private readonly Dictionary<string, BitmapImage> coverCache = [];
+    private readonly Services.ArtworkCache coverCache = new();
+    private sealed record ArtworkLoad(object? Context, object? Source)
+    {
+        internal TaskCompletionSource Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+    private readonly Dictionary<Image, ArtworkLoad> artworkLoads = [];
     private CancellationTokenSource lyricsWork = new();
     private Lyrics currentLyrics = Lyrics.Empty;
     private int activeLyric = -1;
@@ -30,7 +34,7 @@ public sealed partial class MainWindow
     private bool normalContentWasEnabled;
     private double normalPlayerMinHeight;
 #if DEBUG
-    private Func<Task>? localArtworkBeforeCommit;
+    private Func<Image, Task>? localArtworkBeforeCommit;
     private Func<Task>? lyricsBeforeCommit;
 #endif
     private void InitializePresentation()
@@ -105,6 +109,7 @@ public sealed partial class MainWindow
         FullOutputHost.Content = OutputDeviceButton;
         PlaySelectedButton.Visibility = Visibility.Collapsed;
         LyricsPanel.Visibility = Visibility.Visible;
+        _ = LoadArtworkAsync(FullNowCover);
         UpdateAdaptiveLayout(Root.ActualWidth);
         NowPlayingBack.Focus(FocusState.Programmatic);
         await AnimateUiAsync(LyricsPanel, Math.Max(1, Root.ActualHeight), 0, 320);
@@ -138,6 +143,8 @@ public sealed partial class MainWindow
         PlayerBar.MinHeight = normalPlayerMinHeight;
         NormalContent.IsEnabled = normalContentWasEnabled;
         LyricsPanel.Visibility = Visibility.Collapsed;
+        if (FullNowCover.Tag is CancellationTokenSource artworkWork) artworkWork.Cancel();
+        FullNowCover.Source = null;
         if (FindUiMotionTransform(LyricsPanel) is { } transform) transform.TranslateY = 0;
         SidebarHost.Visibility = lyricsSidebarVisibility;
         SettingsPanel.Visibility = lyricsSettingsVisibility;
@@ -171,17 +178,40 @@ public sealed partial class MainWindow
         args.Handled = true; await CloseNowPlayingAsync();
     }
 
-    private async void Artwork_Loaded(object sender, RoutedEventArgs e) { if (sender is Image image) await LoadArtworkAsync(image); }
+    private async void Artwork_Loaded(object sender, RoutedEventArgs e)
+    { if (sender is Image image) await LoadArtworkAsync(image); }
     private async void Artwork_DataContextChanged(FrameworkElement sender, DataContextChangedEventArgs args) { if (sender is Image { IsLoaded: true } image) await LoadArtworkAsync(image); }
     private void Artwork_Unloaded(object sender, RoutedEventArgs e)
-    { if (sender is Image image && image.Tag is CancellationTokenSource work) { work.Cancel(); image.Tag = null; } }
+    { if (sender is Image image) { artworkLoads.Remove(image); if (image.Tag is CancellationTokenSource work) { work.Cancel(); image.Tag = null; } } }
     private async Task LoadArtworkAsync(Image image)
+    {
+        object? context = image.DataContext;
+        object? source = context is MusicTrack track && localSources.TryGetValue(track.SourceInstanceId, out var local)
+            ? local : ViewModel.AuthenticatedClient;
+        bool canLoad = !closed && (!ReferenceEquals(image, FullNowCover) || LyricsPanel.Visibility == Visibility.Visible)
+            && (context is MusicTrack song ? TrackSupports(song, MusicSourceCapabilities.Artwork)
+                : ViewModel.AuthenticatedClient is { } currentApi && ViewModel.PlaybackRouter.Supports(currentApi.SourceInstanceId, MusicSourceCapabilities.Artwork));
+        if (canLoad && artworkLoads.TryGetValue(image, out var pending)
+            && ReferenceEquals(pending.Context, context) && ReferenceEquals(pending.Source, source))
+        { await pending.Completion.Task; return; }
+        var load = new ArtworkLoad(context, source);
+        artworkLoads[image] = load;
+        try { await LoadArtworkCoreAsync(image); }
+        finally
+        {
+            if (ReferenceEquals(artworkLoads.GetValueOrDefault(image), load)) artworkLoads.Remove(image);
+            load.Completion.TrySetResult();
+        }
+    }
+    private async Task LoadArtworkCoreAsync(Image image)
     {
         if (closed) return;
         if (image.Tag is CancellationTokenSource old) old.Cancel();
         image.Tag = null;
         image.Source = null;
-        object context = image.DataContext;
+        if (ReferenceEquals(image, FullNowCover) && LyricsPanel.Visibility != Visibility.Visible) return;
+        int decodeEdge = ReferenceEquals(image, FullNowCover) ? Services.ArtworkDecoder.FullCoverEdge : Services.ArtworkDecoder.ThumbnailEdge;
+        object? context = image.DataContext;
         if (context is MusicTrack unsupported && !TrackSupports(unsupported, MusicSourceCapabilities.Artwork)) return;
         using var request = CancellationTokenSource.CreateLinkedTokenSource(localLifetime.Token);
         image.Tag = request; request.CancelAfter(TimeSpan.FromSeconds(15)); var ct = request.Token;
@@ -193,61 +223,53 @@ public sealed partial class MainWindow
                 && !string.IsNullOrEmpty(coverId) && (context is not MusicTrack remote || remote.SourceInstanceId == api.SourceInstanceId)
                 ? api.SourceInstanceId + ":" + coverId : null;
         if (key is null) { image.Tag = null; return; }
+        key += ":" + decodeEdge;
+        bool IsCurrent() => !ct.IsCancellationRequested && !closed && ReferenceEquals(image.DataContext, context)
+            && (context is not MusicTrack presented || TrackSupports(presented, MusicSourceCapabilities.Artwork))
+            && (source is not null ? ReferenceEquals(localSources.GetValueOrDefault(source.Source.Id), source)
+                : ReferenceEquals(api, ViewModel.AuthenticatedClient) && api is not null
+                    && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.Artwork));
         try
         {
             if (coverCache.TryGetValue(key, out var cached)) { image.Source = cached; return; }
             await coverSlots.WaitAsync(ct);
             try
             {
-                BitmapImage? bitmap = null;
+                if (!IsCurrent()) return;
+                if (coverCache.TryGetValue(key, out cached)) { image.Source = cached; return; }
+                BitmapSource? bitmap = null;
                 if (context is MusicTrack local && source?.Source.Id == local.SourceInstanceId)
                 {
                     await foreach (var candidate in source.GetSidecarCoversAsync(local.Reference, ct))
                     {
-                        try { bitmap = await DecodeArtworkAsync(candidate, ct); break; }
+                        try { bitmap = await Services.ArtworkDecoder.DecodeAsync(candidate, decodeEdge, ct); break; }
                         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
                         catch (Exception) { /* Invalid sidecars must not hide later or embedded covers. */ }
                     }
                     if (bitmap is null)
                     {
-                        var thumbnail = await Services.LocalArtworkReader.ReadThumbnailAsync(source.GetFilePath(local.Reference), ct);
+                        var thumbnail = await Services.LocalArtworkReader.ReadThumbnailAsync(source.GetFilePath(local.Reference), decodeEdge, ct);
                         if (thumbnail is null) return;
-                        bitmap = await DecodeArtworkAsync(thumbnail, ct);
+                        bitmap = await Services.ArtworkDecoder.DecodeAsync(thumbnail, decodeEdge, ct);
                     }
                 }
                 else
                 {
-                    var bytes = await api!.GetCoverAsync(coverId!, ct);
+                    var bytes = await api!.GetCoverAsync(coverId!, decodeEdge == Services.ArtworkDecoder.FullCoverEdge
+                        ? FnMusic.Infrastructure.NasCoverSize.Large : FnMusic.Infrastructure.NasCoverSize.Medium, ct);
                     if (bytes is null || bytes.Length == 0) return;
-                    bitmap = await DecodeArtworkAsync(bytes, ct);
+                    bitmap = await Services.ArtworkDecoder.DecodeAsync(bytes, decodeEdge, ct);
                 }
 #if DEBUG
-                if (source is not null && localArtworkBeforeCommit is { } beforeCommit) await beforeCommit();
+                if (source is not null && localArtworkBeforeCommit is { } beforeCommit) await beforeCommit(image);
 #endif
-                if (ct.IsCancellationRequested || closed || !ReferenceEquals(image.DataContext, context)) return;
-                if (source is not null)
-                {
-                    if (!ReferenceEquals(localSources.GetValueOrDefault(source.Source.Id), source)) return;
-                }
-                else
-                    if (!ReferenceEquals(api, ViewModel.AuthenticatedClient)) return;
-                if (coverCache.Count >= 96) coverCache.Clear();
-                coverCache[key] = bitmap; image.Source = bitmap;
+                if (!IsCurrent()) return;
+                coverCache.Set(key, bitmap); image.Source = bitmap;
             }
             finally { coverSlots.Release(); }
         }
         catch (Exception) { /* 封面失败保留占位，不影响播放或暴露地址。 */ }
         finally { if (ReferenceEquals(image.Tag, request)) image.Tag = null; }
-    }
-
-    private static async Task<BitmapImage> DecodeArtworkAsync(byte[] bytes, CancellationToken ct)
-    {
-        ct.ThrowIfCancellationRequested();
-        var bitmap = new BitmapImage { DecodePixelWidth = 256 };
-        using var input = new MemoryStream(bytes);
-        await bitmap.SetSourceAsync(input.AsRandomAccessStream()).AsTask(ct);
-        ct.ThrowIfCancellationRequested();
-        return bitmap;
     }
 
     private void ClearPresentation()

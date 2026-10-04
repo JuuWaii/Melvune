@@ -31,11 +31,14 @@ public sealed partial class NasApiClient
         return plain ?? Lyrics.Empty;
     }
 
-    public async Task<byte[]?> GetCoverAsync(string coverId, CancellationToken ct)
+    public Task<byte[]?> GetCoverAsync(string coverId, CancellationToken ct) => GetCoverAsync(coverId, NasCoverSize.Medium, ct);
+
+    public async Task<byte[]?> GetCoverAsync(string coverId, NasCoverSize size, CancellationToken ct)
     {
         _ = EncodeCollectionId(coverId);
+        if (!Enum.IsDefined(size)) throw new ArgumentOutOfRangeException(nameof(size));
         var session = CaptureSession();
-        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(endpoint.ApiUri, "static/cover?coverId=" + Uri.EscapeDataString(coverId) + "&size=256"));
+        using var request = new HttpRequestMessage(HttpMethod.Get, new Uri(endpoint.ApiUri, "static/cover?coverId=" + Uri.EscapeDataString(coverId) + "&size=" + ((int)size).ToString(System.Globalization.CultureInfo.InvariantCulture)));
         if (session.Token is not null) request.Headers.Add("Cookie", "music-token=" + Uri.EscapeDataString(session.Token));
         try
         {

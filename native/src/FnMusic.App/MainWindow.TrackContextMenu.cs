@@ -53,7 +53,8 @@ public sealed partial class MainWindow
         CloseTrackContextMenu();
         var menu = CreateTrackContextMenu(list, track, favoriteStateKnown);
         trackContextMenu = menu;
-        void ThemeChanged(FrameworkElement _, object args) => menu.Hide();
+        void ThemeChanged(FrameworkElement _, object args)
+        { if (ReferenceEquals(trackContextMenu, menu)) CloseTrackContextMenu(); else menu.Hide(); }
         Root.ActualThemeChanged += ThemeChanged;
         menu.Closed += (_, _) =>
         {

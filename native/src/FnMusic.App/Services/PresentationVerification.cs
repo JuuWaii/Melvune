@@ -1,6 +1,7 @@
 #if DEBUG
 using System.Text.Json;
 using FnMusic.App.ViewModels;
+using FnMusic.Infrastructure;
 
 namespace FnMusic.App.Services;
 
@@ -11,6 +12,7 @@ internal static class PresentationVerification
     {
         var checks = new Dictionary<string, bool>();
         var skipped = new List<string>();
+        var dimensions = new Dictionary<string, int[]>();
         string stage = "session", error = "";
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(45));
         using var connection = new ConnectionViewModel();
@@ -37,13 +39,33 @@ internal static class PresentationVerification
                 stage = "cover_contract";
                 var bytes = await api.GetCoverAsync(cover.CoverId!, timeout.Token);
                 checks[stage] = bytes is { Length: > 0 };
+                if (bytes is { Length: > 0 })
+                {
+                    stage = "thumbnail_decode";
+                    var thumbnail = await ArtworkDecoder.DecodeAsync(bytes, ArtworkDecoder.ThumbnailEdge, timeout.Token);
+                    dimensions[stage] = [thumbnail.PixelWidth, thumbnail.PixelHeight];
+                    checks[stage] = thumbnail.PixelWidth > 0 && thumbnail.PixelHeight > 0
+                        && Math.Max(thumbnail.PixelWidth, thumbnail.PixelHeight) <= ArtworkDecoder.ThumbnailEdge;
+                    stage = "large_cover_contract";
+                    var fullBytes = await api.GetCoverAsync(cover.CoverId!, NasCoverSize.Large, timeout.Token);
+                    checks[stage] = fullBytes is { Length: > 0 };
+                    if (fullBytes is { Length: > 0 })
+                    {
+                        stage = "large_cover_decode";
+                        var full = await ArtworkDecoder.DecodeAsync(fullBytes, ArtworkDecoder.FullCoverEdge, timeout.Token);
+                        dimensions[stage] = [full.PixelWidth, full.PixelHeight];
+                        checks[stage] = full.PixelWidth > 0 && full.PixelHeight > 0
+                            && Math.Max(full.PixelWidth, full.PixelHeight) <= ArtworkDecoder.FullCoverEdge
+                            && Math.Max(full.PixelWidth, full.PixelHeight) >= Math.Max(thumbnail.PixelWidth, thumbnail.PixelHeight);
+                    }
+                }
             }
             else skipped.Add("no_cover_in_sample");
             stage = checks.Values.All(v => v) ? skipped.Count == 0 ? "complete" : "complete_with_skips" : "contract_mismatch";
         }
         catch (Exception ex) { error = ex.GetType().Name; }
         await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "presentation-verification.json"),
-            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, skipped }));
+            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, skipped, dimensions }));
     }
 }
 #endif

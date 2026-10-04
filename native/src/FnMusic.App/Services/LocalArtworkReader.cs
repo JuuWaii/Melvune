@@ -6,16 +6,30 @@ namespace FnMusic.App.Services;
 
 internal static class LocalArtworkReader
 {
-    internal static async Task<byte[]?> ReadThumbnailAsync(string path, CancellationToken ct)
+    internal static Task<byte[]?> ReadThumbnailAsync(string path, CancellationToken ct) => ReadThumbnailAsync(path, ArtworkDecoder.ThumbnailEdge, ct);
+
+    internal static async Task<byte[]?> ReadThumbnailAsync(string path, int requestedSize, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
+        if (requestedSize is <= 0 or > ArtworkDecoder.FullCoverEdge) throw new ArgumentOutOfRangeException(nameof(requestedSize));
+        // Full-page covers should use the embedded original rather than an already reduced Shell thumbnail.
+        if (requestedSize > ArtworkDecoder.ThumbnailEdge)
+        {
+            var embedded = await ReadEmbeddedAsync(path, ct);
+            if (embedded is not null) return embedded;
+        }
         try
         {
-            var thumbnail = await ReadWindowsThumbnailAsync(path, ct);
+            var thumbnail = await ReadWindowsThumbnailAsync(path, requestedSize, ct);
             if (thumbnail is not null) return thumbnail;
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception) { /* Shell handlers are optional; try the stream decoder. */ }
+        return requestedSize > ArtworkDecoder.ThumbnailEdge ? null : await ReadEmbeddedAsync(path, ct);
+    }
+
+    private static async Task<byte[]?> ReadEmbeddedAsync(string path, CancellationToken ct)
+    {
         ct.ThrowIfCancellationRequested();
         using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
         timeout.CancelAfter(TimeSpan.FromSeconds(3));
@@ -39,12 +53,12 @@ internal static class LocalArtworkReader
         finally { await probe.Stop(); }
     }
 
-    private static async Task<byte[]?> ReadWindowsThumbnailAsync(string path, CancellationToken ct)
+    private static async Task<byte[]?> ReadWindowsThumbnailAsync(string path, int requestedSize, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
         var file = await StorageFile.GetFileFromPathAsync(path).AsTask(ct);
-        using var thumbnail = await file.GetThumbnailAsync(ThumbnailMode.MusicView, 256,
-            ThumbnailOptions.UseCurrentScale).AsTask(ct);
+        using var thumbnail = await file.GetThumbnailAsync(ThumbnailMode.MusicView, (uint)requestedSize,
+            ThumbnailOptions.None).AsTask(ct);
         const int limit = 4 * 1024 * 1024;
         if (thumbnail is null || thumbnail.Type != ThumbnailType.Image || thumbnail.Size == 0 || thumbnail.Size > limit) return null;
         using var stream = thumbnail.AsStreamForRead();

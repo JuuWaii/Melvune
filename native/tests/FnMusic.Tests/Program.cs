@@ -418,12 +418,45 @@ await Test("cover retrieval rejects redirects and non-images", async () =>
     Check(await missing.GetCoverAsync("cover", default) is null);
     using var image = new NasApiClient(endpoint, new FakeHandler(request =>
     {
-        Check(request.RequestUri!.Query == "?coverId=a%26b&size=256");
+        Check(request.RequestUri!.Query == "?coverId=a%26b&size=600");
         var content = new ByteArrayContent([1, 2, 3]);
         content.Headers.ContentType = new("image/png");
         return new(HttpStatusCode.OK) { Content = content };
     }));
     Check((await image.GetCoverAsync("a&b", default))!.SequenceEqual(new byte[] { 1, 2, 3 }));
+});
+await Test("cover sizes follow server tiers and reject unbounded requests before transport", async () =>
+{
+    int requests = 0;
+    using var image = new NasApiClient(endpoint, new FakeHandler(request =>
+    {
+        requests++;
+        Check(request.RequestUri!.Query == "?coverId=a%26b&size=1024");
+        var content = new ByteArrayContent([1, 2, 3]);
+        content.Headers.ContentType = new("image/png");
+        return new(HttpStatusCode.OK) { Content = content };
+    }));
+    Check((await image.GetCoverAsync("a&b", NasCoverSize.Large, default))!.SequenceEqual(new byte[] { 1, 2, 3 }));
+    foreach (int invalidSize in new[] { 0, -1, 256, 4096, int.MaxValue })
+    {
+        try { await image.GetCoverAsync("a&b", (NasCoverSize)invalidSize, default); throw new Exception("Invalid size accepted"); }
+        catch (ArgumentOutOfRangeException) { }
+    }
+    Check(requests == 1);
+});
+await Test("large covers retain redirect, media type and body size protections", async () =>
+{
+    using var redirect = new NasApiClient(endpoint, new FakeHandler(_ => new(HttpStatusCode.Found)));
+    await Fails(MusicFailure.RedirectRejected, () => redirect.GetCoverAsync("cover", NasCoverSize.Large, default));
+    using var html = new NasApiClient(endpoint, new FakeHandler(_ => new(HttpStatusCode.OK) { Content = new StringContent("html") }));
+    await Fails(MusicFailure.InvalidResponse, () => html.GetCoverAsync("cover", NasCoverSize.Large, default));
+    using var oversized = new NasApiClient(endpoint, new FakeHandler(_ =>
+    {
+        var content = new ByteArrayContent(new byte[4 * 1024 * 1024 + 1]);
+        content.Headers.ContentType = new("image/png");
+        return new(HttpStatusCode.OK) { Content = content };
+    }));
+    await Fails(MusicFailure.InvalidResponse, () => oversized.GetCoverAsync("cover", NasCoverSize.Large, default));
 });
 await Test("NAS settings preserve language, scope writes and detect remote changes", async () =>
 {
