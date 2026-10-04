@@ -17,7 +17,7 @@ public sealed partial class MainWindow : Window
         ViewModel.SessionChanging += ResetLibrary;
         ViewModel.PropertyChanged += ConnectionCapabilitiesChanged;
         UpdateSourceCommands();
-        Closed += (_, _) => { ViewModel.PropertyChanged -= ConnectionCapabilitiesChanged; ClosePlayback(); ViewModel.Dispose(); };
+        Closed += (_, _) => { ViewModel.PropertyChanged -= ConnectionCapabilitiesChanged; CloseTrackContextMenu(); ClosePlayback(); ViewModel.Dispose(); };
     }
     private async void Root_Loaded(object sender, RoutedEventArgs e)
     {

@@ -37,6 +37,7 @@ public sealed partial class MainWindow
     private void UpdateFavoriteButton()
     {
         if (FavoriteToggle is null) return;
+        TrackActionsButton.IsEnabled = TrackList.SelectedItem is MusicTrack;
         FavoriteToggle.IsEnabled = !favoriteBusy && TrackList.SelectedItem is MusicTrack selected && CanFavoriteTrack(selected);
         FavoriteToggle.Content = TrackList.SelectedItem is MusicTrack { IsFavorite: true } ? "取消收藏" : "收藏歌曲";
         ToolTipService.SetToolTip(FavoriteToggle, TrackList.SelectedItem is not MusicTrack ? "请先选择歌曲。"
@@ -47,7 +48,11 @@ public sealed partial class MainWindow
     { await ToggleFavoriteAsync(); }
     private async Task ToggleFavoriteAsync()
     {
-        if (favoriteBusy || TrackList.SelectedItem is not MusicTrack track) return;
+        if (TrackList.SelectedItem is MusicTrack track) await ToggleFavoriteTrackAsync(track);
+    }
+    private async Task ToggleFavoriteTrackAsync(MusicTrack track)
+    {
+        if (favoriteBusy) return;
         if (!CanFavoriteTrack(track)) { FavoriteStatus.Text = "歌曲来源未连接或不支持收藏，可使用本地歌单。"; return; }
         var api = ViewModel.AuthenticatedClient;
         if (api is null && !IsSyntheticPreview) { FavoriteStatus.Text = "请先登录后使用收藏。"; return; }
@@ -76,10 +81,10 @@ public sealed partial class MainWindow
                     await LoadPageAsync(page > 1 && tracks.Count() == 1 ? page - 1 : page);
                 else
                 {
-                    string? selectedId = (TrackList.SelectedItem as MusicTrack)?.Id;
-                    var updated = tracks.Select(t => t.Id == track.Id ? t with { IsFavorite = desired } : t).ToArray();
+                    var selectedReference = (TrackList.SelectedItem as MusicTrack)?.Reference;
+                    var updated = tracks.Select(t => t.Reference == track.Reference ? t with { IsFavorite = desired } : t).ToArray();
                     TrackList.ItemsSource = updated;
-                    TrackList.SelectedItem = updated.FirstOrDefault(t => t.Id == selectedId);
+                    TrackList.SelectedItem = updated.FirstOrDefault(t => t.Reference == selectedReference);
                 }
             }
         }

@@ -27,16 +27,18 @@ public sealed partial class MainWindow
         catch (Exception) { if (!closed) PlaybackStatus.Text = "飞牛歌单加载失败，请检查连接后重试。"; }
     }
 
-    private async Task ShowNasPlaylistsAsync(Infrastructure.NasApiClient api, PlaylistReference? selectedPlaylist = null, bool createNew = false)
+    private async Task ShowNasPlaylistsAsync(Infrastructure.NasApiClient api, PlaylistReference? selectedPlaylist = null, bool createNew = false, MusicTrack? pickedTrack = null)
     {
         IReadOnlyList<NasPlaylist> playlists = [];
         if (closed || !IsCurrentPlaylistClient(api)) return;
-        var picked = TrackList.SelectedItem as MusicTrack;
+        var picked = pickedTrack ?? TrackList.SelectedItem as MusicTrack;
         NasPlaylistSnapshot? snapshot = null;
         bool busy = false, rendering = false;
         var picker = new ComboBox { Header = "选择飞牛歌单", DisplayMemberPath = "Name", HorizontalAlignment = HorizontalAlignment.Stretch };
         var name = new TextBox { Header = "歌单名称", MaxLength = 32, PlaceholderText = "输入名称后新建或改名" };
         var list = new ListView { DisplayMemberPath = "Title", Height = 200, SelectionMode = ListViewSelectionMode.Single };
+        list.ContextRequested += TrackList_ContextRequested;
+        list.ContextCanceled += TrackContext_Canceled;
         var confirm = new CheckBox { Content = "确认从飞牛服务器删除所选歌单" };
         var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
         var panel = new StackPanel { Spacing = 10, MinWidth = 300 };
@@ -139,6 +141,7 @@ public sealed partial class MainWindow
             await Run(async () => { snapshot = await api.ChangePlaylistTracksAsync(current, [track.Reference], false, ct); ct.ThrowIfCancellationRequested(); RenderSnapshot(); }, true);
         };
         refresh.Click += async (_, _) => await Run(() => Refresh((picker.SelectedItem as NasPlaylist)?.Reference));
+        view.Reload = () => Run(() => Refresh((picker.SelectedItem as NasPlaylist)?.Reference));
         view.PlayButton.Click += async (_, _) =>
         {
             if (ct.IsCancellationRequested || closed || !IsCurrentPlaylistClient(api) || snapshot is not { } selected || list.SelectedItem is not MusicTrack { IsCue: false } start) return;

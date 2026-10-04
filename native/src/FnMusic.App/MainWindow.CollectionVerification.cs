@@ -301,6 +301,7 @@ public sealed partial class MainWindow
             await VerifyNasPlaylistWindowAsync(Verify);
             await VerifyNasSettingsWindowAsync(Verify);
             await VerifyPlaylistPageNavigationAsync(Verify);
+            await VerifyTrackContextWindowAsync(Verify);
             await VerifyUiMotionAsync(Verify);
             stage = "complete";
         }

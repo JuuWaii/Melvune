@@ -76,7 +76,7 @@ public sealed class LocalPlaylistStore(string directory)
                     entry.Track.SourceInstanceId == Guid.Empty || string.IsNullOrWhiteSpace(entry.Track.TrackId) || entry.Track.TrackId.Length > 4096 ||
                     !tracks.Add(entry.Track) || !TextValid(entry.Title) || !TextValid(entry.Artist) || !TextValid(entry.Album) ||
                     (entry.LibraryId is not null && entry.LibraryId.Length > 4096) ||
-                    !LibrariesValid(entry) ||
+                    !LibrariesValid(entry) || !RelatedCollectionsValid(entry) ||
                     (entry.CoverId is not null && entry.CoverId.Length > 4096) ||
                     !double.IsFinite(entry.DurationSeconds) || entry.DurationSeconds is < 0 or > 864000)
                     throw new InvalidDataException("Invalid playlist entry.");
@@ -84,6 +84,11 @@ public sealed class LocalPlaylistStore(string directory)
         }
     }
     private static bool TextValid(string text) => text is not null && text.Length <= 4096;
+    private static bool RelatedCollectionsValid(LocalPlaylistEntry entry) =>
+        (entry.AlbumId is null || entry.AlbumId.Length is > 0 and <= 256)
+        && (entry.Artists is null || entry.Artists.Count <= 100 && entry.Artists.All(a => a is not null
+            && !string.IsNullOrWhiteSpace(a.Id) && a.Id.Length <= 256 && TextValid(a.Name))
+            && entry.Artists.Select(a => a.Id).Distinct(StringComparer.Ordinal).Count() == entry.Artists.Count);
     private static bool LibrariesValid(LocalPlaylistEntry entry)
     {
         var ids = entry.GetLibraryIds();

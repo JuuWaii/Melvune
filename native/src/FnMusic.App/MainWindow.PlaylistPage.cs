@@ -25,6 +25,7 @@ public sealed partial class MainWindow
         public bool BlockNavigation { get; set; }
         public Action? Closing { get; set; }
         public Action? SourceChanged { get; set; }
+        public Func<Task>? Reload { get; set; }
         public bool IsDisposed { get; private set; }
         private readonly StackPanel heading = new() { Orientation = Orientation.Horizontal, Spacing = 12 };
         private readonly ScrollViewer actionScroll;
@@ -84,6 +85,7 @@ public sealed partial class MainWindow
     private async Task<bool> NavigateMainContentAsync(FrameworkElement target)
     {
         if (closed) return false;
+        CloseTrackContextMenu();
         if (activePlaylistPage is { BlockNavigation: true } busy)
         { busy.Status.Text = "正在保存，请等待核对完成后切换页面。"; return false; }
         int version = ++contentNavigationVersion;

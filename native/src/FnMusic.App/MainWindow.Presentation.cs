@@ -76,6 +76,7 @@ public sealed partial class MainWindow
     }
     private async Task OpenNowPlayingAsync()
     {
+        CloseTrackContextMenu();
         if (nowPlayingExit is { IsCompleted: false } exit) await exit;
         if (closed || LyricsPanel.Visibility == Visibility.Visible) return;
         int transition = ++nowPlayingTransitionVersion;

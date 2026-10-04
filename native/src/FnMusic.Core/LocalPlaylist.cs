@@ -2,26 +2,30 @@ namespace FnMusic.Core;
 
 /// <summary>Local references survive disconnection. Display data is a snapshot, not credentials.</summary>
 public sealed record LocalPlaylistEntry(Guid Id, TrackReference Track, string Title, string Artist, string Album,
-    double DurationSeconds, bool IsCue, string? LibraryId = null, string? CoverId = null, IReadOnlyList<string>? LibraryIds = null)
+    double DurationSeconds, bool IsCue, string? LibraryId = null, string? CoverId = null, IReadOnlyList<string>? LibraryIds = null,
+    string? AlbumId = null, IReadOnlyList<TrackArtist>? Artists = null)
 {
     public static LocalPlaylistEntry FromTrack(MusicTrack track, string? libraryId = null)
     {
         var libraries = libraryId is null ? track.LibraryIds.ToArray() : new[] { libraryId };
         return new(Guid.NewGuid(), track.Reference, track.Title, track.Artist, track.Album, track.DurationSeconds, track.IsCue,
-            libraries.FirstOrDefault(), track.CoverId, libraries);
+            libraries.FirstOrDefault(), track.CoverId, libraries, track.AlbumId, track.Artists.ToArray());
     }
     public IReadOnlyList<string> GetLibraryIds() => LibraryIds ?? (string.IsNullOrEmpty(LibraryId) ? [] : new[] { LibraryId });
     public MusicTrack ToTrack() => new(Track.TrackId, Title, Artist, DurationSeconds, IsCue)
-        { SourceInstanceId = Track.SourceInstanceId, Album = Album, CoverId = CoverId, LibraryIds = GetLibraryIds().ToArray() };
+        { SourceInstanceId = Track.SourceInstanceId, Album = Album, CoverId = CoverId, LibraryIds = GetLibraryIds().ToArray(), AlbumId = AlbumId, Artists = Artists?.ToArray() ?? [] };
     public bool Equals(LocalPlaylistEntry? other) => other is not null && Id == other.Id && Track == other.Track
         && Title == other.Title && Artist == other.Artist && Album == other.Album && DurationSeconds == other.DurationSeconds
-        && IsCue == other.IsCue && LibraryId == other.LibraryId && CoverId == other.CoverId && GetLibraryIds().SequenceEqual(other.GetLibraryIds());
+        && IsCue == other.IsCue && LibraryId == other.LibraryId && CoverId == other.CoverId && GetLibraryIds().SequenceEqual(other.GetLibraryIds())
+        && AlbumId == other.AlbumId && (Artists ?? []).SequenceEqual(other.Artists ?? []);
     public override int GetHashCode()
     {
         var hash = new HashCode();
         hash.Add(Id); hash.Add(Track); hash.Add(Title); hash.Add(Artist); hash.Add(Album); hash.Add(DurationSeconds);
         hash.Add(IsCue); hash.Add(LibraryId); hash.Add(CoverId);
         foreach (var library in GetLibraryIds()) hash.Add(library);
+        hash.Add(AlbumId);
+        foreach (var artist in Artists ?? []) hash.Add(artist);
         return hash.ToHashCode();
     }
 }

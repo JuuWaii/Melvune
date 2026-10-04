@@ -87,8 +87,17 @@ public sealed partial class NasApiClient : IDisposable
                 ? string.Join(" / ", artists.EnumerateArray().Where(a => a.ValueKind == JsonValueKind.Object && a.TryGetProperty("name", out var n) && n.ValueKind == JsonValueKind.String).Select(a => a.GetProperty("name").GetString())) : "";
             double duration = item.TryGetProperty("duration", out var d) && d.ValueKind == JsonValueKind.Number && d.TryGetDouble(out double ms) && double.IsFinite(ms) ? Math.Max(0, ms / 1000) : 0;
             bool cue = item.TryGetProperty("isCue", out var c) && c.ValueKind == JsonValueKind.True;
+            var artistReferences = item.TryGetProperty("artists", out var refs) && refs.ValueKind == JsonValueKind.Array
+                ? refs.EnumerateArray().Where(a => a.ValueKind == JsonValueKind.Object
+                    && ReadOptionalString(a, "guid") is { Length: > 0 and <= 256 }
+                    && ReadOptionalString(a, "name") is { Length: > 0 })
+                    .Select(a => new TrackArtist(a.GetProperty("guid").GetString()!, a.GetProperty("name").GetString()!))
+                    .DistinctBy(a => a.Id).ToArray() : [];
+            string? albumId = item.TryGetProperty("album", out var album) && album.ValueKind == JsonValueKind.Object
+                ? ReadOptionalString(album, "guid") : null;
             tracks.Add(new MusicTrack(id.GetString()!, title, artist, duration, cue)
             { SourceInstanceId = SourceInstanceId, CoverId = ReadOptionalString(item, "coverId"), Album = ReadAlbum(item),
+                AlbumId = albumId is { Length: > 0 and <= 256 } ? albumId : null, Artists = artistReferences,
                 IsFavorite = item.TryGetProperty("isFavorite", out var favorite) && favorite.ValueKind == JsonValueKind.True });
         }
         return new TrackPage(tracks, count);

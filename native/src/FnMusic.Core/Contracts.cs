@@ -5,6 +5,7 @@ public sealed record ConnectionSettings(string ServerAddress, string DeviceId, b
     public string? SourceAccountKey { get; init; }
 }
 public sealed record MusicUser(string Name);
+public sealed record TrackArtist(string Id, string Name);
 public sealed record MusicTrack(string Id, string Title, string Artist, double DurationSeconds, bool IsCue)
 {
     public Guid SourceInstanceId { get; init; }
@@ -14,6 +15,8 @@ public sealed record MusicTrack(string Id, string Title, string Artist, double D
     public IReadOnlyList<LibraryReference> GetLibraries() => LibraryIds.Select(id => new LibraryReference(SourceInstanceId, id)).ToArray();
     public bool IsFavorite { get; init; }
     public string Album { get; init; } = "";
+    public string? AlbumId { get; init; }
+    public IReadOnlyList<TrackArtist> Artists { get; init; } = [];
     public string SourceLabel { get; init; } = "";
     public string BrowseArtist => string.IsNullOrEmpty(SourceLabel) ? Artist : Artist + " · " + SourceLabel;
     public string? CoverId { get; init; }

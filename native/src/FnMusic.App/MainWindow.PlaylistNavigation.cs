@@ -77,6 +77,7 @@ public sealed partial class MainWindow
     }
     private void ResetPlaylistNavigation()
     {
+        CloseTrackContextMenu();
         ++contentNavigationVersion;
         playlistNavigationWork?.Cancel();
         ClearNasPlaylistNavigation();

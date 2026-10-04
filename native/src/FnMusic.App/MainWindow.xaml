@@ -86,7 +86,8 @@
      <Button Content="刷新曲库" Click="Refresh_Click"/>
      <Button x:Name="PreviousPage" Content="上一页" Click="Previous_Click" IsEnabled="False"/>
      <Button x:Name="NextPage" Content="下一页" Click="Next_Click" IsEnabled="False"/>
-     <Button x:Name="FavoriteToggle" Content="收藏歌曲" IsEnabled="False" Click="Favorite_Click"/>
+     <Button x:Name="FavoriteToggle" Content="收藏歌曲" IsEnabled="False" Visibility="Collapsed" Click="Favorite_Click"/>
+     <Button x:Name="TrackActionsButton" Content="更多操作" IsEnabled="False" Click="TrackActions_Click" ToolTipService.ToolTip="歌曲操作：右键歌曲或 Shift+F10"/>
     </StackPanel><TextBlock x:Name="PageStatus" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="FavoriteStatus" TextWrapping="Wrap"/>
    </StackPanel>
 
@@ -95,7 +96,7 @@
      <Grid Padding="8" ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="72"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Width="72" Height="72" CornerRadius="8" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE93C;"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border><StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="6"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Summary}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" FontSize="12"/></StackPanel></Grid>
     </DataTemplate></ListView.ItemTemplate>
    </ListView>
-   <ListView x:Name="TrackList" Grid.Row="1" SelectionMode="Single" SelectionChanged="TrackSelection_Changed">
+   <ListView x:Name="TrackList" Grid.Row="1" SelectionMode="Single" SelectionChanged="TrackSelection_Changed" ContextRequested="TrackList_ContextRequested" ContextCanceled="TrackContext_Canceled">
     <ListView.ItemTemplate><DataTemplate>
      <Grid Padding="8" ColumnSpacing="16" Background="Transparent" DoubleTapped="Track_DoubleTapped">
       <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions><Border Width="44" Height="44" CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="20"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>

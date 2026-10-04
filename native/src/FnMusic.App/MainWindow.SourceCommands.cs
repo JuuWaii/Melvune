@@ -34,6 +34,7 @@ public sealed partial class MainWindow
     private void UpdateSourceCommands()
     {
         if (closed) return;
+        CloseTrackContextMenu();
         void Set(Button button, MusicSourceCapabilities capability)
         {
             button.IsEnabled = RemoteSupports(capability);

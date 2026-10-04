@@ -36,14 +36,16 @@ public sealed partial class MainWindow
         catch (Exception) { if (!closed) PlaybackStatus.Text = "本地歌单无法读取，原文件已保留。"; }
     }
 
-    private async Task ShowLocalPlaylistsAsync(Guid? selectedPlaylist = null, bool createNew = false)
+    private async Task ShowLocalPlaylistsAsync(Guid? selectedPlaylist = null, bool createNew = false, MusicTrack? picked = null)
     {
         var catalog = LocalPlaylistCatalog.Empty;
         if (closed) return;
-        var pickedTrack = TrackList.SelectedItem as MusicTrack;
+        var pickedTrack = picked ?? TrackList.SelectedItem as MusicTrack;
         var picker = new ComboBox { Header = "选择本地歌单", DisplayMemberPath = "Name", HorizontalAlignment = HorizontalAlignment.Stretch };
         var name = new TextBox { Header = "歌单名称", MaxLength = 120, PlaceholderText = "输入名称后新建或改名" };
         var list = new ListView { DisplayMemberPath = "Text", SelectionMode = ListViewSelectionMode.Single, Height = 180 };
+        list.ContextRequested += TrackList_ContextRequested;
+        list.ContextCanceled += TrackContext_Canceled;
         var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
         var confirmDelete = new CheckBox { Content = "确认删除所选歌单（不会删除音乐文件）" };
         var panel = new StackPanel { Spacing = 8, MinWidth = 300 };
@@ -171,14 +173,16 @@ public sealed partial class MainWindow
             (entries[from], entries[to]) = (entries[to], entries[from]); await Replace(current, entries, row.Entry.Id);
         }
         up.Click += async (_, _) => await Move(-1); down.Click += async (_, _) => await Move(1);
-        refresh.Click += async (_, _) =>
+        async Task Reload()
         {
             if (busy || ct.IsCancellationRequested) return;
             busy = true; editor.IsEnabled = false; view.PlayButton.IsEnabled = false;
             try { var selected = Selected()?.Id; catalog = await playlistStore.LoadAsync(ct); ct.ThrowIfCancellationRequested(); Render(selected); status.Text = "已刷新。"; }
             catch (Exception) { status.Text = "刷新失败，当前列表保留。"; }
             finally { busy = false; editor.IsEnabled = true; UpdateButtons(); }
-        };
+        }
+        refresh.Click += async (_, _) => await Reload();
+        view.Reload = Reload;
         view.PlayButton.Click += async (_, _) =>
         {
             if (!ct.IsCancellationRequested && Selected() is { } chosen && list.SelectedItem is PlaylistRow start && PlaylistTrackAvailable(start.Entry))

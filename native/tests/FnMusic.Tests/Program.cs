@@ -1322,6 +1322,71 @@ if (args.Contains("--ffmpeg"))
     });
 }
 MusicTrack MakeTrack(string id, bool cue = false) => new(id, "测试曲目", "测试歌手", 60, cue);
+await Test("next requests preserve current identity and deduplicate by source reference", () =>
+{
+    var queue = new PlaybackQueue();
+    var first = MakeTrack("a"); var second = MakeTrack("b"); var third = MakeTrack("c");
+    queue.Replace([first, second, third], second.Reference);
+    Check(queue.InsertNext(first) && queue.Current?.Reference == second.Reference && queue.Index == 0 && queue.Count == 3);
+    Check(queue.Tracks[1].Reference == first.Reference && queue.InsertNext(first) && queue.Count == 3);
+    var foreign = first with { SourceInstanceId = Guid.NewGuid() };
+    Check(queue.InsertNext(foreign) && queue.Count == 4 && queue.Current?.Reference == second.Reference);
+    Check(queue.Next(true)?.Reference == foreign.Reference && queue.Next(true)?.Reference == first.Reference);
+    Check(!queue.InsertNext(first) && !queue.InsertNext(MakeTrack("cue", true)) && queue.Count == 4);
+    return Task.CompletedTask;
+});
+await Test("explicit next requests override shuffle and repeat-one then resume the mode", () =>
+{
+    foreach (var mode in new[] { QueueMode.Shuffle, QueueMode.RepeatOne })
+    {
+        var queue = new PlaybackQueue(new Random(42)) { Mode = mode };
+        queue.Replace([MakeTrack("a"), MakeTrack("b"), MakeTrack("c")], MakeTrack("a").Reference);
+        queue.InsertNext(MakeTrack("c")); queue.InsertNext(MakeTrack("b"));
+        Check(queue.Next(true)?.Id == "b" && queue.Next(false)?.Id == "c");
+        Check(queue.Previous()?.Id == "b" && queue.Select(MakeTrack("c").Reference)?.Id == "c");
+        Check(mode == QueueMode.RepeatOne ? queue.Next(true)?.Id == "c" : queue.Next(true)?.Id != "c");
+    }
+    return Task.CompletedTask;
+});
+await Test("queued next requests are cleared by replacement and removal", () =>
+{
+    var queue = new PlaybackQueue { Mode = QueueMode.RepeatOne };
+    queue.Replace([MakeTrack("a"), MakeTrack("b")], MakeTrack("a").Reference);
+    queue.InsertNext(MakeTrack("b")); queue.Remove(MakeTrack("b").Reference);
+    Check(queue.Next(true)?.Id == "a");
+    queue.InsertNext(MakeTrack("b")); queue.Replace([MakeTrack("a"), MakeTrack("b")], MakeTrack("a").Reference);
+    Check(queue.Next(true)?.Id == "a");
+    queue.Clear(); Check(queue.InsertNext(MakeTrack("b")) && queue.Current?.Id == "b" && queue.Count == 1);
+    queue.Clear(); Check(queue.Count == 0 && queue.Next(true) is null);
+    return Task.CompletedTask;
+});
+await Test("track related collections use distinct provider identifiers rather than names", async () =>
+{
+    using var api = new NasApiClient(endpoint, new FakeHandler(_ => Json("""{"code":0,"data":{"total":1,"list":[{"guid":"track","artists":[{"guid":"a","name":"同名"},{"guid":"b","name":"同名"},{"guid":"a","name":"重复"},{"name":"无ID"}],"album":{"guid":"album-id","name":"专辑"}}]}}""")));
+    var track = (await api.ListTracksAsync(1, 50, default)).Tracks.Single();
+    Check(track.Artists.Count == 2 && track.Artists[0].Id == "a" && track.Artists[1].Id == "b" && track.AlbumId == "album-id" && track.Album == "专辑");
+});
+await Test("local playlist snapshots retain related collection identities and reject malformed references", async () =>
+{
+    string directory = Path.Combine(Path.GetTempPath(), "fnmusic-related-" + Guid.NewGuid().ToString("N"));
+    var store = new LocalPlaylistStore(directory);
+    var track = MakeTrack("related") with { SourceInstanceId = Guid.NewGuid(), AlbumId = "album", Artists = [new("a", "同名"), new("b", "同名")] };
+    var entry = LocalPlaylistEntry.FromTrack(track);
+    try
+    {
+        var saved = await store.SaveAsync(new(0, [new(Guid.NewGuid(), "fixture", [entry])]));
+        var restored = (await store.LoadAsync()).Playlists.Single().Entries.Single();
+        Check(restored == entry && restored.GetHashCode() == entry.GetHashCode() && restored.ToTrack().AlbumId == track.AlbumId
+            && restored.ToTrack().Artists.SequenceEqual(track.Artists));
+        foreach (var invalid in new[] { entry with { AlbumId = "" }, entry with { Artists = [new("", "name")] }, entry with { Artists = [new("same", "a"), new("same", "b")] } })
+        {
+            try { await store.SaveAsync(saved with { Playlists = [saved.Playlists[0] with { Entries = [invalid] }] }); throw new Exception("Malformed related reference saved"); }
+            catch (InvalidDataException) { }
+        }
+        Check((await store.LoadAsync()).Revision == saved.Revision);
+    }
+    finally { Directory.Delete(directory, true); }
+});
 await Test("queue snapshot excludes unsupported tracks and survives source mutation", () =>
 {
     var source = new List<MusicTrack> { MakeTrack("a"), MakeTrack("cue", true), MakeTrack("b"), MakeTrack("a") };
