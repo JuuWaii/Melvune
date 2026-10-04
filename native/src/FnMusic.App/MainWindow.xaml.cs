@@ -30,7 +30,9 @@ public sealed partial class MainWindow : Window
         if (IsSyntheticPreview) { await ShowSyntheticPreviewAsync(); return; }
 #endif
         await ViewModel.InitializeAsync();
-        if (ViewModel.AuthenticatedClient is not null) await ShowLibraryAsync();
+        await ShowHomeAsync();
+        await RefreshPlaylistNavigationAsync();
+        await LoadDevicesAsync();
     }
     private async void Connect_Click(object sender, RoutedEventArgs e) => await ViewModel.SaveConnectionAsync();
     private async void Login_Click(object sender, RoutedEventArgs e)

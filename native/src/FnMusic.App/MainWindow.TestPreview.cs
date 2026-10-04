@@ -38,6 +38,34 @@ public sealed partial class MainWindow
         PlaybackStatus.Text = "合成音频交互验证，默认静音。";
         music.Player.IsMuted = true; MuteToggle.IsChecked = true;
         await LoadDevicesAsync();
+        await RefreshPlaylistNavigationAsync();
+        if (Environment.GetCommandLineArgs().Contains("--preview-playlists"))
+        {
+            string directory = Path.Combine(AppContext.BaseDirectory, "playlist-preview-files");
+            Directory.CreateDirectory(directory);
+            for (int i = 1; i <= 3; i++)
+            {
+                string filePath = Path.Combine(directory, "preview-" + i + ".wav");
+                if (!File.Exists(filePath))
+                {
+                    using var wave = Services.PlaybackVerification.CreateWave();
+                    using var file = File.Create(filePath);
+                    await wave.CopyToAsync(file);
+                }
+                await File.WriteAllTextAsync(Path.ChangeExtension(filePath, ".lrc"), "[00:00]合成歌单歌词\n[00:10]播放与来源验证");
+            }
+            var local = await FnMusic.Infrastructure.LocalMusicSource.ScanAsync(new(Guid.NewGuid(), directory), default);
+            ReplaceLocalSource(local);
+            var tracks = local.Tracks.Select((track, i) => track with { Title = "合成歌曲 " + (i + 1), Artist = "测试音乐库", Album = "合成示例" }).ToArray();
+            TrackList.ItemsSource = tracks; TrackList.SelectedIndex = 0; localView = true;
+            var saved = await playlistStore.LoadAsync();
+            var first = new LocalPlaylist(Guid.NewGuid(), "本地收藏", tracks.Select(track => LocalPlaylistEntry.FromTrack(track)).ToArray());
+            var second = new LocalPlaylist(Guid.NewGuid(), "跨库与离线示例", [LocalPlaylistEntry.FromTrack(tracks[0]),
+                LocalPlaylistEntry.FromTrack(tracks[0] with { SourceInstanceId = Guid.NewGuid(), Title = "离线歌曲（保留引用）" })]);
+            await playlistStore.SaveAsync(saved with { Playlists = [first, second] });
+            await ShowLocalPlaylistsAsync(first.Id);
+            return;
+        }
         if (Environment.GetCommandLineArgs().Contains("--preview-now-playing") && TrackList.SelectedItem is MusicTrack selected)
         {
             await StartQueueAsync(selected);

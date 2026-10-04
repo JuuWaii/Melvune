@@ -15,16 +15,17 @@ public sealed partial class MainWindow
         var saved = await playlistStore.LoadAsync();
         await playlistStore.SaveAsync(saved with { Playlists = [new(Guid.NewGuid(), "窗口夹具", [available, offline])] });
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        playlistDialogOpened = async dialog =>
+        playlistPageOpened = async view =>
         {
             try
             {
-                var editor = (ScrollViewer)dialog.Content;
-                var panel = (StackPanel)editor.Content;
+                var editor = view.Editor;
+                await VerifyPlaylistPagePresentationAsync(verify, view, "playlist_page");
+                var panel = view.Fields;
                 var picker = panel.Children.OfType<ComboBox>().Single();
                 var name = panel.Children.OfType<TextBox>().Single();
-                var list = panel.Children.OfType<ListView>().Single();
-                var buttons = panel.Children.OfType<Button>().Concat(panel.Children.OfType<StackPanel>().SelectMany(p => p.Children.OfType<Button>())).ToArray();
+                var list = view.List;
+                var buttons = panel.Children.OfType<Button>().Concat(panel.Children.OfType<StackPanel>().SelectMany(p => p.Children.OfType<Button>())).Concat(view.Actions.Children.OfType<Button>()).ToArray();
                 async Task Click(string label)
                 {
                     var button = buttons.Single(b => b.Content.ToString() == label);
@@ -36,7 +37,7 @@ public sealed partial class MainWindow
                 }
                 verify("playlist_offline_retained", list.Items.Count == 2 && ((PlaylistRow)list.Items[1]).Text.Contains("离线"));
                 list.SelectedIndex = 1;
-                verify("playlist_offline_play_disabled", !dialog.IsPrimaryButtonEnabled);
+                verify("playlist_offline_play_disabled", !view.PlayButton.IsEnabled);
                 await Click("上移");
                 verify("playlist_move_persisted", (await playlistStore.LoadAsync()).Playlists[0].Entries[0].Id == offline.Id);
                 await Click("下移");
@@ -45,10 +46,11 @@ public sealed partial class MainWindow
                 verify("playlist_remove_persisted", (await playlistStore.LoadAsync()).Playlists[0].Entries.Count == 1);
                 await Click("将所选条目重新关联到列表歌曲");
                 var relinked = (await playlistStore.LoadAsync()).Playlists[0].Entries.Single();
-                verify("playlist_relink_keeps_entry_identity", relinked.Id == offline.Id && relinked.Track == available.Track && dialog.IsPrimaryButtonEnabled);
+                verify("playlist_relink_keeps_entry_identity", relinked.Id == offline.Id && relinked.Track == available.Track && view.PlayButton.IsEnabled);
                 verify("playlist_relink_keeps_library_membership", relinked.ToTrack().LibraryIds.SequenceEqual(track.LibraryIds));
                 name.Text = "已改名"; await Click("改名");
                 verify("playlist_rename_persisted", (await playlistStore.LoadAsync()).Playlists[0].Name == "已改名");
+                verify("playlist_sidebar_rename_updated", LocalPlaylistNavigation.Items.Cast<LocalPlaylist>().Single().Name == "已改名");
                 name.Text = "新建夹具"; await Click("新建");
                 verify("playlist_create_selected", picker.SelectedItem is LocalPlaylist { Name: "新建夹具" } && list.Items.Count == 0);
                 await Click("加入列表中所选歌曲");
@@ -61,13 +63,14 @@ public sealed partial class MainWindow
                 toggle.Toggle(); toggle.Toggle();
                 await Click("删除歌单");
                 verify("playlist_delete_only_catalog", (await playlistStore.LoadAsync()).Playlists.Count == 1 && PlaylistTrackAvailable(available));
-                done.TrySetResult();
+                verify("playlist_sidebar_delete_updated", LocalPlaylistNavigation.Items.Count == 1);
             }
             catch (Exception ex) { done.TrySetException(ex); }
-            finally { dialog.Hide(); }
+            finally { if (ReferenceEquals(activePlaylistPage, view)) await ReturnFromPlaylistPageAsync(); }
+            done.TrySetResult();
         };
         try { await ShowLocalPlaylistsAsync(); await done.Task.WaitAsync(TimeSpan.FromSeconds(15)); }
-        finally { playlistDialogOpened = null; }
+        finally { playlistPageOpened = null; }
         var final = (await playlistStore.LoadAsync()).Playlists.Single();
         await PlayLocalPlaylistAsync(final with { Entries = [available, offline] }, available);
         for (int i = 0; i < 80 && !mediaReady; i++) await Task.Delay(100);

@@ -84,7 +84,7 @@ public sealed partial class MainWindow
     private async Task ShowLibraryAsync()
     {
         if (!RequireRemoteCapability(MusicSourceCapabilities.Browse)) return;
-        await CloseNowPlayingAsync();
+        if (!await NavigateMainContentAsync(LibraryPanel)) return;
         localView = false;
 #if DEBUG
         if (IsSyntheticPreview) { SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible; await SwitchCollectionAsync(null); return; }
@@ -97,7 +97,7 @@ public sealed partial class MainWindow
     private async void Library_Click(object sender, RoutedEventArgs e) => await ShowLibraryAsync();
     private async void Settings_Click(object sender, RoutedEventArgs e) => await ShowSettingsPanelAsync();
     private async Task ShowSettingsPanelAsync()
-    { await CloseNowPlayingAsync(); LibraryPanel.Visibility = Visibility.Collapsed; SettingsPanel.Visibility = Visibility.Visible; AnimateViewEntry(SettingsPanel); }
+    { await NavigateMainContentAsync(SettingsPanel); }
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     { if (localView) await LoadLocalPageAsync(1, true); else await LoadPageAsync(1); }
     private async void Previous_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page - 1);
@@ -405,6 +405,7 @@ public sealed partial class MainWindow
     private void CancelWork() { ResetSeek(); work.Cancel(); work.Dispose(); work = new(); }
     private void ResetLibrary()
     {
+        ResetPlaylistNavigation();
         coverCache.Clear();
         favoriteWork.Cancel(); favoriteWork.Dispose(); favoriteWork = new();
         favoritesView = false; FavoriteStatus.Text = "";
@@ -430,5 +431,5 @@ public sealed partial class MainWindow
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
     }
     private void ClosePlayback()
-    { closed = true; StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { closed = true; activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

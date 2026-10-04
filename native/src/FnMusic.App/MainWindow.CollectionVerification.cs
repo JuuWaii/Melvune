@@ -300,6 +300,7 @@ public sealed partial class MainWindow
             await VerifyMultiLibraryWindowAsync(Verify);
             await VerifyNasPlaylistWindowAsync(Verify);
             await VerifyNasSettingsWindowAsync(Verify);
+            await VerifyPlaylistPageNavigationAsync(Verify);
             await VerifyUiMotionAsync(Verify);
             stage = "complete";
         }

@@ -24,6 +24,7 @@ public sealed partial class MainWindow
     private object? lyricsPreviousItems;
     private double lyricsPreviousHorizontalOffset, lyricsPreviousVerticalOffset;
     private Visibility lyricsSidebarVisibility, lyricsSettingsVisibility, lyricsLibraryVisibility;
+    private Visibility lyricsPlaylistVisibility, lyricsHomeVisibility;
     private Task? nowPlayingExit;
     private int nowPlayingTransitionVersion;
     private bool normalContentWasEnabled;
@@ -64,10 +65,10 @@ public sealed partial class MainWindow
             _ => foreground.R + foreground.G + foreground.B > 384 ? ElementTheme.Dark : ElementTheme.Light
         };
     }
-    private async void SidebarFavorites_Click(object sender, RoutedEventArgs e) { await ShowBrowsePanelAsync(); await ShowFavoritesAsync(); }
-    private async void SidebarAlbums_Click(object sender, RoutedEventArgs e) { await ShowBrowsePanelAsync(); await SwitchCollectionAsync(CollectionKind.Album); }
-    private async void SidebarArtists_Click(object sender, RoutedEventArgs e) { await ShowBrowsePanelAsync(); await SwitchCollectionAsync(CollectionKind.Artist); }
-    private async Task ShowBrowsePanelAsync() { await CloseNowPlayingAsync(); SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible; }
+    private async void SidebarFavorites_Click(object sender, RoutedEventArgs e) { if (await ShowBrowsePanelAsync()) await ShowFavoritesAsync(); }
+    private async void SidebarAlbums_Click(object sender, RoutedEventArgs e) { if (await ShowBrowsePanelAsync()) await SwitchCollectionAsync(CollectionKind.Album); }
+    private async void SidebarArtists_Click(object sender, RoutedEventArgs e) { if (await ShowBrowsePanelAsync()) await SwitchCollectionAsync(CollectionKind.Artist); }
+    private async Task<bool> ShowBrowsePanelAsync() => await NavigateMainContentAsync(LibraryPanel);
     private async void Lyrics_Click(object sender, RoutedEventArgs e)
     {
         if (LyricsPanel.Visibility == Visibility.Visible) { await CloseNowPlayingAsync(); return; }
@@ -79,7 +80,7 @@ public sealed partial class MainWindow
         if (closed || LyricsPanel.Visibility == Visibility.Visible) return;
         int transition = ++nowPlayingTransitionVersion;
         lyricsPreviousFocus = FocusManager.GetFocusedElement(Root.XamlRoot) as Control;
-        lyricsPreviousList = SettingsPanel.Visibility == Visibility.Visible ? null
+        lyricsPreviousList = PlaylistPanel.Visibility == Visibility.Visible ? activePlaylistPage?.List : SettingsPanel.Visibility == Visibility.Visible ? null
             : CollectionList.Visibility == Visibility.Visible ? CollectionList : TrackList;
         lyricsPreviousItems = lyricsPreviousList?.ItemsSource;
         lyricsPreviousScroll = lyricsPreviousList is null ? SettingsPanel : FindPresentationScroll(lyricsPreviousList);
@@ -88,6 +89,8 @@ public sealed partial class MainWindow
         lyricsSidebarVisibility = SidebarHost.Visibility;
         lyricsSettingsVisibility = SettingsPanel.Visibility;
         lyricsLibraryVisibility = LibraryPanel.Visibility;
+        lyricsPlaylistVisibility = PlaylistPanel.Visibility;
+        lyricsHomeVisibility = HomePanel.Visibility;
         normalContentWasEnabled = NormalContent.IsEnabled;
         normalPlayerMinHeight = PlayerBar.MinHeight;
         PlayerBar.MinHeight = PlayerBar.ActualHeight;
@@ -105,6 +108,7 @@ public sealed partial class MainWindow
         await AnimateUiAsync(LyricsPanel, Math.Max(1, Root.ActualHeight), 0, 320);
         if (closed || transition != nowPlayingTransitionVersion) return;
         SidebarHost.Visibility = SettingsPanel.Visibility = LibraryPanel.Visibility = PlayerBar.Visibility = Visibility.Collapsed;
+        PlaylistPanel.Visibility = HomePanel.Visibility = Visibility.Collapsed;
         if (LyricsPanel.Visibility == Visibility.Visible && lyricsNeedsRetry && queue.Current is { } track
             && TrackSupports(track, MusicSourceCapabilities.Lyrics)) await LoadLyricsAsync(track);
         if (closed) return;
@@ -118,6 +122,8 @@ public sealed partial class MainWindow
         SidebarHost.Visibility = lyricsSidebarVisibility;
         SettingsPanel.Visibility = lyricsSettingsVisibility;
         LibraryPanel.Visibility = lyricsLibraryVisibility;
+        PlaylistPanel.Visibility = lyricsPlaylistVisibility;
+        HomePanel.Visibility = lyricsHomeVisibility;
         PlayerBar.Visibility = Visibility.Visible;
         double from = FindUiMotionTransform(LyricsPanel)?.TranslateY ?? 0;
         await AnimateUiAsync(LyricsPanel, from, Math.Max(1, Root.ActualHeight), 220);
@@ -134,6 +140,8 @@ public sealed partial class MainWindow
         SidebarHost.Visibility = lyricsSidebarVisibility;
         SettingsPanel.Visibility = lyricsSettingsVisibility;
         LibraryPanel.Visibility = lyricsLibraryVisibility;
+        PlaylistPanel.Visibility = lyricsPlaylistVisibility;
+        HomePanel.Visibility = lyricsHomeVisibility;
         UpdateAdaptiveLayout(Root.ActualWidth);
         Root.UpdateLayout();
         if (lyricsPreviousScroll is { } scroll && (lyricsPreviousList is null || ReferenceEquals(lyricsPreviousItems, lyricsPreviousList.ItemsSource)))

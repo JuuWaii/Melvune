@@ -7,16 +7,21 @@
   <ContentControl x:Name="NormalContent" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"><Grid>
   <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <Border x:Name="SidebarHost" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="16"><ScrollViewer HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
-   <StackPanel Spacing="12">
-    <FontIcon Glyph="&#xE8D6;" FontSize="36" HorizontalAlignment="Left" />
-    <TextBlock Text="飞牛音乐" Style="{ThemeResource TitleTextBlockStyle}" />
-    <TextBlock Text="Windows 原生客户端" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+   <StackPanel Spacing="8">
+    <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE8D6;" FontSize="24"/><TextBlock Text="飞牛音乐" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/></StackPanel>
     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
-    <TextBlock Text="音乐导航" FontWeight="SemiBold" />
+    <Button Content="首页" Click="Home_Click" HorizontalAlignment="Stretch"/>
     <Button x:Name="RemoteMusicNavigation" Content="所有音乐" Click="Library_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteFavoritesNavigation" Content="收藏" Click="SidebarFavorites_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteAlbumsNavigation" Content="专辑" Click="SidebarAlbums_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteArtistsNavigation" Content="歌手" Click="SidebarArtists_Click" HorizontalAlignment="Stretch"/>
     <Button Content="本地音乐" Click="LocalMusic_Click" HorizontalAlignment="Stretch" />
-    <Button Content="本地歌单" Click="LocalPlaylists_Click" HorizontalAlignment="Stretch" />
-    <Button x:Name="RemotePlaylistsNavigation" Content="飞牛歌单" Click="NasPlaylists_Click" HorizontalAlignment="Stretch" />
+    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+    <Grid ColumnSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button x:Name="RemotePlaylistsNavigation" Content="飞牛歌单" Click="NasPlaylists_Click" HorizontalAlignment="Stretch"/><Button x:Name="NewNasPlaylist" Grid.Column="1" Click="NewNasPlaylist_Click" AutomationProperties.Name="新建飞牛歌单" ToolTipService.ToolTip="新建飞牛歌单"><FontIcon Glyph="&#xE710;" FontSize="14"/></Button></Grid>
+    <ListView x:Name="NasPlaylistNavigation" SelectionMode="Single" MaxHeight="220" IsItemClickEnabled="True" ItemClick="NasPlaylistNavigation_ItemClick" AutomationProperties.Name="飞牛歌单导航"><ListView.ItemTemplate><DataTemplate><Grid ColumnSpacing="8" Padding="2,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><FontIcon Glyph="&#xE8F1;" FontSize="14"/><TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/></Grid></DataTemplate></ListView.ItemTemplate></ListView>
+    <TextBlock x:Name="NasPlaylistNavigationStatus" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
+    <Grid ColumnSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button Content="本地歌单" Click="LocalPlaylists_Click" HorizontalAlignment="Stretch"/><Button Grid.Column="1" Click="NewLocalPlaylist_Click" AutomationProperties.Name="新建本地歌单" ToolTipService.ToolTip="新建本地歌单"><FontIcon Glyph="&#xE710;" FontSize="14"/></Button></Grid>
+    <ListView x:Name="LocalPlaylistNavigation" SelectionMode="Single" MaxHeight="220" IsItemClickEnabled="True" ItemClick="LocalPlaylistNavigation_ItemClick" AutomationProperties.Name="本地歌单导航"><ListView.ItemTemplate><DataTemplate><Grid ColumnSpacing="8" Padding="2,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><FontIcon Glyph="&#xE8F1;" FontSize="14"/><TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/></Grid></DataTemplate></ListView.ItemTemplate></ListView>
+    <TextBlock x:Name="LocalPlaylistNavigationStatus" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
     <Button Content="导入文件夹" Click="ImportLocal_Click" HorizontalAlignment="Stretch" />
     <Button Content="音乐库管理" Click="ManageLocalLibraries_Click" HorizontalAlignment="Stretch" />
     <TextBlock x:Name="LocalScanStatus" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
@@ -55,6 +60,8 @@
     <TextBlock Text="NAS 授权登录与 FN Connect 远程访问正在适配。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
    </StackPanel>
   </ScrollViewer>
+  <Grid x:Name="HomePanel" Grid.Column="1" Margin="24" Visibility="Collapsed"><StackPanel Spacing="20"><TextBlock Text="首页" Style="{ThemeResource TitleTextBlockStyle}"/><TextBlock Text="你的音乐，在这里继续。" TextWrapping="Wrap"/><TextBlock Text="浏览飞牛资料库，或聆听本地音乐；两类歌单可从左侧直接打开。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><StackPanel Orientation="Horizontal" Spacing="12"><Button Content="本地音乐" Click="LocalMusic_Click"/><Button Content="连接与账号" Click="Settings_Click"/></StackPanel><Border Padding="20" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"><StackPanel Spacing="8"><TextBlock Text="正在播放" FontWeight="SemiBold"/><TextBlock Text="{Binding Text, ElementName=NowPlaying}" TextWrapping="Wrap"/><Button Content="打开歌词" Click="Lyrics_Click" HorizontalAlignment="Left"/></StackPanel></Border></StackPanel></Grid>
+  <ContentControl x:Name="PlaylistPanel" Grid.Column="1" Margin="24" Visibility="Collapsed" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
   <Grid x:Name="LibraryPanel" Grid.Column="1" Margin="24" RowSpacing="16" Visibility="Collapsed">
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
    <StackPanel Grid.ColumnSpan="2" Spacing="12"><TextBlock Text="音乐，陪伴每一个时刻" TextWrapping="Wrap" Style="{ThemeResource TitleTextBlockStyle}"/><TextBlock Text="浏览你的音乐资料库，或从本地文件夹开始聆听。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>

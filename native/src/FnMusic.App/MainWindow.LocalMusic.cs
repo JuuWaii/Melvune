@@ -25,11 +25,9 @@ public sealed partial class MainWindow
     private async void LocalMusic_Click(object sender, RoutedEventArgs e) => await ShowLocalMusicAsync();
     private async Task ShowLocalMusicAsync()
     {
-        await CloseNowPlayingAsync();
+        if (!await NavigateMainContentAsync(LibraryPanel)) return;
         localView = true; favoritesView = false; parentArtist = null; collectionKind = null; collection = null;
         SearchInput.Text = searchQuery = ""; UpdateCollectionView();
-        SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
-        AnimateViewEntry(LibraryPanel);
         await LoadPageAsync(1);
     }
 
@@ -57,7 +55,7 @@ public sealed partial class MainWindow
             var definition = existing ?? new LocalLibrary(Guid.NewGuid(), path,
                 string.IsNullOrWhiteSpace(name.Text) ? new DirectoryInfo(path).Name : name.Text.Trim(), group.Text.Trim());
             if (string.IsNullOrWhiteSpace(definition.Name)) definition = definition with { Name = "本地音乐" };
-            SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
+            if (!await NavigateMainContentAsync(LibraryPanel)) return;
             PlaybackStatus.Text = "正在扫描本地音乐…";
             var scanned = await ScanLocalAsync(definition.Settings, localLifetime.Token);
             var next = saved with { Libraries = existing is null ? saved.Libraries.Append(definition).ToArray() : saved.Libraries };
@@ -77,7 +75,6 @@ public sealed partial class MainWindow
         {
             if (!closed)
             {
-                SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
                 PlaybackStatus.Text = "导入失败，请检查目录是否可访问、是否包含链接或超过 10000 首；原音乐库保持不变。";
             }
         }

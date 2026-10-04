@@ -29,6 +29,7 @@ public sealed partial class MainWindow
     private void ConnectionCapabilitiesChanged(object? sender, PropertyChangedEventArgs args)
     {
         if (args.PropertyName is nameof(ConnectionViewModel.AuthenticatedClient) or nameof(ConnectionViewModel.IsReady)) UpdateSourceCommands();
+        if (args.PropertyName == nameof(ConnectionViewModel.AuthenticatedClient) && !closed) _ = RefreshPlaylistNavigationAsync();
     }
     private void UpdateSourceCommands()
     {
@@ -42,9 +43,12 @@ public sealed partial class MainWindow
         foreach (var button in new[] { RemoteMusicNavigation, RemoteAlbumsNavigation, RemoteArtistsNavigation, RemoteSongsTab, RemoteAlbumsTab, RemoteArtistsTab }) Set(button, MusicSourceCapabilities.Browse);
         foreach (var button in new[] { RemoteFavoritesNavigation, RemoteFavoritesTab }) Set(button, MusicSourceCapabilities.ReadFavorites);
         Set(RemotePlaylistsNavigation, MusicSourceCapabilities.ReadPlaylists);
+        Set(NewNasPlaylist, MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.WritePlaylists);
+        NasPlaylistNavigation.IsEnabled = RemoteSupports(MusicSourceCapabilities.ReadPlaylists);
         Set(RemoteSettingsNavigation, MusicSourceCapabilities.ReadSettings);
         SearchInput.IsEnabled = SearchAction.IsEnabled = localView || RemoteSupports(MusicSourceCapabilities.Search);
         ToolTipService.SetToolTip(SearchAction, SearchAction.IsEnabled ? null : "当前来源未连接或不支持搜索。");
         UpdateFavoriteButton();
+        activePlaylistPage?.SourceChanged?.Invoke();
     }
 }

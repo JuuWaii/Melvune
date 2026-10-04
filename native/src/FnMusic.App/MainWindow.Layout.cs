@@ -8,6 +8,7 @@ public sealed partial class MainWindow
     private void UpdateAdaptiveLayout(double width)
     {
         if (width <= 0 || closed) return;
+        activePlaylistPage?.Adapt(Root.ActualHeight - PlayerBar.ActualHeight);
         bool compact = width < 1100;
         SidebarColumn.Width = new GridLength(compact ? 176 : 220);
         NowPlayingColumn.Width = compact ? new GridLength(1, GridUnitType.Star) : new GridLength(270);

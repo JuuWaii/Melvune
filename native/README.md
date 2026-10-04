@@ -59,6 +59,8 @@ Debug 参数 `--verify-native-collections` 使用本应用已保存会话，对�
 
 Debug 窗口回归：`--preview-synthetic --preview-collections` 提供两页专辑/歌手、两页详情歌曲、空详情及 20 秒延迟详情。追加 `--verify-collection-window` 可执行窗口内状态断言，写入 `collection-window-verification.json` 并自动退出；不模拟鼠标，不访问 NAS。
 
+追加 `--preview-playlists` 可查看主页面歌单布局：隔离输出目录内生成三首合成 WAV 和同名 LRC，提供本地收藏、跨库与离线示例两份测试歌单，默认静音。可加 `--preview-dark` 或 `--preview-light`；仅 Debug 合成模式启用，不读取正式配置或账户。歌单侧栏、首页和应用内歌词页的阶段验收见 [UI 整合记录](../docs/UI_REORGANIZATION.md)。
+
 Debug 参数 `--verify-native-favorites` 只读核验当前账户收藏，写入脱敏 `favorite-verification.json` 后退出。数据不足时分页检查会标记跳过；不执行收藏增删。
 
 ## 工具链参考
