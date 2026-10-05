@@ -16,6 +16,8 @@ public sealed partial class MainWindow
             verify("top_brand_replaces_sidebar_brand", TitleBrandName.IsLoaded && TitleBrandName.FontSize == 20 && TitleBrandIcon.FontSize == 28
                 && FindSongVisual<TextBlock>(SidebarHost, text => text.Text == "飞牛音乐") is null);
             verify("top_home_search_available_without_remote_and_back_disabled", !TopBack.IsEnabled && SearchAction.IsEnabled && SearchInput.IsEnabled);
+            verify("welcome_copy_only_on_home", FindSongVisual<TextBlock>(HomePanel, text => text.Text == "音乐，陪伴每一个时刻") is not null
+                && FindSongVisual<TextBlock>(LibraryPanel, text => text.Text == "音乐，陪伴每一个时刻" || text.Text == "浏览你的音乐资料库，或从本地文件夹开始聆听。") is null);
             foreach (int width in new[] { 1360, 980, 820 })
             {
                 AppWindow.Resize(new global::Windows.Graphics.SizeInt32(width, 680)); await Task.Delay(100); WindowRoot.UpdateLayout();
@@ -32,6 +34,9 @@ public sealed partial class MainWindow
                     && item.Y + item.Height <= AppTitleBar.ActualHeight + 1) && bounds[0].X >= brand.X + TitleBrand.ActualWidth
                     && bounds[^1].X + bounds[^1].Width <= settings.X && SearchInput.ActualWidth >= 64
                     && bounds.Zip(bounds.Skip(1)).All(pair => pair.First.X + pair.First.Width <= pair.Second.X));
+                double captionGap = WindowRoot.ActualWidth - AppWindow.TitleBar.RightInset / WindowRoot.XamlRoot.RasterizationScale
+                    - settings.X - TitleBarSettings.ActualWidth;
+                verify("settings_adjacent_to_minimize_" + width, captionGap >= 0 && captionGap <= 10);
             }
             AppWindow.Resize(size); await Task.Delay(100);
             foreach (var mode in new[] { ElementTheme.Light, ElementTheme.Dark })
