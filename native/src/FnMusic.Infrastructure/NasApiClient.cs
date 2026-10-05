@@ -24,7 +24,7 @@ public sealed partial class NasApiClient : IDisposable
         lifetimeToken = lifetime.Token;
         SourceInstanceId = sourceInstanceId;
         http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
-        { Timeout = Timeout.InfiniteTimeSpan };
+        { Timeout = TimeSpan.FromSeconds(15) };
     }
 
     public void RestoreSession(string sessionToken)
