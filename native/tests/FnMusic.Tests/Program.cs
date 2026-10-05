@@ -15,11 +15,25 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+if (args.Contains("--verify-cover-requests"))
+{
+    await Test("cover partial body timeout closes TCP input and permits an explicit retry", CoverRequestVerification.BodyTimeoutAsync);
+    await Test("cover request deadline includes delayed headers and response body", CoverRequestVerification.TotalDeadlineAsync);
+    await Test("cover caller cancellation preserves replacement session without retry", CoverRequestVerification.CallerCancellationAsync);
+    await Test("cover disposal closes stalled body and rejects subsequent requests", CoverRequestVerification.DisposalAsync);
+    await Test("cover truncated TCP body reports unavailable and preserves session for retry", CoverRequestVerification.DisconnectedBodyAsync);
+    Console.WriteLine($"Cover checks: {passed} passed."); return;
+}
 await Test("JSON partial body timeout closes TCP input and preserves session for explicit retry", JsonRequestVerification.BodyTimeoutAsync);
 await Test("JSON request deadline includes delayed headers and response body", JsonRequestVerification.TotalDeadlineAsync);
 await Test("JSON caller cancellation preserves the replacement session without retry", JsonRequestVerification.CallerCancellationAsync);
 await Test("JSON client disposal promptly closes stalled response body", JsonRequestVerification.DisposalAsync);
 if (args.Contains("--verify-json-requests")) { Console.WriteLine($"JSON checks: {passed} passed."); return; }
+await Test("cover partial body timeout closes TCP input and permits an explicit retry", CoverRequestVerification.BodyTimeoutAsync);
+await Test("cover request deadline includes delayed headers and response body", CoverRequestVerification.TotalDeadlineAsync);
+await Test("cover caller cancellation preserves replacement session without retry", CoverRequestVerification.CallerCancellationAsync);
+await Test("cover disposal closes stalled body and rejects subsequent requests", CoverRequestVerification.DisposalAsync);
+await Test("cover truncated TCP body reports unavailable and preserves session for retry", CoverRequestVerification.DisconnectedBodyAsync);
 #if DEBUG
 await Test("indexed file diagnostics validate paths and metadata identity without mutating tracks", async () =>
 {
