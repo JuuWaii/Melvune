@@ -13,6 +13,31 @@ namespace FnMusic.App;
 
 public sealed partial class MainWindow
 {
+    private async Task VerifyAllMusicStandaloneWindowAsync()
+    {
+        var checks = new Dictionary<string, bool>(); string stage = "setup", error = "";
+        void Verify(string name, bool value) { stage = name; checks[name] = value; if (!value) throw new InvalidOperationException(); }
+        try
+        {
+            motionPreferenceOverride = false; music.Player.IsMuted = true;
+            var libraries = new List<LocalLibrary>();
+            for (int index = 0; index < 2; index++)
+            {
+                string root = Path.Combine(AppContext.BaseDirectory, "catalog-fixture", Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root);
+                using (var wave = Services.PlaybackVerification.CreateWave())
+                using (var file = File.Create(Path.Combine(root, "same.wav"))) await wave.CopyToAsync(file);
+                libraries.Add(new(Guid.NewGuid(), root, "夹具音乐库" + index, "分组" + index));
+            }
+            var saved = await localLibraryStore.LoadAsync();
+            ApplyLocalCatalog(await localLibraryStore.SaveAsync(saved with { Libraries = libraries }));
+            await VerifyAllMusicWindowAsync(Verify); stage = "complete";
+        }
+        catch (Exception ex) { error = ex.GetType().Name; }
+        finally { motionPreferenceOverride = null; }
+        await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "all-music-window-verification.json"),
+            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks }));
+    }
+
     private sealed class AllMusicFixtureHandler(string collisionId) : HttpMessageHandler
     {
         public int Calls, TrackCount = 55;
@@ -65,18 +90,46 @@ public sealed partial class MainWindow
                     && BrowseSourceFilter.ActualWidth > 100 && LocalGroupFilter.ActualWidth > 100 && LocalLibraryFilter.ActualWidth > 100);
             }
             finally { AppWindow.Resize(size); await Task.Delay(100); Root.UpdateLayout(); }
-            verify("all_music_remote_first_page_bounded", total == 55 + localTracks.Length && page == 1 && Rows().Length == 50
-                && Rows().All(track => track.SourceInstanceId == api.SourceInstanceId) && handler.Calls == 1 && NextPage.IsEnabled);
+            verify("all_music_full_text_catalog_without_pagination", total == 55 + localTracks.Length && page == 1 && Rows().Length == total
+                && Rows().Take(55).All(track => track.SourceInstanceId == api.SourceInstanceId) && handler.Calls == 2
+                && !NextPage.IsEnabled && PreviousPage.Visibility == Visibility.Collapsed && NextPage.Visibility == Visibility.Collapsed);
             var remoteCollision = Rows()[0];
-            await LoadPageAsync(2);
-            verify("all_music_cross_source_boundary_page", page == 2 && Rows().Length == 5 + localTracks.Length
-                && Rows().Take(5).All(track => track.SourceInstanceId == api.SourceInstanceId)
-                && Rows().Skip(5).All(track => localSources.ContainsKey(track.SourceInstanceId)) && !NextPage.IsEnabled && handler.Calls == 3);
+            handler.TrackCount = 357; await LoadPageAsync(1); await Task.Delay(150); Root.UpdateLayout();
+            verify("all_music_beyond_six_pages_has_every_reference", Rows().Length == 357 + localTracks.Length
+                && Rows().Select(track => track.Reference).Distinct().Count() == total && Rows()[356].Id == "remote-357");
+            verify("all_music_large_catalog_virtualizes_containers", TrackList.ItemsPanelRoot is ItemsStackPanel panel
+                && panel.Children.Count < 80 && TrackList.ContainerFromIndex(total - 1) is null);
+            TrackList.ScrollIntoView(Rows()[^1]); await Task.Delay(200); Root.UpdateLayout();
+            var scroll = FindPresentationScroll(TrackList)!;
+            bool LastRowVisible() => TrackList.ContainerFromIndex(total - 1) is ListViewItem row
+                && row.TransformToVisual(TrackList).TransformPoint(new global::Windows.Foundation.Point()).Y < TrackList.ActualHeight
+                && row.TransformToVisual(TrackList).TransformPoint(new global::Windows.Foundation.Point()).Y + row.ActualHeight > 0;
+            await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "all-music-virtualization.json"), JsonSerializer.Serialize(new
+            {
+                total, scroll.ExtentHeight, scroll.ViewportHeight, scroll.ScrollableHeight, scroll.VerticalOffset,
+                FirstRealized = TrackList.ContainerFromIndex(0) is not null, LastRealized = TrackList.ContainerFromIndex(total - 1) is not null,
+                Containers = (TrackList.ItemsPanelRoot as ItemsStackPanel)?.Children.Count,
+                FirstHeight = (TrackList.ContainerFromIndex(0) as FrameworkElement)?.ActualHeight,
+                LastHeight = (TrackList.ContainerFromIndex(total - 1) as FrameworkElement)?.ActualHeight,
+                Artwork = songArtworkViewports.Count, VisibleArtwork = songArtworkViewports.Values.Count(value => value)
+            }));
+            // WinUI may retain the selected/focused first container after scrolling; the bounded
+            // visual count and exact extent prove virtualization without forbidding that retention.
+            verify("all_music_full_scroll_extent_and_last_row_accessible", LastRowVisible()
+                && (TrackList.ItemsPanelRoot as ItemsStackPanel)?.Children.Count < 80 && scroll.ScrollableHeight > 10000
+                && Math.Abs(scroll.ExtentHeight - total * 64) < 100);
+            verify("all_music_cover_work_bounded_by_viewport", songArtworkViewports.Count is > 0 and < 80 && songArtworkViewports.Values.Any(value => value)
+                && songArtworkViewports.Values.Count(value => value) <= Math.Ceiling(TrackList.ActualHeight / 64) + 2);
+            handler.TrackCount = 10000; await LoadPageAsync(1); await Task.Delay(150); Root.UpdateLayout();
+            verify("all_music_ten_thousand_text_rows_keep_bounded_visuals", Rows().Length == 10000 + localTracks.Length
+                && TrackList.ItemsPanelRoot is ItemsStackPanel largePanel && largePanel.Children.Count < 80);
+            TrackList.ScrollIntoView(Rows()[^1]); await Task.Delay(200); Root.UpdateLayout();
+            verify("all_music_ten_thousand_last_row_and_scroll_range", LastRowVisible()
+                && (TrackList.ItemsPanelRoot as ItemsStackPanel)?.Children.Count < 80
+                && Math.Abs(FindPresentationScroll(TrackList)!.ExtentHeight - total * 64) < 100);
             handler.TrackCount = 49; await LoadPageAsync(1);
-            verify("all_music_partial_remote_page_fills_with_local", Rows().Length == 50 && Rows()[49].Reference == localTracks.OrderBy(track => track.Title, StringComparer.OrdinalIgnoreCase)
+            verify("all_music_full_remote_and_local_catalog", Rows().Length == 49 + localTracks.Length && Rows()[49].Reference == localTracks.OrderBy(track => track.Title, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(track => track.SourceInstanceId).ThenBy(track => track.Id).First().Reference && total == 49 + localTracks.Length);
-            await LoadPageAsync(2);
-            verify("all_music_local_tail_has_no_duplicate_boundary", Rows().Length == localTracks.Length - 1 && Rows().All(track => localSources.ContainsKey(track.SourceInstanceId)));
             handler.TrackCount = 55;
             BrowseSourceFilter.SelectedIndex = 2; await WaitAllMusicViewAsync();
             int before = handler.Calls;
@@ -92,7 +145,7 @@ public sealed partial class MainWindow
             BrowseSourceFilter.SelectedIndex = 0; await WaitAllMusicViewAsync();
             SearchInput.Text = "远程音乐"; await SearchAsync();
             verify("all_music_search_keeps_unified_scope", allMusicView && total == 55 && Rows().All(track => track.SourceInstanceId == api.SourceInstanceId));
-            SearchInput.Text = "same"; await SearchAsync(); await LoadPageAsync(2);
+            SearchInput.Text = "same"; await SearchAsync();
             verify("all_music_search_combines_both_sources", total == 55 + localTracks.Length && Rows().Any(track => localSources.ContainsKey(track.SourceInstanceId)));
             var oldItems = TrackList.ItemsSource;
             var oldSources = localSources.ToDictionary(item => item.Key, item => item.Value);
@@ -110,19 +163,19 @@ public sealed partial class MainWindow
                 verify("all_music_scan_cancel_hides_browse_progress", BrowseScanProgress.Visibility == Visibility.Collapsed
                     && CancelLocalScan.Visibility == Visibility.Collapsed);
                 verify("all_music_rescan_cancel_keeps_sources_page_and_audio", oldSources.All(item => ReferenceEquals(localSources[item.Key], item.Value))
-                    && ReferenceEquals(oldItems, TrackList.ItemsSource) && page == 2 && total == 55 + localTracks.Length && ReferenceEquals(audio, music.Player.Source));
+                    && ReferenceEquals(oldItems, TrackList.ItemsSource) && page == 1 && total == 55 + localTracks.Length && ReferenceEquals(audio, music.Player.Source));
             }
             finally { localPageMetadataReader = null; }
             handler.Fail = true; await LoadPageAsync(1);
             verify("all_music_remote_failure_keeps_local_and_explicit_status", total == localTracks.Length && Rows().All(track => localSources.ContainsKey(track.SourceInstanceId))
                 && PageStatus.Text.Contains("飞牛读取失败") && ReferenceEquals(audio, music.Player.Source));
             handler.Fail = false; await LoadPageAsync(1);
-            verify("all_music_remote_retry_restores_total", total == 55 + localTracks.Length && NextPage.IsEnabled);
+            verify("all_music_remote_retry_restores_total", total == 55 + localTracks.Length && Rows().Length == total && !NextPage.IsEnabled);
             ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId); before = handler.Calls;
             await LoadPageAsync(1);
             verify("all_music_disconnected_source_skipped_without_transport", total == localTracks.Length && handler.Calls == before && AllMusicNavigation.IsEnabled && SearchAction.IsEnabled);
             ViewModel.PlaybackRouter.Register(new RemoteCapabilityFixture(api.SourceInstanceId, MusicSourceCapabilities.Browse | MusicSourceCapabilities.Search));
-            await LoadPageAsync(2); var mixed = Rows();
+            await LoadPageAsync(1); var mixed = Rows();
             verify("all_music_same_provider_id_remains_distinct_reference", mixed.Any(track => track.Id == remoteCollision.Id && track.Reference != remoteCollision.Reference)
                 && remoteCollision.SourceInstanceId == api.SourceInstanceId && localTracks.Any(track => track.Reference == first.Reference));
             ResetLibrary();

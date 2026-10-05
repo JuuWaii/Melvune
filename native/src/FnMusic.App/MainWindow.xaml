@@ -45,9 +45,9 @@
     <Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="MinWidth" Value="32"/><Setter Property="Padding" Value="4"/>
    </Style>
    <DataTemplate x:Key="SongRowTemplate">
-    <Grid Padding="8" ColumnSpacing="16" Background="Transparent">
+    <Grid Height="60" Padding="8" ColumnSpacing="16" Background="Transparent">
      <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
-     <Border Width="44" Height="44" CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="20"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
+     <Border Width="44" Height="44" CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="20"/><Image Stretch="UniformToFill" Loaded="SongArtwork_Loaded" DataContextChanged="SongArtwork_DataContextChanged" EffectiveViewportChanged="SongArtwork_ViewportChanged" Unloaded="SongArtwork_Unloaded"/></Grid></Border>
      <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding BrowseArtist}" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
      <TextBlock Grid.Column="2" Text="{Binding Album}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding DisplayDuration}" HorizontalAlignment="Right"/>
     </Grid>

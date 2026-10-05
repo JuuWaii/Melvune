@@ -15,6 +15,10 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+await Test("complete metadata catalog includes final rows beyond six pages and empty boundaries", TrackCatalogVerification.CompleteAsync);
+await Test("metadata catalog rejects repeated changed truncated and oversized pages", TrackCatalogVerification.InconsistentAsync);
+await Test("metadata catalog cancellation does not return a partial snapshot or issue later requests", TrackCatalogVerification.CancelAsync);
+if (args.Contains("--verify-catalog")) { Console.WriteLine($"Catalog checks: {passed} passed."); return; }
 if (args.Contains("--verify-cover-requests"))
 {
     await Test("cover partial body timeout closes TCP input and permits an explicit retry", CoverRequestVerification.BodyTimeoutAsync);

@@ -183,6 +183,7 @@ public sealed partial class MainWindow
     { if (sender is Image image) { artworkLoads.Remove(image); if (image.Tag is CancellationTokenSource work) { work.Cancel(); image.Tag = null; } } }
     private async Task LoadArtworkAsync(Image image)
     {
+        if (songArtworkViewports.TryGetValue(image, out bool visible) && !visible) return;
         object? context = image.DataContext;
         var track = ContextTrack(context);
         object? source = track is not null && localSources.TryGetValue(track.SourceInstanceId, out var local)
@@ -191,6 +192,7 @@ public sealed partial class MainWindow
             && (track is not null ? TrackSupports(track, MusicSourceCapabilities.Artwork)
                 : ViewModel.AuthenticatedClient is { } currentApi && ViewModel.PlaybackRouter.Supports(currentApi.SourceInstanceId, MusicSourceCapabilities.Artwork));
         if (canLoad && artworkLoads.TryGetValue(image, out var pending)
+            && image.Tag is not CancellationTokenSource { IsCancellationRequested: true }
             && ReferenceEquals(pending.Context, context) && ReferenceEquals(pending.Source, source))
         { await pending.Completion.Task; return; }
         var load = new ArtworkLoad(context, source);

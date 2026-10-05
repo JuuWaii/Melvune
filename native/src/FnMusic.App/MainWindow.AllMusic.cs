@@ -96,7 +96,6 @@ public sealed partial class MainWindow
             string remoteStatus = "";
             int remoteTotal = 0;
             IReadOnlyList<MusicTrack> remoteTracks = [];
-            int targetPage = Math.Max(1, requestedPage);
             async Task<TrackPage> ReadRemote(int index)
             {
 #if DEBUG
@@ -111,16 +110,19 @@ public sealed partial class MainWindow
                 {
                     try
                     {
-                        // Fetch totals without loading the whole remote catalog. At most two pages per request.
-                        var first = await ReadRemote(1);
-                        remoteTotal = Math.Max(0, first.Total);
-                        targetPage = Math.Clamp(targetPage, 1, Math.Max(1, (int)(((long)remoteTotal + localTracks.Length + 49) / 50)));
-                        if ((long)(targetPage - 1) * 50 < remoteTotal)
+                        bool reading = true;
+                        var progress = new Progress<int>(count =>
                         {
-                            var result = targetPage == 1 ? first : await ReadRemote(targetPage);
-                            if (result.Total != remoteTotal || result.Tracks.Count != Math.Min(50L, remoteTotal - (long)(targetPage - 1) * 50)) throw new InvalidDataException("Remote catalog changed during paging.");
-                            remoteTracks = result.Tracks.Take(50).Select(track => track with { SourceLabel = "飞牛音乐" }).ToArray();
+                            if (reading && !closed && !ct.IsCancellationRequested && allMusicView && ReferenceEquals(api, AllMusicClient))
+                                PageStatus.Text = $"正在读取飞牛歌曲信息… 已读取 {count} 首";
+                        });
+                        try
+                        {
+                            remoteTracks = (await TrackCatalogReader.ReadAsync((index, _) => ReadRemote(index), ct, progress))
+                                .Select(track => track with { SourceLabel = "飞牛音乐" }).ToArray();
                         }
+                        finally { reading = false; }
+                        remoteTotal = remoteTracks.Count;
                     }
                     catch (MusicApiException ex) when (ex.Failure == MusicFailure.Unauthorized)
                     {
@@ -141,14 +143,15 @@ public sealed partial class MainWindow
             foreach (var id in failed) unavailableLibraries.Add(id);
             RenderLocalFilters();
             total = checked(remoteTotal + localTracks.Length);
-            page = Math.Clamp(Math.Max(1, requestedPage), 1, Math.Max(1, (int)(((long)total + 49) / 50)));
-            int localStart = (int)Math.Max(0L, (long)(page - 1) * 50 - remoteTotal);
-            var rows = remoteTracks.Concat(localTracks.Skip(localStart).Take(Math.Max(0, 50 - remoteTracks.Count))).ToArray();
-            TrackList.ItemsSource = rows; TrackList.SelectedIndex = rows.Length > 0 ? 0 : -1;
+            page = 1;
+            var rows = remoteTracks.Concat(localTracks).ToArray();
+            TrackList.ItemsSource = rows;
+            TrackList.SelectedIndex = oldSelection is MusicTrack selected ? Array.FindIndex(rows, track => track.Reference == selected.Reference) : -1;
+            if (TrackList.SelectedIndex < 0 && rows.Length > 0) TrackList.SelectedIndex = 0;
             string scopeName = scope == BrowseScope.All ? "所有音乐" : scope == BrowseScope.Nas ? "飞牛音乐" : "本地音乐";
-            PageStatus.Text = $"{scopeName} · 第 {page} 页，共 {total} 首" + (scope == BrowseScope.All ? $"（飞牛 {remoteTotal} / 本地 {localTracks.Length}）" : "")
+            PageStatus.Text = $"{scopeName} · 共 {total} 首" + (scope == BrowseScope.All ? $"（飞牛 {remoteTotal} / 本地 {localTracks.Length}）" : "")
                 + (remoteStatus.Length > 0 ? " · " + remoteStatus : "") + (failed.Count > 0 ? $" · {failed.Count} 个本地库读取失败，配置与可用缓存保留" : "");
-            PreviousPage.IsEnabled = page > 1; NextPage.IsEnabled = (long)page * 50 < total;
+            PreviousPage.IsEnabled = NextPage.IsEnabled = false;
         }
         catch (OperationCanceledException)
         {
