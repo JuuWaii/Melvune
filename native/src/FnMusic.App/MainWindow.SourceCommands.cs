@@ -48,8 +48,7 @@ public sealed partial class MainWindow
         Set(NewNasPlaylist, MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.WritePlaylists);
         NasPlaylistNavigation.IsEnabled = RemoteSupports(MusicSourceCapabilities.ReadPlaylists);
         Set(RemoteSettingsNavigation, MusicSourceCapabilities.ReadSettings);
-        SearchInput.IsEnabled = SearchAction.IsEnabled = allMusicView || localView || RemoteSupports(MusicSourceCapabilities.Search);
-        ToolTipService.SetToolTip(SearchAction, SearchAction.IsEnabled ? null : "当前来源未连接或不支持搜索。");
+        UpdateTopNavigation();
         UpdateFavoriteButton();
         activePlaylistPage?.SourceChanged?.Invoke();
         fullPageView?.SourceChanged?.Invoke();

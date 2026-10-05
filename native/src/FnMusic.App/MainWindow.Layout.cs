@@ -8,6 +8,7 @@ public sealed partial class MainWindow
     private void UpdateAdaptiveLayout(double width)
     {
         if (width <= 0 || closed) return;
+        UpdateTopNavigation();
         UpdateLibraryHeaderLayout();
         activePlaylistPage?.Adapt(Root.ActualHeight - PlayerBar.ActualHeight);
         bool compact = width < 1100;

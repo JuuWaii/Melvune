@@ -96,6 +96,13 @@ public sealed partial class MainWindow
             host.SetBinding(Control.IsEnabledProperty, new Binding { Source = Editor, Path = new PropertyPath(nameof(Control.IsEnabled)) });
             heading.Children.Add(host);
         }
+        public void UseTopBack()
+        {
+            BackButton.Visibility = Visibility.Collapsed;
+            heading.ColumnSpacing = 0;
+            CancelButton.Margin = new Thickness(0, 0, 12, 0);
+            if (HeadingActions is { } actions) actions.Margin = new Thickness(12, 0, 0, 0);
+        }
         public void Dispose()
         {
             if (IsDisposed) return;
@@ -128,6 +135,7 @@ public sealed partial class MainWindow
         ClosePlaylistPage();
         foreach (var panel in new FrameworkElement[] { LibraryPanel, SettingsPanel, HomePanel, PlaylistPanel })
             panel.Visibility = ReferenceEquals(panel, target) ? Visibility.Visible : Visibility.Collapsed;
+        UpdateTopNavigation();
         AnimateViewEntry(target);
         return true;
     }
@@ -157,10 +165,11 @@ public sealed partial class MainWindow
         playlistReturnScroll = scroll; playlistReturnItems = items;
         playlistReturnHorizontal = horizontal; playlistReturnVertical = vertical;
         activePlaylistPage = view;
+        view.UseTopBack();
         view.BackButton.Click += async (_, _) => await ReturnFromPlaylistPageAsync();
         PlaylistPanel.Content = view.Layout;
         view.Adapt(Root.ActualHeight - PlayerBar.ActualHeight);
-        Root.UpdateLayout(); view.BackButton.Focus(FocusState.Programmatic);
+        UpdateTopNavigation(); Root.UpdateLayout(); TopBack.Focus(FocusState.Programmatic);
         return true;
     }
     private async Task ReturnFromPlaylistPageAsync()

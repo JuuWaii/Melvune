@@ -20,12 +20,12 @@ public sealed partial class MainWindow
         ViewModel.AuthenticatedClient;
     private async void AllMusic_Click(object sender, RoutedEventArgs e) => await ShowAllMusicAsync();
 
-    private async Task ShowAllMusicAsync()
+    private async Task ShowAllMusicAsync(string initialQuery = "")
     {
         if (!await NavigateMainContentAsync(LibraryPanel)) return;
         allMusicView = true; localView = false; browseScope = BrowseScope.All;
         favoritesView = false; parentArtist = null; collectionKind = null; collection = null;
-        SearchInput.Text = searchQuery = ""; selectedLocalGroup = null; selectedLocalLibrary = null;
+        SearchInput.Text = searchQuery = initialQuery; selectedLocalGroup = null; selectedLocalLibrary = null;
         RenderLocalFilters(); UpdateCollectionView();
         await LoadPageAsync(1);
     }

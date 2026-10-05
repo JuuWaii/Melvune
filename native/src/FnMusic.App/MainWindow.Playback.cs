@@ -105,12 +105,12 @@ public sealed partial class MainWindow
     { if (allMusicView) await LoadAllMusicPageAsync(1, true); else if (localView) await LoadLocalPageAsync(1, true); else await LoadPageAsync(1); }
     private async void Previous_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page - 1);
     private async void Next_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page + 1);
-    private async void Search_Click(object sender, RoutedEventArgs e) => await SearchAsync();
+    private async void Search_Click(object sender, RoutedEventArgs e) => await SearchFromTopAsync();
     private async void Search_KeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key != global::Windows.System.VirtualKey.Enter) return;
         e.Handled = true;
-        await SearchAsync();
+        await SearchFromTopAsync();
     }
     private async Task SearchAsync()
     {
@@ -122,7 +122,7 @@ public sealed partial class MainWindow
         await LoadPageAsync(1);
     }
     private async void ClearSearch_Click(object sender, RoutedEventArgs e)
-    { if (allMusicView || localView) { SearchInput.Text = searchQuery = ""; await LoadPageAsync(1); } else await SwitchCollectionAsync(null); }
+        => await ClearTopSearchAsync();
 
     private async Task LoadPageAsync(int requestedPage)
     {

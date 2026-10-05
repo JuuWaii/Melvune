@@ -20,12 +20,13 @@ public sealed partial class MainWindow
         bool listing = collectionKind is not null && collection is null;
         CollectionList.Visibility = CollectionOpen.Visibility = listing ? Visibility.Visible : Visibility.Collapsed;
         TrackList.Visibility = listing ? Visibility.Collapsed : Visibility.Visible;
-        CollectionBack.Visibility = collection is null && parentArtist is null ? Visibility.Collapsed : Visibility.Visible;
+        CollectionBack.Visibility = Visibility.Collapsed;
         CollectionBack.Content = parentArtist is not null && collection is null ? "返回歌手" : "返回列表";
         ArtistAlbums.Visibility = collectionKind == CollectionKind.Artist && collection is not null ? Visibility.Visible : Visibility.Collapsed;
         CollectionHeading.Visibility = collectionKind is null ? Visibility.Collapsed : Visibility.Visible;
         CollectionHeading.Text = collection is null ? CollectionLabel : $"{CollectionLabel} · {collection.Name} · {collection.Summary}";
         if (parentArtist is not null && collection is null) CollectionHeading.Text = $"{parentArtist.Name} · 专辑";
+        UpdateTopNavigation();
     }
     private async Task SwitchCollectionAsync(CollectionKind? kind)
     {

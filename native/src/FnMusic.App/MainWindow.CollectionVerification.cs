@@ -311,6 +311,7 @@ public sealed partial class MainWindow
             await VerifyManagementFullPagesAsync(Verify);
             await VerifyAllMusicWindowAsync(Verify);
             await VerifyCategorizedSettingsWindowAsync(Verify);
+            await VerifyTopNavigationAsync(Verify);
             await VerifyUiMotionAsync(Verify);
             stage = "complete";
         }

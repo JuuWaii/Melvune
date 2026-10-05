@@ -22,6 +22,7 @@ public sealed partial class MainWindow
         fullPageLyricsEnabled = LyricsInteractionHost.IsEnabled;
         NormalContent.IsEnabled = LyricsInteractionHost.IsEnabled = false;
         fullPageView = view;
+        UpdateTopNavigation();
         FullPageHost.Content = view.Layout;
         FullPageHost.Visibility = Visibility.Visible;
         view.BackButton.Click += (_, _) => CloseFullPage();
@@ -45,6 +46,7 @@ public sealed partial class MainWindow
         FullPageHost.Visibility = Visibility.Collapsed;
         NormalContent.IsEnabled = fullPageNormalEnabled;
         LyricsInteractionHost.IsEnabled = fullPageLyricsEnabled;
+        UpdateTopNavigation();
         var focus = fullPageReturnFocus;
         fullPageReturnFocus = null;
         if (restoreFocus && !closed)

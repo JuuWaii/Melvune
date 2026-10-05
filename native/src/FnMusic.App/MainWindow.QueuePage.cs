@@ -64,6 +64,7 @@ public sealed partial class MainWindow
         };
         queueReturnFocus = FocusManager.GetFocusedElement(Root.XamlRoot) as Control;
         queuePage = view; queueRemoveButton = remove; queueClearButton = clear;
+        UpdateTopNavigation();
         QueuePaneHost.IsEnabled = true;
         QueuePaneHost.Content = view.Layout;
         QueueOverlay.Visibility = Visibility.Visible;
@@ -93,6 +94,7 @@ public sealed partial class MainWindow
         if (uiMotions.TryGetValue(QueuePane, out var motion)) motion.Finish(true);
         queuePage = null; queueRemoveButton = queueClearButton = null;
         view.Dispose(); QueuePaneHost.Content = null; QueueOverlay.Visibility = Visibility.Collapsed;
+        UpdateTopNavigation();
         var focus = queueReturnFocus; queueReturnFocus = null;
         if (restoreFocus && !closed && focus is { IsLoaded: true, IsEnabled: true }) focus.Focus(FocusState.Programmatic);
         return true;

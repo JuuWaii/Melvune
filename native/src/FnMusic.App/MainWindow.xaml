@@ -3,8 +3,15 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
  <Grid x:Name="WindowRoot" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
   <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-  <TitleBar x:Name="AppTitleBar" Title="飞牛音乐">
-   <TitleBar.IconSource><FontIconSource Glyph="&#xE8D6;"/></TitleBar.IconSource>
+  <TitleBar x:Name="AppTitleBar">
+   <TitleBar.Resources><HorizontalAlignment x:Key="TitleBarContentHorizontalAlignment">Left</HorizontalAlignment></TitleBar.Resources>
+   <TitleBar.LeftHeader><StackPanel x:Name="TitleBrand" Width="196" Margin="14,0,0,0" Orientation="Horizontal" Spacing="10" VerticalAlignment="Center"><FontIcon x:Name="TitleBrandIcon" Glyph="&#xE8D6;" FontSize="28"/><TextBlock x:Name="TitleBrandName" Text="飞牛音乐" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/></StackPanel></TitleBar.LeftHeader>
+   <TitleBar.Content><Grid x:Name="TopNavigation" Width="480" ColumnSpacing="6" Margin="0,0,12,0"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+    <Button x:Name="TopBack" Width="32" Height="32" Padding="6" Click="TopBack_Click" AutomationProperties.Name="返回" ToolTipService.ToolTip="返回"><FontIcon Glyph="&#xE72B;" FontSize="14"/></Button>
+    <TextBox x:Name="SearchInput" Grid.Column="1" PlaceholderText="搜索音乐" AutomationProperties.Name="搜索音乐" MaxLength="256" MinWidth="64"/>
+    <Button x:Name="SearchAction" Grid.Column="2" Width="32" Height="32" Padding="6" Click="Search_Click" AutomationProperties.Name="搜索音乐" ToolTipService.ToolTip="搜索音乐"><FontIcon Glyph="&#xE721;" FontSize="14"/></Button>
+    <Button x:Name="ClearSearchAction" Grid.Column="3" Width="32" Height="32" Padding="6" Click="ClearSearch_Click" AutomationProperties.Name="清空搜索" ToolTipService.ToolTip="清空搜索"><FontIcon Glyph="&#xE894;" FontSize="14"/></Button>
+   </Grid></TitleBar.Content>
    <TitleBar.RightHeader><Button x:Name="TitleBarSettings" Click="Settings_Click" Width="36" Height="32" Padding="6" AutomationProperties.Name="设置" ToolTipService.ToolTip="设置"><FontIcon Glyph="&#xE713;" FontSize="16"/></Button></TitleBar.RightHeader>
   </TitleBar>
  <Grid x:Name="Root" Grid.Row="1" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Loaded="Root_Loaded">
@@ -59,8 +66,6 @@
   <Grid.ColumnDefinitions><ColumnDefinition x:Name="SidebarColumn" Width="220" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="*"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
   <Border x:Name="SidebarHost" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" Padding="16"><ScrollViewer HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
    <StackPanel Spacing="8">
-    <StackPanel Orientation="Horizontal" Spacing="8"><FontIcon Glyph="&#xE8D6;" FontSize="24"/><TextBlock Text="飞牛音乐" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center"/></StackPanel>
-    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
     <TextBlock Text="音乐浏览" Margin="8,8,0,2" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
     <Button Content="首页" Click="Home_Click" HorizontalAlignment="Stretch"/>
     <Button x:Name="AllMusicNavigation" Content="所有音乐" Click="AllMusic_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteFavoritesNavigation" Content="收藏" Click="SidebarFavorites_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteAlbumsNavigation" Content="专辑" Click="SidebarAlbums_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteArtistsNavigation" Content="歌手" Click="SidebarArtists_Click" HorizontalAlignment="Stretch"/>
@@ -150,12 +155,6 @@
      <Grid x:Name="LocalLibraryFilters" Grid.Column="1" Visibility="Collapsed" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="LocalGroupFilter" Header="本地分组" HorizontalAlignment="Stretch" SelectionChanged="LocalFilter_Changed"/><ComboBox x:Name="LocalLibraryFilter" Grid.Column="1" Header="本地音乐库" DisplayMemberPath="Name" HorizontalAlignment="Stretch" SelectionChanged="LocalFilter_Changed"/></Grid>
     </Grid>
     <TextBlock x:Name="CollectionHeading" TextWrapping="Wrap" Visibility="Collapsed"/>
-    <Grid ColumnSpacing="8">
-     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-     <TextBox x:Name="SearchInput" PlaceholderText="搜索歌曲" AutomationProperties.Name="搜索歌曲" MaxLength="256"/>
-     <Button x:Name="SearchAction" Grid.Column="1" Content="搜索" Click="Search_Click"/>
-     <Button Grid.Column="2" Content="清空搜索" Click="ClearSearch_Click"/>
-    </Grid>
     <StackPanel Orientation="Horizontal" Spacing="8">
      <Button Content="刷新曲库" Click="Refresh_Click"/>
      <Button x:Name="PreviousPage" Content="上一页" Click="Previous_Click" IsEnabled="False"/>
