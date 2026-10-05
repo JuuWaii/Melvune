@@ -98,8 +98,9 @@ public sealed partial class MainWindow
     }
     private async void Library_Click(object sender, RoutedEventArgs e) => await ShowLibraryAsync();
     private async void Settings_Click(object sender, RoutedEventArgs e) => await ShowSettingsPanelAsync();
-    private async Task ShowSettingsPanelAsync()
-    { await NavigateMainContentAsync(SettingsPanel); }
+    private async Task ShowSettingsPanelAsync(SelectorBarItem? category = null)
+    { if (await NavigateMainContentAsync(SettingsPanel) && category is not null) SettingsCategories.SelectedItem = category; }
+    private async void ConnectionSettings_Click(object sender, RoutedEventArgs e) => await ShowSettingsPanelAsync(ConnectionCategory);
     private async void Refresh_Click(object sender, RoutedEventArgs e)
     { if (allMusicView) await LoadAllMusicPageAsync(1, true); else if (localView) await LoadLocalPageAsync(1, true); else await LoadPageAsync(1); }
     private async void Previous_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page - 1);
@@ -249,6 +250,7 @@ public sealed partial class MainWindow
             _ => ("顺序播放", "\uE72A")
         };
         QueueModeIcon.Glyph = glyph;
+        SettingsModeSummary.Text = name;
         string description = "播放模式：" + name;
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(QueueModeButton, description);
         ToolTipService.SetToolTip(QueueModeButton, description);

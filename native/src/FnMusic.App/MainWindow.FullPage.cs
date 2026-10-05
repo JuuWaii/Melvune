@@ -15,6 +15,8 @@ public sealed partial class MainWindow
         if (closed || activePlaylistPage is { BlockNavigation: true } || !CloseFullPage() || !CloseQueuePage())
         { view.Dispose(); return false; }
         CloseTrackContextMenu();
+        QueueModeButton.Flyout.Hide();
+        OutputDeviceButton.Flyout.Hide();
         fullPageReturnFocus = FocusManager.GetFocusedElement(Root.XamlRoot) as Control;
         fullPageNormalEnabled = NormalContent.IsEnabled;
         fullPageLyricsEnabled = LyricsInteractionHost.IsEnabled;

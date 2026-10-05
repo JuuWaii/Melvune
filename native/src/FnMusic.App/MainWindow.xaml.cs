@@ -9,7 +9,12 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        ExtendsContentIntoTitleBar = true;
+        AppWindow.TitleBar.PreferredHeightOption = global::Microsoft.UI.Windowing.TitleBarHeightOption.Tall;
+        SetTitleBar(AppTitleBar);
+        ApplyMonochromeResources(WindowRoot);
         ApplyMonochromeResources(Root);
+        SettingsCategories.SelectedItem = ConnectionCategory;
         ConfigureSongList(TrackList);
         QueueModeButton.Flyout.Opening += PlayerMenu_Opening;
         OutputDeviceButton.Flyout.Opening += PlayerOutput_Opening;

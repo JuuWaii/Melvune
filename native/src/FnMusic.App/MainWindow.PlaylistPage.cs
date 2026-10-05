@@ -120,6 +120,8 @@ public sealed partial class MainWindow
         if (activePlaylistPage is { BlockNavigation: true } busy)
         { busy.Status.Text = "正在保存，请等待核对完成后切换页面。"; return false; }
         int version = ++contentNavigationVersion;
+        QueueModeButton.Flyout.Hide();
+        OutputDeviceButton.Flyout.Hide();
         await CloseNowPlayingAsync();
         if (closed || version != contentNavigationVersion) return false;
         ClosePlaylistPage();

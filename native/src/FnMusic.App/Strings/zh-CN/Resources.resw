@@ -2,7 +2,7 @@
 <root>
  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
  <resheader name="version"><value>2.0</value></resheader>
- <data name="SettingsTitle.Text" xml:space="preserve"><value>连接与设置</value></data>
+ <data name="SettingsTitle.Text" xml:space="preserve"><value>设置</value></data>
  <data name="ServerAddress.Header" xml:space="preserve"><value>音乐服务器地址</value></data>
  <data name="ServerAddress.PlaceholderText" xml:space="preserve"><value>输入 NAS 的 HTTP 或 HTTPS 地址</value></data>
  <data name="ConnectButton.Content" xml:space="preserve"><value>保存并连接</value></data>
