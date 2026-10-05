@@ -181,6 +181,12 @@ public sealed partial class MainWindow
                 await OpenNowPlayingAsync(); await Task.Delay(50);
                 verify("player_controls_same_row_lyrics_" + width, ControlsFit() && PlayerBar.Visibility == Visibility.Collapsed
                     && ReferenceEquals(FullTransportHost.Content, TransportPanel));
+                verify("lyrics_player_scrollbar_cannot_cover_queue_button_" + width,
+                    FullPlayerColumn.VerticalScrollBarVisibility == ScrollBarVisibility.Hidden
+                    && FullPlayerColumn.HorizontalScrollBarVisibility == ScrollBarVisibility.Disabled
+                    && QueueButton.IsLoaded && QueueButton.ActualWidth > 0
+                    && FindSongVisual<Microsoft.UI.Xaml.Controls.Primitives.ScrollBar>(FullPlayerColumn,
+                        bar => bar.Orientation == Orientation.Vertical && bar.Visibility == Visibility.Visible && bar.ActualWidth > 0) is null);
             }
             foreach (var item in new[] { SequentialModeItem, RepeatAllModeItem, RepeatOneModeItem, ShuffleModeItem })
             {

@@ -11,9 +11,13 @@
   <Grid.Resources>
    <DataTemplate x:Key="LocalLibraryCardTemplate">
     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,8" MinHeight="92">
-     <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+     <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
       <Border Width="44" Height="44" CornerRadius="8" Background="{ThemeResource ControlFillColorSecondaryBrush}" VerticalAlignment="Center"><FontIcon Glyph="&#xE8B7;" FontSize="24"/></Border>
       <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Directory}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><TextBlock Text="{Binding Group}" FontSize="12" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+       <Button Click="LibraryCardEdit_Click" Width="36" Height="36" Padding="8" IsEnabled="{Binding CanEdit}" AutomationProperties.Name="编辑音乐库" ToolTipService.ToolTip="编辑音乐库"><FontIcon Glyph="&#xE70F;" FontSize="16"/></Button>
+       <Button Click="LibraryCardDelete_Click" Width="36" Height="36" Padding="8" IsEnabled="{Binding CanDelete}" AutomationProperties.Name="删除音乐库" ToolTipService.ToolTip="删除音乐库"><FontIcon Glyph="&#xE74D;" FontSize="16"/></Button>
+      </StackPanel>
      </Grid>
     </Border>
    </DataTemplate>
@@ -113,7 +117,7 @@
     </StackPanel>
     <StackPanel x:Name="SettingsLibrariesSection" Visibility="Collapsed" Spacing="16">
      <TextBlock Text="音乐库与素材库" FontSize="20" FontWeight="SemiBold"/>
-     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24"><StackPanel Spacing="12"><TextBlock Text="本地音乐库" FontWeight="SemiBold"/><TextBlock Text="管理文件夹、分组和扫描；本地歌单可混合不同来源的歌曲。" TextWrapping="Wrap"/><StackPanel Orientation="Horizontal" Spacing="8"><Button Content="管理音乐库" Click="ManageLocalLibraries_Click"/><Button Content="添加文件夹" Click="ImportLocal_Click"/></StackPanel></StackPanel></Border>
+     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24"><StackPanel Spacing="12"><TextBlock Text="本地音乐库" FontWeight="SemiBold"/><TextBlock Text="管理文件夹、分组和扫描；本地歌单可混合不同来源的歌曲。" TextWrapping="Wrap"/><StackPanel Orientation="Horizontal" Spacing="8"><Button Content="管理音乐库" Click="ManageLocalLibraries_Click"/><Button Content="新建音乐库" Click="ImportLocal_Click"/></StackPanel></StackPanel></Border>
      <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24"><StackPanel Spacing="12"><TextBlock Text="飞牛服务器" FontWeight="SemiBold"/><TextBlock Text="素材库、服务器设置和后台任务同步到已登录的飞牛账号，权限由服务器决定。" TextWrapping="Wrap"/><Button x:Name="RemoteSettingsNavigation" Content="飞牛素材库与设置" Click="NasSettings_Click" HorizontalAlignment="Left"/></StackPanel></Border>
     </StackPanel>
    </StackPanel>
@@ -124,10 +128,6 @@
    <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
    <ScrollViewer x:Name="LibraryHeaderScroll" Grid.ColumnSpan="2" HorizontalContentAlignment="Stretch" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto"><StackPanel Spacing="12"><TextBlock Text="音乐，陪伴每一个时刻" TextWrapping="Wrap" Style="{ThemeResource TitleTextBlockStyle}"/><TextBlock Text="浏览你的音乐资料库，或从本地文件夹开始聆听。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
     <ScrollViewer HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled" VerticalScrollBarVisibility="Disabled"><StackPanel Orientation="Horizontal" Spacing="8">
-     <Button x:Name="RemoteSongsTab" Content="歌曲" Click="Songs_Click"/>
-     <Button x:Name="RemoteFavoritesTab" Content="收藏" Click="Favorites_Click"/>
-     <Button x:Name="RemoteAlbumsTab" Content="专辑" Click="Albums_Click"/>
-     <Button x:Name="RemoteArtistsTab" Content="歌手" Click="Artists_Click"/>
      <Button x:Name="CollectionBack" Content="返回列表" Click="CollectionBack_Click" Visibility="Collapsed"/>
      <Button x:Name="CollectionOpen" Content="查看详情" Click="CollectionOpen_Click" Visibility="Collapsed"/>
      <Button x:Name="ArtistAlbums" Content="歌手专辑" Click="ArtistAlbums_Click" Visibility="Collapsed"/>
@@ -211,7 +211,7 @@
     <TextBlock Grid.Column="1" Text="正在播放" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
    </Grid>
    <Grid Grid.Row="1" ColumnSpacing="32" RowSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
-    <ScrollViewer x:Name="FullPlayerColumn" Grid.RowSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" HorizontalContentAlignment="Stretch" MaxWidth="480">
+    <ScrollViewer x:Name="FullPlayerColumn" Grid.RowSpan="2" HorizontalAlignment="Center" VerticalAlignment="Center" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Hidden" HorizontalContentAlignment="Stretch" MaxWidth="480">
      <StackPanel Spacing="12">
       <Border x:Name="FullArtworkPanel" CornerRadius="12" Background="{ThemeResource ControlFillColorSecondaryBrush}" HorizontalAlignment="Center" Width="380" Height="380"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="80" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><Image x:Name="FullNowCover" Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
       <StackPanel Spacing="4"><TextBlock x:Name="FullNowTitle" Text="尚未播放歌曲" FontSize="24" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="FullNowArtist" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/></StackPanel>

@@ -17,12 +17,12 @@ public sealed partial class MainWindow
         try
         {
             UpdateSourceCommands();
-            verify("unregistered_remote_navigation_disabled", !RemoteSongsTab.IsEnabled && !RemoteFavoritesNavigation.IsEnabled && AllMusicNavigation.IsEnabled
+            verify("unregistered_remote_navigation_disabled", !RemoteAlbumsNavigation.IsEnabled && !RemoteFavoritesNavigation.IsEnabled && AllMusicNavigation.IsEnabled
                 && !RemotePlaylistsNavigation.IsEnabled && !RemoteSettingsNavigation.IsEnabled);
             ViewModel.PlaybackRouter.Register(new RemoteCapabilityFixture(id, MusicSourceCapabilities.Browse));
             ConnectionCapabilitiesChanged(ViewModel, new(nameof(ViewModel.AuthenticatedClient)));
-            verify("read_only_browse_navigation", RemoteSongsTab.IsEnabled && RemoteAlbumsNavigation.IsEnabled && RemoteArtistsTab.IsEnabled
-                && !RemoteFavoritesTab.IsEnabled && !RemotePlaylistsNavigation.IsEnabled && !RemoteSettingsNavigation.IsEnabled
+            verify("read_only_browse_navigation", RemoteAlbumsNavigation.IsEnabled && RemoteArtistsNavigation.IsEnabled
+                && !RemoteFavoritesNavigation.IsEnabled && !RemotePlaylistsNavigation.IsEnabled && !RemoteSettingsNavigation.IsEnabled
                 && !SearchInput.IsEnabled && !SearchAction.IsEnabled);
             await SwitchCollectionAsync(null);
             var items = TrackList.ItemsSource;
@@ -51,7 +51,7 @@ public sealed partial class MainWindow
             ViewModel.PlaybackRouter.Register(new RemoteCapabilityFixture(id, MusicSourceCapabilities.Browse | MusicSourceCapabilities.ReadFavorites
                 | MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.ReadSettings));
             UpdateSourceCommands();
-            verify("read_capability_navigation_enabled", RemoteFavoritesNavigation.IsEnabled && RemoteFavoritesTab.IsEnabled
+            verify("read_capability_navigation_enabled", RemoteFavoritesNavigation.IsEnabled
                 && RemotePlaylistsNavigation.IsEnabled && RemoteSettingsNavigation.IsEnabled);
             await ShowFavoritesAsync();
             var favoriteItems = TrackList.ItemsSource;
@@ -73,14 +73,14 @@ public sealed partial class MainWindow
             await SearchAsync();
             verify("empty_search_requires_browse_preserves_search_results", currentQuery == "合成" && searchQuery == currentQuery
                 && ReferenceEquals(searchItems, TrackList.ItemsSource) && PageStatus.Text == searchPageStatus
-                && SearchAction.IsEnabled && !RemoteSongsTab.IsEnabled);
+                && SearchAction.IsEnabled && !RemoteAlbumsNavigation.IsEnabled);
             ViewModel.PlaybackRouter.Unregister(id);
             ViewModel.PlaybackRouter.Register(new RemoteCapabilityFixture(id, MusicSourceCapabilities.Browse));
             await SwitchCollectionAsync(null);
             items = TrackList.ItemsSource;
             ViewModel.PlaybackRouter.Unregister(id);
             ConnectionCapabilitiesChanged(ViewModel, new(nameof(ViewModel.AuthenticatedClient)));
-            verify("disconnected_remote_navigation_disabled", !RemoteSongsTab.IsEnabled && !RemoteFavoritesTab.IsEnabled && AllMusicNavigation.IsEnabled
+            verify("disconnected_remote_navigation_disabled", !RemoteAlbumsNavigation.IsEnabled && !RemoteFavoritesNavigation.IsEnabled && AllMusicNavigation.IsEnabled
                 && !RemotePlaylistsNavigation.IsEnabled && !RemoteSettingsNavigation.IsEnabled);
             var panel = LibraryPanel.Visibility;
             await ShowLibraryAsync();

@@ -180,7 +180,7 @@ public sealed partial class MainWindow
             selectedLocalLibrary = selectedLibrary.SourceId;
             await ShowLocalLibraryManagementAsync(); view = fullPageView ?? throw new InvalidOperationException();
             verify("local_library_full_page_no_dialog", !themedDialogOpen && view.List.Items.Count == catalog.Libraries.Count
-                && view.List.SelectedItem is LocalLibrary selected && selected.SourceId == selectedLibrary.SourceId);
+                && view.List.SelectedItem is LibraryManagerRow { Local: { } selected } && selected.SourceId == selectedLibrary.SourceId);
             await VerifyFullPageLayoutAsync(verify, view, "local_library");
             Root.UpdateLayout();
             var firstCard = (view.List.ContainerFromIndex(0) as ListViewItem)?.ContentTemplateRoot;
@@ -189,61 +189,7 @@ public sealed partial class MainWindow
                 && FindSongVisual<TextBlock>(firstCard, text => text.Text == selectedLibrary.Directory) is { ActualWidth: > 0 });
             await VerifyLibraryHeadingAsync(verify, view);
             await VerifyLibraryCardScanAsync(verify, view);
-            var name = view.Fields.Children.OfType<TextBox>().Single(box => box.Header.ToString() == "库名称");
-            var group = view.Fields.Children.OfType<TextBox>().Single(box => box.Header.ToString() == "分组（可选）");
-            var path = view.Fields.Children.OfType<TextBox>().Single(box => box.Header.ToString() == "文件夹路径");
-            verify("local_library_remove_requires_confirmation", !view.Actions.Children.OfType<Button>().Single(button => button.Content.ToString() == "移除音乐库").IsEnabled);
-            name.Text = "页面改名夹具"; group.Text = "页面分组";
-            await ClickFullPageButtonAsync(view, "保存");
-            var renamed = await localLibraryStore.LoadAsync();
-            verify("local_library_full_page_rename_group_persisted", renamed.Libraries.Any(item => item.SourceId == selectedLibrary.SourceId
-                && item.Name == "页面改名夹具" && item.Group == "页面分组") && ReferenceEquals(audio, music.Player.Source));
-            await localLibraryStore.SaveAsync(renamed with { Libraries = renamed.Libraries.Select(item => item.SourceId == selectedLibrary.SourceId ? item with { Name = "外部更新" } : item).ToArray() });
-            name.Text = "过期名称"; await ClickFullPageButtonAsync(view, "保存");
-            verify("local_library_full_page_conflict_preserves_external", (await localLibraryStore.LoadAsync()).Libraries.Single(item => item.SourceId == selectedLibrary.SourceId).Name == "外部更新"
-                && view.Status.Text.Contains("刷新") && !view.Actions.Children.OfType<Button>().Single(button => button.Content.ToString() == "保存").IsEnabled);
-            await ClickFullPageButtonAsync(view, "刷新音乐库");
-            verify("local_library_full_page_refresh_recovers", name.Text == "外部更新");
-            path.Text = Path.Combine(AppContext.BaseDirectory, "missing-library-" + Guid.NewGuid().ToString("N"));
-            long revision = (await localLibraryStore.LoadAsync()).Revision;
-            await ClickFullPageButtonAsync(view, "保存");
-            verify("local_library_full_page_missing_relink_preserves_catalog", (await localLibraryStore.LoadAsync()).Revision == revision
-                && view.Status.Text.Contains("原音乐库保留") && ReferenceEquals(audio, music.Player.Source));
-            await ClickFullPageButtonAsync(view, "刷新音乐库");
-            string moved = Path.Combine(AppContext.BaseDirectory, "library-page-relocated");
-            Directory.CreateDirectory(moved);
-            var originalFiles = Directory.GetFiles(selectedLibrary.Directory);
-            var originalHashes = originalFiles.ToDictionary(file => file, file => Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(file))));
-            foreach (var file in originalFiles) File.Copy(file, Path.Combine(moved, Path.GetFileName(file)), true);
-            var reference = localSources[selectedLibrary.SourceId].Tracks.First().Reference;
-            path.Text = moved;
-            var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            localPageMetadataReader = async (_, ct) => { entered.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); return new("取消夹具", "夹具", 60); };
-            try
-            {
-                var save = view.Actions.Children.OfType<Button>().Single(button => button.Content.ToString() == "保存");
-                ((IInvokeProvider)new ButtonAutomationPeer(save).GetPattern(PatternInterface.Invoke)).Invoke();
-                await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-                verify("local_library_full_page_scan_can_cancel", view.CancelButton.Visibility == Visibility.Visible && view.CancelButton.IsEnabled
-                    && view.BlockNavigation && !CloseFullPage());
-                ((IInvokeProvider)new ButtonAutomationPeer(view.CancelButton).GetPattern(PatternInterface.Invoke)).Invoke();
-                for (int i = 0; i < 100 && !view.Editor.IsEnabled; i++) await Task.Delay(50);
-                verify("local_library_full_page_cancel_preserves_catalog", view.Editor.IsEnabled && !view.BlockNavigation && (await localLibraryStore.LoadAsync()).Revision == revision
-                    && view.Status.Text.Contains("取消") && ReferenceEquals(audio, music.Player.Source));
-            }
-            finally { localPageMetadataReader = null; }
-            await ClickFullPageButtonAsync(view, "保存");
-            verify("local_library_full_page_relink_preserves_identity", (await localLibraryStore.LoadAsync()).Libraries.Single(item => item.SourceId == selectedLibrary.SourceId).Directory == moved
-                && localSources[selectedLibrary.SourceId].Tracks.Any(track => track.Reference == reference));
-            verify("local_library_full_page_original_files_unchanged", originalHashes.All(item => File.Exists(item.Key)
-                && Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(item.Key))) == item.Value));
-            revision = (await localLibraryStore.LoadAsync()).Revision;
-            await ClickFullPageButtonAsync(view, "添加文件夹");
-            verify("local_library_full_page_add_form_no_implicit_write", view.List.SelectedItem is null && path.Text == ""
-                && view.Fields.Visibility == Visibility.Visible && (await localLibraryStore.LoadAsync()).Revision == revision);
-            await ClickFullPageButtonAsync(view, "收起编辑");
-            verify("local_library_cards_collapse_editor_without_write", view.Fields.Visibility == Visibility.Collapsed && view.Header.ActualHeight < 1
-                && view.List.ActualHeight > 100 && (await localLibraryStore.LoadAsync()).Revision == revision);
+            await VerifyLibraryEditorWindowAsync(verify, view, selectedLibrary, audio);
             view.BlockNavigation = true;
             verify("management_full_page_write_blocks_back", !CloseFullPage() && ReferenceEquals(fullPageView, view) && !view.IsDisposed);
             view.BlockNavigation = false;
@@ -267,7 +213,7 @@ public sealed partial class MainWindow
         try
         {
             AppWindow.Resize(new global::Windows.Graphics.SizeInt32(820, 560)); await Task.Delay(100); Root.UpdateLayout();
-            var add = FindFullPageButton(view, "添加文件夹"); var scan = FindFullPageButton(view, "扫描音乐库");
+            var add = FindFullPageButton(view, "新建音乐库"); var scan = FindFullPageButton(view, "扫描音乐库");
             var origin = scan.TransformToVisual(view.Layout).TransformPoint(new global::Windows.Foundation.Point());
             verify("local_library_heading_actions_fit_compact_window", add.IsLoaded && scan.IsLoaded && add.ActualWidth > 0 && scan.ActualWidth > 0
                 && origin.X + scan.ActualWidth <= view.Layout.ActualWidth + 1 && origin.Y >= 0 && origin.Y < 50
@@ -298,7 +244,7 @@ public sealed partial class MainWindow
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
             verify("local_library_cards_scan_blocks_navigation_and_top_actions", view.BlockNavigation && !CloseFullPage()
                 && view.CancelButton.IsEnabled && view.CancelButton.Visibility == Visibility.Visible
-                && !FindFullPageButton(view, "添加文件夹").IsEnabled);
+                && !FindFullPageButton(view, "新建音乐库").IsEnabled);
             ((IInvokeProvider)new ButtonAutomationPeer(view.CancelButton).GetPattern(PatternInterface.Invoke)).Invoke();
             for (int i = 0; i < 100 && !view.Editor.IsEnabled; i++) await Task.Delay(50);
             verify("local_library_cards_scan_cancel_discards_all_staged_sources", view.Editor.IsEnabled && view.Status.Text.Contains("取消")

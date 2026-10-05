@@ -42,9 +42,8 @@ public sealed partial class MainWindow
                 ? "连接飞牛并登录后使用；本地音乐和歌单可独立使用。" : "当前来源不支持此操作。");
         }
         AllMusicNavigation.IsEnabled = true;
-        foreach (var button in new[] { RemoteAlbumsNavigation, RemoteArtistsNavigation, RemoteSongsTab, RemoteAlbumsTab, RemoteArtistsTab }) Set(button, MusicSourceCapabilities.Browse);
-        if (allMusicView) RemoteSongsTab.IsEnabled = true;
-        foreach (var button in new[] { RemoteFavoritesNavigation, RemoteFavoritesTab }) Set(button, MusicSourceCapabilities.ReadFavorites);
+        foreach (var button in new[] { RemoteAlbumsNavigation, RemoteArtistsNavigation }) Set(button, MusicSourceCapabilities.Browse);
+        Set(RemoteFavoritesNavigation, MusicSourceCapabilities.ReadFavorites);
         Set(RemotePlaylistsNavigation, MusicSourceCapabilities.ReadPlaylists);
         Set(NewNasPlaylist, MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.WritePlaylists);
         NasPlaylistNavigation.IsEnabled = RemoteSupports(MusicSourceCapabilities.ReadPlaylists);

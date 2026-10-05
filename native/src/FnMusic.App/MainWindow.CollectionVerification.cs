@@ -18,6 +18,9 @@ public sealed partial class MainWindow
         try
         {
             motionPreferenceOverride = false;
+            Verify("browse_duplicate_tabs_removed_sidebar_kept", Root.FindName("RemoteSongsTab") is null
+                && Root.FindName("RemoteFavoritesTab") is null && Root.FindName("RemoteAlbumsTab") is null
+                && Root.FindName("RemoteArtistsTab") is null && AllMusicNavigation is not null && RemoteFavoritesNavigation is not null);
             music.Player.IsMuted = true;
             if (!Environment.GetCommandLineArgs().Contains("--preview-collections")) throw new InvalidOperationException();
             SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
