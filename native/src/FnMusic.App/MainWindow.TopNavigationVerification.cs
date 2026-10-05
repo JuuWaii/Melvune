@@ -70,6 +70,7 @@ public sealed partial class MainWindow
             await VerifyPlaylistCreationDialogAsync(verify, () => CreateLocalPlaylistFromDialogAsync(), null, "top_modal_guard", 120, beforeSubmit: async () =>
             {
                 await SearchFromTopAsync(); await ReturnFromTopAsync();
+                InvokeSettingsButton(TitleBarSettings); await Task.Delay(80);
                 verify("top_actions_do_not_navigate_under_modal_dialog", themedDialogOpen && ReferenceEquals(activePlaylistPage, manager) && !manager.IsDisposed);
             });
             var form = new PlaylistPageView("顶部返回夹具", new StackPanel(), new ListView(), new StackPanel(), new TextBlock(), localLifetime.Token);

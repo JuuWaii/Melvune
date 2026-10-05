@@ -163,6 +163,7 @@ public sealed partial class MainWindow
             finally { quickDialog.Hide(); await showing; }
             verify("motion_early_dialog_close_cleans_up_animation", quickSurface is not null && Settled(quickSurface) && !themedDialogOpen);
             motionPreferenceOverride = false;
+            await ShowHomeAsync();
             var stillDialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "无动画验证", CloseButtonText = "关闭" };
             opened = new(TaskCreationOptions.RunContinuationsAsynchronously);
             stillDialog.Opened += (_, _) => opened.TrySetResult();
@@ -173,6 +174,9 @@ public sealed partial class MainWindow
                 for (int i = 0; i < 10 && (FindDialogMotionSurface(stillDialog) is not { } candidateSurface || !Settled(candidateSurface)); i++)
                     await Task.Delay(20);
                 verify("motion_disabled_dialog_is_immediately_settled", FindDialogMotionSurface(stillDialog) is { } surface && Settled(surface));
+                InvokeSettingsButton(TitleBarSettings); await Task.Delay(80);
+                verify("modal_dialog_blocks_titlebar_settings_navigation", themedDialogOpen && HomePanel.Visibility == Visibility.Visible
+                    && SettingsPanel.Visibility == Visibility.Collapsed);
             }
             finally { stillDialog.Hide(); await showing; }
             verify("motion_all_transitions_preserve_audio_and_queue", ReferenceEquals(audio, music.Player.Source)

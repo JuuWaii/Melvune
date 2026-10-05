@@ -11,3 +11,9 @@
 最终报告 `.review-audit/top-navigation-review-app/collection-window-verification.json`，时间 `2026-10-05T16:59:12.4104056+08:00`，574/574、stage=complete、error 为空；Debug/Release 零警告零错误，隐私回归 8/8。首次主题断言在通知落定前执行而失败；补充 80 毫秒等待与浅/深色诊断后，Root、TitleBar、品牌、搜索和返回的 ActualTheme 均与请求一致，生产主题逻辑保持。最新独立 Release 位于 `.review-audit/top-navigation-release-app`，保留完整目录运行。
 
 实际窗口截图已观察新布局，但鼠标工具两次激活均返回 `failed to activate captured window`，未执行点击；已正常关闭自建的合成数据窗口。原生按钮 Invoke 检查不代表实际标题栏鼠标输入或不同 DPI 全部通过。本轮不写入真实 NAS，也不更新已有 preview.8 固定包。
+
+## 验证包准备时发现的模态导航问题
+
+真实 ContentDialog 打开后调用标题栏齿轮，旧代码仍会切换背后的主页面；返回和搜索已保护，但共用主导航入口缺少相同检查。先增加原生齿轮 Invoke 回归，旧代码在 `.review-audit/modal-before-app/ui-motion-verification.json` 的 `modal_dialog_blocks_titlebar_settings_navigation` 处失败。修复后，`NavigateMainContentAsync` 在 `themedDialogOpen` 时拒绝离开，避免隐藏或释放弹窗下的页面。
+
+完整窗口报告 `.review-audit/modal-fixed-app/collection-window-verification.json`，时间 `2026-10-05T17:22:40.9260406+08:00`，575/575、stage=complete、error 为空。新增检查在真实弹窗打开时调用原生齿轮按钮并验证首页保持；歌单命名弹窗检查也同时调用返回、搜索和齿轮，确认原管理页没有被释放。Debug/Release 构建零警告零错误。该修复将进入独立 preview.9 verified 包；初始 preview.9 包保留，不覆盖。实际鼠标输入与不同 DPI 的边界仍保留。

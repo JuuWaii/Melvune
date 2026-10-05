@@ -121,7 +121,7 @@ public sealed partial class MainWindow
 
     private async Task<bool> NavigateMainContentAsync(FrameworkElement target)
     {
-        if (closed) return false;
+        if (closed || themedDialogOpen) return false;
         if (!CloseFullPage()) return false;
         if (!CloseQueuePage()) return false;
         CloseTrackContextMenu();
