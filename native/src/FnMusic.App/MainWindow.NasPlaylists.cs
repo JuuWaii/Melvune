@@ -31,6 +31,13 @@ public sealed partial class MainWindow
     {
         IReadOnlyList<NasPlaylist> playlists = [];
         if (closed || !IsCurrentPlaylistClient(api)) return;
+        if (createNew)
+        {
+            int version = contentNavigationVersion;
+            var created = await CreateNasPlaylistFromDialogAsync(api);
+            if (created is null || closed || version != contentNavigationVersion || !IsCurrentPlaylistClient(api)) return;
+            selectedPlaylist = created;
+        }
         var picked = pickedTrack ?? TrackList.SelectedItem as MusicTrack;
         NasPlaylistSnapshot? snapshot = null;
         bool busy = false, rendering = false;
@@ -153,7 +160,6 @@ public sealed partial class MainWindow
         if (!IsCurrentPlaylistClient(api)) { if (ReferenceEquals(activePlaylistPage, view)) ClosePlaylistPage(); return; }
         await Run(() => Refresh(selectedPlaylist));
         if (ct.IsCancellationRequested || closed || !IsCurrentPlaylistClient(api)) return;
-        if (createNew) { name.Text = ""; name.Focus(Microsoft.UI.Xaml.FocusState.Programmatic); }
 #if DEBUG
         if (ReferenceEquals(activePlaylistPage, view)) nasPlaylistPageOpened?.Invoke(view);
 #endif

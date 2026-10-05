@@ -50,6 +50,13 @@ public sealed partial class MainWindow
     {
         var catalog = LocalPlaylistCatalog.Empty;
         if (closed) return;
+        if (createNew)
+        {
+            int version = contentNavigationVersion;
+            var created = await CreateLocalPlaylistFromDialogAsync();
+            if (created is null || closed || version != contentNavigationVersion) return;
+            selectedPlaylist = created;
+        }
         var pickedTrack = picked ?? TrackList.SelectedItem as MusicTrack;
         var picker = new ComboBox { Header = "选择本地歌单", DisplayMemberPath = "Name", HorizontalAlignment = HorizontalAlignment.Stretch };
         var name = new TextBox { Header = "歌单名称", MaxLength = 120, PlaceholderText = "输入名称后新建或改名" };
@@ -217,7 +224,6 @@ public sealed partial class MainWindow
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
         catch (Exception) { status.Text = "本地歌单无法读取，原文件已保留；请刷新后重试。"; }
         finally { busy = false; editor.IsEnabled = true; UpdateButtons(); }
-        if (createNew) { name.Text = ""; name.Focus(FocusState.Programmatic); }
 #if DEBUG
         if (ReferenceEquals(activePlaylistPage, view)) playlistPageOpened?.Invoke(view);
 #endif

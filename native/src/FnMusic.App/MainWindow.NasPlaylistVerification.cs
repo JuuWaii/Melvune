@@ -113,6 +113,24 @@ public sealed partial class MainWindow
         {
             await ShowNasPlaylistsAsync(api); await done.Task.WaitAsync(TimeSpan.FromSeconds(15));
             nasPlaylistPageOpened = null;
+            int createWrites = handler.Writes;
+            await VerifyPlaylistCreationDialogAsync(verify, () => ShowNasPlaylistsAsync(api, createNew: true), null, "nas_plus_cancel", 32);
+            verify("nas_plus_cancel_never_writes", handler.Writes == createWrites && !handler.Exists);
+            await VerifyPlaylistCreationDialogAsync(verify, () => ShowNasPlaylistsAsync(api, createNew: true), "  加号飞牛歌单  ", "nas_plus_create", 32);
+            verify("nas_plus_create_confirms_and_selects_sidebar", handler.Name == "加号飞牛歌单" && handler.Writes == createWrites + 1
+                && NasPlaylistNavigation.SelectedItem is NasPlaylist selected && selected.Name == "加号飞牛歌单"
+                && activePlaylistPage?.List.Items.Count == 0);
+            await ReturnFromPlaylistPageAsync();
+            ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId);
+            ViewModel.PlaybackRouter.Register(new CapabilityPlaybackSource(new NasPlaybackSource(api), MusicSourceCapabilities.ReadPlaylists));
+            createWrites = handler.Writes;
+            verify("nas_plus_read_only_never_opens_or_writes", await CreateNasPlaylistFromDialogAsync(api) is null && !themedDialogOpen && handler.Writes == createWrites);
+            ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId);
+            ViewModel.PlaybackRouter.Register(new NasPlaybackSource(api));
+            await VerifyPlaylistCreationDialogAsync(verify, async () => { await CreateNasPlaylistFromDialogAsync(api); }, "旧会话禁止创建", "nas_plus_session_change", 32,
+                beforeAccept: () => playlistTestClient = null);
+            verify("nas_plus_session_change_before_accept_never_writes", handler.Writes == createWrites);
+            playlistTestClient = api;
             handler.Exists = true; handler.Name = "旧账号歌单夹具";
             var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

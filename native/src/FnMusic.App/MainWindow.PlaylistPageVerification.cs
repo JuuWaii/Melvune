@@ -87,9 +87,16 @@ public sealed partial class MainWindow
         await ReturnFromPlaylistPageAsync();
         verify("playlist_back_preserves_browse_context", LibraryPanel.Visibility == Visibility.Visible && PlaylistPanel.Visibility == Visibility.Collapsed
             && ReferenceEquals(oldItems, TrackList.ItemsSource) && ReferenceEquals(oldSelection, TrackList.SelectedItem) && page == oldPage && searchQuery == oldQuery);
-        await ShowLocalPlaylistsAsync(createNew: true);
-        verify("playlist_plus_enters_name_without_creating_data", activePlaylistPage?.Fields.Children.OfType<TextBox>().Single().Text == ""
+        await VerifyPlaylistCreationDialogAsync(verify, () => ShowLocalPlaylistsAsync(createNew: true), null, "playlist_plus_cancel", 120);
+        verify("playlist_plus_cancel_preserves_catalog_and_page", activePlaylistPage is null && LibraryPanel.Visibility == Visibility.Visible
             && (await playlistStore.LoadAsync()).Revision == latest.Revision);
+        await VerifyPlaylistCreationDialogAsync(verify, () => ShowLocalPlaylistsAsync(createNew: true), "  加号新歌单  ", "playlist_plus_create", 120);
+        var created = (await playlistStore.LoadAsync()).Playlists.Last();
+        verify("playlist_plus_create_trims_and_selects_sidebar", created.Name == "加号新歌单" && created.Entries.Count == 0
+            && LocalPlaylistNavigation.SelectedItem is LocalPlaylist selected && selected.Id == created.Id
+            && activePlaylistPage?.List.Items.Count == 0 && (await playlistStore.LoadAsync()).Playlists.Count == 4);
+        verify("sidebar_categories_have_distinct_headings", new[] { "音乐浏览", "歌单", "音乐库与设置" }
+            .All(label => FindSongVisual<TextBlock>(SidebarHost, text => text.Text == label) is { IsLoaded: true, ActualHeight: > 0, Margin.Top: >= 8 }));
         await ShowHomeAsync();
         verify("home_navigation_is_independent_of_remote_connection", HomePanel.Visibility == Visibility.Visible && PlaylistPanel.Visibility == Visibility.Collapsed && activePlaylistPage is null);
         await ShowSettingsPanelAsync();
