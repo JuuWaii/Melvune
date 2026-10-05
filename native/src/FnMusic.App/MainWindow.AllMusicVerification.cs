@@ -6,6 +6,8 @@ using FnMusic.Core;
 using FnMusic.Infrastructure;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Automation.Peers;
+using Microsoft.UI.Xaml.Automation.Provider;
 
 namespace FnMusic.App;
 
@@ -99,7 +101,14 @@ public sealed partial class MainWindow
             try
             {
                 var pending = LoadAllMusicPageAsync(1, true); await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-                CancelLocalScan_Click(this, new RoutedEventArgs()); await pending;
+                await Task.Delay(100); Root.UpdateLayout();
+                verify("all_music_scan_progress_and_cancel_render_in_browse", BrowseScanProgress.Visibility == Visibility.Visible
+                    && BrowseScanStatus.Text == LocalScanStatus.Text && BrowseScanStatus.Text.Contains("已读取")
+                    && BrowseScanStatus.ActualWidth > 100 && BrowseCancelLocalScan.IsLoaded && BrowseCancelLocalScan.IsEnabled
+                    && BrowseCancelLocalScan.ActualWidth > 0);
+                ((IInvokeProvider)new ButtonAutomationPeer(BrowseCancelLocalScan).GetPattern(PatternInterface.Invoke)).Invoke(); await pending;
+                verify("all_music_scan_cancel_hides_browse_progress", BrowseScanProgress.Visibility == Visibility.Collapsed
+                    && CancelLocalScan.Visibility == Visibility.Collapsed);
                 verify("all_music_rescan_cancel_keeps_sources_page_and_audio", oldSources.All(item => ReferenceEquals(localSources[item.Key], item.Value))
                     && ReferenceEquals(oldItems, TrackList.ItemsSource) && page == 2 && total == 55 + localTracks.Length && ReferenceEquals(audio, music.Player.Source));
             }

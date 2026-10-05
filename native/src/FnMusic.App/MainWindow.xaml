@@ -149,7 +149,12 @@
      <Button x:Name="NextPage" Content="下一页" Click="Next_Click" IsEnabled="False"/>
      <Button x:Name="FavoriteToggle" Content="收藏歌曲" IsEnabled="False" Visibility="Collapsed" Click="Favorite_Click"/>
      <Button x:Name="TrackActionsButton" Content="更多操作" IsEnabled="False" Click="TrackActions_Click" ToolTipService.ToolTip="歌曲操作：右键歌曲或 Shift+F10"/>
-    </StackPanel><TextBlock x:Name="PageStatus" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="FavoriteStatus" TextWrapping="Wrap"/>
+    </StackPanel><TextBlock x:Name="PageStatus" TextTrimming="CharacterEllipsis"/>
+    <Grid x:Name="BrowseScanProgress" Visibility="{Binding Visibility, ElementName=CancelLocalScan}" ColumnSpacing="12">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+     <TextBlock x:Name="BrowseScanStatus" Text="{Binding Text, ElementName=LocalScanStatus}" TextWrapping="Wrap" VerticalAlignment="Center" AutomationProperties.LiveSetting="Polite"/>
+     <Button x:Name="BrowseCancelLocalScan" Grid.Column="1" Content="取消扫描" Click="CancelLocalScan_Click"/>
+    </Grid><TextBlock x:Name="FavoriteStatus" TextWrapping="Wrap"/>
    </StackPanel></ScrollViewer>
 
    <ListView x:Name="CollectionList" Grid.Row="1" SelectionMode="Single" Visibility="Collapsed" IsItemClickEnabled="True" ItemClick="Collection_ItemClick">
