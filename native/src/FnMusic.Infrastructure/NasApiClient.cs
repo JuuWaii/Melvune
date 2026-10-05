@@ -11,6 +11,9 @@ public sealed partial class NasApiClient : IDisposable
 {
     private readonly HttpClient http;
     private readonly ServerEndpoint endpoint;
+    private readonly CancellationTokenSource lifetime = new();
+    private readonly CancellationToken lifetimeToken;
+    private int disposed;
     private string? token;
     private readonly object sessionGate = new();
     private long sessionVersion;
@@ -18,9 +21,10 @@ public sealed partial class NasApiClient : IDisposable
     public NasApiClient(ServerEndpoint endpoint, HttpMessageHandler? handler = null, Guid sourceInstanceId = default)
     {
         this.endpoint = endpoint;
+        lifetimeToken = lifetime.Token;
         SourceInstanceId = sourceInstanceId;
         http = new HttpClient(handler ?? new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false })
-        { Timeout = TimeSpan.FromSeconds(15) };
+        { Timeout = Timeout.InfiniteTimeSpan };
     }
 
     public void RestoreSession(string sessionToken)
@@ -164,6 +168,11 @@ public sealed partial class NasApiClient : IDisposable
     }
     private async Task<JsonDocument> RequestAsync(HttpMethod method, string path, object? body, CancellationToken ct)
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct, lifetimeToken);
+        // ResponseHeadersRead 不把正文读取计入 HttpClient.Timeout；整个 JSON 请求共用同一期限。
+        deadline.CancelAfter(TimeSpan.FromSeconds(15));
+        var requestToken = deadline.Token;
         var session = CaptureSession();
         using var request = new HttpRequestMessage(method, new Uri(endpoint.ApiUri, path));
         if (session.Token is not null) request.Headers.Add("Cookie", "music-token=" + Uri.EscapeDataString(session.Token));
@@ -171,33 +180,44 @@ public sealed partial class NasApiClient : IDisposable
         if (body is not null) request.Content = JsonContent.Create(body);
         try
         {
-            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            requestToken.ThrowIfCancellationRequested();
+            using var response = await http.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, requestToken);
+            requestToken.ThrowIfCancellationRequested();
             if ((int)response.StatusCode is >= 300 and < 400) throw new MusicApiException(MusicFailure.RedirectRejected);
-            if (response.StatusCode == HttpStatusCode.Unauthorized) RejectSession(session.Version, ct);
+            if (response.StatusCode == HttpStatusCode.Unauthorized) RejectSession(session.Version, requestToken);
             if (!response.IsSuccessStatusCode) throw new MusicApiException(MusicFailure.Rejected);
             // 即使 Content-Length 缺失也限制读取量，防止异常响应耗尽内存。
-            using var input = await response.Content.ReadAsStreamAsync(ct);
+            using var input = await response.Content.ReadAsStreamAsync(requestToken);
             using var output = new MemoryStream();
             byte[] buffer = new byte[8192];
             int count;
-            while ((count = await input.ReadAsync(buffer, ct)) != 0)
+            while ((count = await input.ReadAsync(buffer, requestToken)) != 0)
             {
                 if (output.Length + count > 2 * 1024 * 1024) throw new MusicApiException(MusicFailure.InvalidResponse);
-                await output.WriteAsync(buffer.AsMemory(0, count), ct);
+                await output.WriteAsync(buffer.AsMemory(0, count), requestToken);
             }
+            requestToken.ThrowIfCancellationRequested();
             using var envelope = JsonDocument.Parse(output.ToArray());
             var root = envelope.RootElement;
             if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("code", out var code) || code.ValueKind != JsonValueKind.Number || !code.TryGetInt32(out int codeValue))
                 throw new MusicApiException(MusicFailure.InvalidResponse);
-            if (codeValue == 120001) RejectSession(session.Version, ct);
+            if (codeValue == 120001) RejectSession(session.Version, requestToken);
             if (codeValue is not (0 or 200)) throw new MusicApiException(MusicFailure.Rejected);
-            return JsonDocument.Parse(root.TryGetProperty("data", out var data) ? data.GetRawText() : "null");
+            var result = JsonDocument.Parse(root.TryGetProperty("data", out var data) ? data.GetRawText() : "null");
+            try { requestToken.ThrowIfCancellationRequested(); return result; }
+            catch { result.Dispose(); throw; }
         }
         catch (JsonException) { throw new MusicApiException(MusicFailure.InvalidResponse); }
         catch (HttpRequestException) { throw new MusicApiException(MusicFailure.Unavailable); }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested) { throw new MusicApiException(MusicFailure.Unavailable); }
     }
-    public void Dispose() { ClearSession(); http.Dispose(); }
+    public void Dispose()
+    {
+        if (Interlocked.Exchange(ref disposed, 1) != 0) return;
+        // 收到响应头后 HttpClient.Dispose 不会取消正文读取，必须主动取消客户端生命周期。
+        lifetime.Cancel();
+        ClearSession(); http.Dispose(); lifetime.Dispose();
+    }
     private static string? ReadOptionalString(JsonElement item, string name) =>
         item.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
     private static string ReadAlbum(JsonElement item)
