@@ -30,6 +30,7 @@ public sealed partial class MainWindow
         public bool IsDisposed { get; private set; }
         public bool IsForm { get; private set; }
         public TextBlock TitleText { get; } = new() { FontSize = 24, FontWeight = global::Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        public StackPanel? HeadingActions { get; private set; }
         public Guid? LocalPlaylistId { get; set; }
         public PlaylistReference? RemotePlaylistReference { get; set; }
         public double HeaderHeightLimit { get; init; } = 260;
@@ -84,6 +85,15 @@ public sealed partial class MainWindow
             List.Visibility = Visibility.Collapsed; List.MinHeight = 0;
             PlayButton.Visibility = Visibility.Collapsed;
             Grid.SetRow(Editor, 2); Header.MaxHeight = double.PositiveInfinity;
+        }
+        public void SetHeadingActions(StackPanel actions)
+        {
+            HeadingActions = actions;
+            heading.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            var host = new ContentControl { Content = actions, HorizontalContentAlignment = HorizontalAlignment.Stretch };
+            Grid.SetColumn(host, 3);
+            host.SetBinding(Control.IsEnabledProperty, new Binding { Source = Editor, Path = new PropertyPath(nameof(Control.IsEnabled)) });
+            heading.Children.Add(host);
         }
         public void Dispose()
         {

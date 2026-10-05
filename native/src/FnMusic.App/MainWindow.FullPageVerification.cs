@@ -41,13 +41,16 @@ public sealed partial class MainWindow
 
     private async Task ClickFullPageButtonAsync(PlaylistPageView view, string label)
     {
-        var button = view.Actions.Children.OfType<Button>().Single(item => item.Content.ToString() == label);
+        var button = FindFullPageButton(view, label);
         if (!button.IsEnabled) throw new InvalidOperationException("Fixture control disabled: " + label);
         ((IInvokeProvider)new ButtonAutomationPeer(button).GetPattern(PatternInterface.Invoke)).Invoke();
         await Task.Delay(50);
         for (int i = 0; i < 200 && !view.Editor.IsEnabled; i++) await Task.Delay(50);
         if (!view.Editor.IsEnabled) throw new TimeoutException();
     }
+    private static Button FindFullPageButton(PlaylistPageView view, string label) => view.Actions.Children.OfType<Button>()
+        .Concat(view.HeadingActions?.Children.OfType<Button>() ?? [])
+        .Single(item => item.Tag?.ToString() == label || item.Content.ToString() == label);
 
     private async Task VerifyQueueDrawerLayoutAsync(Action<string, bool> verify, PlaylistPageView view)
     {
@@ -179,6 +182,13 @@ public sealed partial class MainWindow
             verify("local_library_full_page_no_dialog", !themedDialogOpen && view.List.Items.Count == catalog.Libraries.Count
                 && view.List.SelectedItem is LocalLibrary selected && selected.SourceId == selectedLibrary.SourceId);
             await VerifyFullPageLayoutAsync(verify, view, "local_library");
+            Root.UpdateLayout();
+            var firstCard = (view.List.ContainerFromIndex(0) as ListViewItem)?.ContentTemplateRoot;
+            verify("local_library_cards_show_name_and_directory", ReferenceEquals(view.List.ItemTemplate, Root.Resources["LocalLibraryCardTemplate"])
+                && firstCard is not null && FindSongVisual<TextBlock>(firstCard, text => text.Text == selectedLibrary.Name) is { ActualWidth: > 0 }
+                && FindSongVisual<TextBlock>(firstCard, text => text.Text == selectedLibrary.Directory) is { ActualWidth: > 0 });
+            await VerifyLibraryHeadingAsync(verify, view);
+            await VerifyLibraryCardScanAsync(verify, view);
             var name = view.Fields.Children.OfType<TextBox>().Single(box => box.Header.ToString() == "库名称");
             var group = view.Fields.Children.OfType<TextBox>().Single(box => box.Header.ToString() == "分组（可选）");
             var path = view.Fields.Children.OfType<TextBox>().Single(box => box.Header.ToString() == "文件夹路径");
@@ -228,9 +238,12 @@ public sealed partial class MainWindow
             verify("local_library_full_page_original_files_unchanged", originalHashes.All(item => File.Exists(item.Key)
                 && Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(item.Key))) == item.Value));
             revision = (await localLibraryStore.LoadAsync()).Revision;
-            await ClickFullPageButtonAsync(view, "添加音乐库");
+            await ClickFullPageButtonAsync(view, "添加文件夹");
             verify("local_library_full_page_add_form_no_implicit_write", view.List.SelectedItem is null && path.Text == ""
-                && (await localLibraryStore.LoadAsync()).Revision == revision);
+                && view.Fields.Visibility == Visibility.Visible && (await localLibraryStore.LoadAsync()).Revision == revision);
+            await ClickFullPageButtonAsync(view, "收起编辑");
+            verify("local_library_cards_collapse_editor_without_write", view.Fields.Visibility == Visibility.Collapsed && view.Header.ActualHeight < 1
+                && view.List.ActualHeight > 100 && (await localLibraryStore.LoadAsync()).Revision == revision);
             view.BlockNavigation = true;
             verify("management_full_page_write_blocks_back", !CloseFullPage() && ReferenceEquals(fullPageView, view) && !view.IsDisposed);
             view.BlockNavigation = false;
@@ -246,6 +259,75 @@ public sealed partial class MainWindow
         }
         verify("management_full_page_back_cleanup", fullPageView is null && FullPageHost.Content is null
             && NormalContent.IsEnabled && LyricsInteractionHost.IsEnabled);
+    }
+
+    private async Task VerifyLibraryHeadingAsync(Action<string, bool> verify, PlaylistPageView view)
+    {
+        var size = AppWindow.Size;
+        try
+        {
+            AppWindow.Resize(new global::Windows.Graphics.SizeInt32(820, 560)); await Task.Delay(100); Root.UpdateLayout();
+            var add = FindFullPageButton(view, "添加文件夹"); var scan = FindFullPageButton(view, "扫描音乐库");
+            var origin = scan.TransformToVisual(view.Layout).TransformPoint(new global::Windows.Foundation.Point());
+            verify("local_library_heading_actions_fit_compact_window", add.IsLoaded && scan.IsLoaded && add.ActualWidth > 0 && scan.ActualWidth > 0
+                && origin.X + scan.ActualWidth <= view.Layout.ActualWidth + 1 && origin.Y >= 0 && origin.Y < 50
+                && view.TitleText.ActualWidth > 100 && view.CancelButton.Visibility == Visibility.Collapsed);
+        }
+        finally { AppWindow.Resize(size); await Task.Delay(100); Root.UpdateLayout(); }
+    }
+
+    private async Task VerifyLibraryCardScanAsync(Action<string, bool> verify, PlaylistPageView view)
+    {
+        var catalog = await localLibraryStore.LoadAsync();
+        // The preceding removal fixture intentionally leaves one in-memory source unregistered.
+        ApplyLocalCatalog(catalog);
+        await RestoreLocalSourcesAsync(default);
+        var oldSources = catalog.Libraries.ToDictionary(item => item.SourceId, item => localSources[item.SourceId]);
+        var audio = music.Player.Source;
+        var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var second = catalog.Libraries.Skip(1).First();
+        localPageMetadataReader = async (file, ct) =>
+        {
+            if (file.StartsWith(Path.TrimEndingDirectorySeparator(second.Directory) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            { entered.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); }
+            return new("扫描夹具", "夹具", 60);
+        };
+        try
+        {
+            ((IInvokeProvider)new ButtonAutomationPeer(FindFullPageButton(view, "扫描音乐库")).GetPattern(PatternInterface.Invoke)).Invoke();
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            verify("local_library_cards_scan_blocks_navigation_and_top_actions", view.BlockNavigation && !CloseFullPage()
+                && view.CancelButton.IsEnabled && view.CancelButton.Visibility == Visibility.Visible
+                && !FindFullPageButton(view, "添加文件夹").IsEnabled);
+            ((IInvokeProvider)new ButtonAutomationPeer(view.CancelButton).GetPattern(PatternInterface.Invoke)).Invoke();
+            for (int i = 0; i < 100 && !view.Editor.IsEnabled; i++) await Task.Delay(50);
+            verify("local_library_cards_scan_cancel_discards_all_staged_sources", view.Editor.IsEnabled && view.Status.Text.Contains("取消")
+                && oldSources.All(item => ReferenceEquals(localSources[item.Key], item.Value))
+                && (await localLibraryStore.LoadAsync()).Revision == catalog.Revision && ReferenceEquals(audio, music.Player.Source));
+        }
+        finally { localPageMetadataReader = null; }
+        await ClickFullPageButtonAsync(view, "扫描音乐库");
+        verify("local_library_cards_scan_applies_all_sources_without_catalog_write", view.Status.Text.Contains("扫描完成")
+            && catalog.Libraries.All(item => !ReferenceEquals(localSources[item.SourceId], oldSources[item.SourceId]))
+            && (await localLibraryStore.LoadAsync()).Revision == catalog.Revision && ReferenceEquals(audio, music.Player.Source));
+
+        oldSources = catalog.Libraries.ToDictionary(item => item.SourceId, item => localSources[item.SourceId]);
+        entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        localPageMetadataReader = async (_, ct) => { entered.TrySetResult(); await release.Task.WaitAsync(ct); return new("过期扫描", "夹具", 60); };
+        try
+        {
+            ((IInvokeProvider)new ButtonAutomationPeer(FindFullPageButton(view, "扫描音乐库")).GetPattern(PatternInterface.Invoke)).Invoke();
+            await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var external = await localLibraryStore.SaveAsync(catalog);
+            release.TrySetResult();
+            for (int i = 0; i < 100 && !view.Editor.IsEnabled; i++) await Task.Delay(50);
+            verify("local_library_cards_scan_conflict_preserves_sources_and_catalog", view.Editor.IsEnabled && view.Status.Text.Contains("刷新")
+                && oldSources.All(item => ReferenceEquals(localSources[item.Key], item.Value))
+                && (await localLibraryStore.LoadAsync()).Revision == external.Revision && ReferenceEquals(audio, music.Player.Source));
+            await ClickFullPageButtonAsync(view, "刷新音乐库");
+        }
+        finally { release.TrySetResult(); localPageMetadataReader = null; }
     }
 }
 #endif

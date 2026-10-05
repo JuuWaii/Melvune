@@ -3,6 +3,14 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
  <Grid x:Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Loaded="Root_Loaded">
   <Grid.Resources>
+   <DataTemplate x:Key="LocalLibraryCardTemplate">
+    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="20" Margin="0,0,0,8" MinHeight="92">
+     <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="44"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+      <Border Width="44" Height="44" CornerRadius="8" Background="{ThemeResource ControlFillColorSecondaryBrush}" VerticalAlignment="Center"><FontIcon Glyph="&#xE8B7;" FontSize="24"/></Border>
+      <StackPanel Grid.Column="1" Spacing="5" VerticalAlignment="Center"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Directory}" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><TextBlock Text="{Binding Group}" FontSize="12" TextTrimming="CharacterEllipsis" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+     </Grid>
+    </Border>
+   </DataTemplate>
    <Style x:Key="PlayerIconButtonStyle" TargetType="Button">
     <Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="MinWidth" Value="32"/><Setter Property="Padding" Value="4"/>
    </Style>
