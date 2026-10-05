@@ -146,14 +146,14 @@ public sealed partial class MainWindow
         { if (queue.Select(track.Reference) is { } selected) await PlayTrackAsync(selected); return; }
         var tracks = list.Items.Cast<object>().Select(ContextTrack).OfType<MusicTrack>().Where(ContextPlayable).ToArray();
         if (!queue.Replace(tracks, track.Reference)) return;
-        queueOrigin = ReferenceEquals(list, TrackList) ? localView ? "本地音乐当前页" : "飞牛歌曲当前页" : "歌单页面";
+        queueOrigin = ReferenceEquals(list, TrackList) ? allMusicView ? "所有音乐当前页" : localView ? "本地音乐当前页" : "飞牛歌曲当前页" : "歌单页面";
         await PlayTrackAsync(track);
     }
     private async Task OpenContextCollectionAsync(MusicTrack track, CollectionKind kind, string id, string name)
     {
         if (!ContextRemoteBrowse(track) || !await NavigateMainContentAsync(LibraryPanel)) return;
         if (!ContextRemoteBrowse(track)) return;
-        localView = favoritesView = false; parentArtist = null;
+        allMusicView = localView = favoritesView = false; parentArtist = null;
         collectionKind = kind; collection = new MusicCollection(id, name, null); collectionListPage = 1;
         SearchInput.Text = searchQuery = ""; UpdateCollectionView(); await LoadPageAsync(1);
     }

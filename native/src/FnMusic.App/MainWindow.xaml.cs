@@ -17,7 +17,7 @@ public sealed partial class MainWindow : Window
         AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1360, 900));
         InitializePlayback();
         InitializePresentation();
-        PlayerBar.SizeChanged += (_, _) => UpdateQueuePaneLayout();
+        PlayerBar.SizeChanged += (_, _) => { UpdateQueuePaneLayout(); UpdateLibraryHeaderLayout(); };
         ViewModel.SessionChanging += ResetLibrary;
         ViewModel.PropertyChanged += ConnectionCapabilitiesChanged;
         UpdateSourceCommands();

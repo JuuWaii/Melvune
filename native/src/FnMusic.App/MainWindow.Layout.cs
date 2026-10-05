@@ -8,6 +8,7 @@ public sealed partial class MainWindow
     private void UpdateAdaptiveLayout(double width)
     {
         if (width <= 0 || closed) return;
+        UpdateLibraryHeaderLayout();
         activePlaylistPage?.Adapt(Root.ActualHeight - PlayerBar.ActualHeight);
         bool compact = width < 1100;
         fullPageView?.Adapt(Root.ActualHeight);
@@ -35,5 +36,10 @@ public sealed partial class MainWindow
         double artworkSize = Math.Clamp(Math.Min(width * .34, Root.ActualHeight - 460), 120, 480);
         FullArtworkPanel.Width = FullArtworkPanel.Height = artworkSize;
         UpdateQueuePaneLayout();
+    }
+    private void UpdateLibraryHeaderLayout()
+    {
+        if (Root.ActualHeight <= 0 || closed) return;
+        LibraryHeaderScroll.MaxHeight = Math.Max(80, Root.ActualHeight - PlayerBar.ActualHeight - 48 - LibraryPanel.RowSpacing - 80);
     }
 }

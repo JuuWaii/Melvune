@@ -26,7 +26,7 @@ public sealed partial class MainWindow
     private async Task ShowLocalMusicAsync()
     {
         if (!await NavigateMainContentAsync(LibraryPanel)) return;
-        localView = true; favoritesView = false; parentArtist = null; collectionKind = null; collection = null;
+        allMusicView = false; localView = true; favoritesView = false; parentArtist = null; collectionKind = null; collection = null;
         SearchInput.Text = searchQuery = ""; UpdateCollectionView();
         await LoadPageAsync(1);
     }
@@ -124,7 +124,7 @@ public sealed partial class MainWindow
 
     private async void LocalFilter_Changed(object sender, SelectionChangedEventArgs e)
     {
-        if (updatingLibraryFilters || !localView) return;
+        if (updatingLibraryFilters || !(localView || allMusicView)) return;
         if (ReferenceEquals(sender, LocalGroupFilter))
         {
             var groups = localCatalog.Libraries.Select(item => item.Group).Distinct().Order().ToArray();

@@ -125,7 +125,7 @@ public sealed partial class MainWindow
                 ApplyLocalCatalog(expected);
                 foreach (var source in scanned) ReplaceLocalSource(source);
                 view.Status.Text = PlaybackStatus.Text = $"扫描完成，{scanned.Count} 个音乐库，共 {scanned.Sum(source => source.Tracks.Count)} 首。";
-                if (localView) await LoadPageAsync(page);
+                if (localView || allMusicView) await LoadPageAsync(page);
             }, true);
         };
         save.Click += async (_, _) =>
@@ -160,7 +160,7 @@ public sealed partial class MainWindow
                 if (rescanned is not null) ReplaceLocalSource(rescanned);
                 Render(updated.SourceId);
                 view.Status.Text = PlaybackStatus.Text = rescanned is null ? "音乐库设置已保存。" : $"音乐库已保存，扫描到 {rescanned.Tracks.Count} 首。";
-                if (localView) await LoadPageAsync(page);
+                if (localView || allMusicView) await LoadPageAsync(page);
             }, true);
         };
         remove.Click += async (_, _) =>
@@ -171,7 +171,7 @@ public sealed partial class MainWindow
                 catalog = await localLibraryStore.SaveAsync(catalog with { Libraries = catalog.Libraries.Where(item => item.SourceId != selected.SourceId).ToArray() }, ct);
                 ct.ThrowIfCancellationRequested(); ApplyLocalCatalog(catalog); Render(null);
                 view.Status.Text = PlaybackStatus.Text = "已移除音乐库，音乐文件与歌单引用保留。";
-                if (localView) await LoadPageAsync(page);
+                if (localView || allMusicView) await LoadPageAsync(page);
             }, true);
         };
         view.Reload = () => Run(() => Refresh((list.SelectedItem as LocalLibrary)?.SourceId), false);

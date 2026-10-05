@@ -15,7 +15,8 @@ public sealed partial class MainWindow
     private void UpdateCollectionView()
     {
         UpdateSourceCommands();
-        LocalLibraryFilters.Visibility = localView ? Visibility.Visible : Visibility.Collapsed;
+        UpdateBrowseSourceFilter();
+        LocalLibraryFilters.Visibility = localView || allMusicView && browseScope != BrowseScope.Nas ? Visibility.Visible : Visibility.Collapsed;
         bool listing = collectionKind is not null && collection is null;
         CollectionList.Visibility = CollectionOpen.Visibility = listing ? Visibility.Visible : Visibility.Collapsed;
         TrackList.Visibility = listing ? Visibility.Collapsed : Visibility.Visible;
@@ -29,7 +30,7 @@ public sealed partial class MainWindow
     private async Task SwitchCollectionAsync(CollectionKind? kind)
     {
         if (!RequireRemoteCapability(MusicSourceCapabilities.Browse)) return;
-        localView = false;
+        allMusicView = false; localView = false;
         favoritesView = false;
         parentArtist = null;
         collectionKind = kind; collection = null; collectionListPage = 1;
@@ -38,7 +39,7 @@ public sealed partial class MainWindow
         AnimateViewEntry(LibraryPanel);
         await LoadPageAsync(1);
     }
-    private async void Songs_Click(object sender, RoutedEventArgs e) => await SwitchCollectionAsync(null);
+    private async void Songs_Click(object sender, RoutedEventArgs e) { if (allMusicView) await LoadPageAsync(1); else await SwitchCollectionAsync(null); }
     private async void Albums_Click(object sender, RoutedEventArgs e) => await SwitchCollectionAsync(CollectionKind.Album);
     private async void Artists_Click(object sender, RoutedEventArgs e) => await SwitchCollectionAsync(CollectionKind.Artist);
     private async void CollectionBack_Click(object sender, RoutedEventArgs e)

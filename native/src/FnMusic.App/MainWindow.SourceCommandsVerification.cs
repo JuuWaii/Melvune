@@ -17,11 +17,11 @@ public sealed partial class MainWindow
         try
         {
             UpdateSourceCommands();
-            verify("unregistered_remote_navigation_disabled", !RemoteMusicNavigation.IsEnabled && !RemoteFavoritesNavigation.IsEnabled
+            verify("unregistered_remote_navigation_disabled", !RemoteSongsTab.IsEnabled && !RemoteFavoritesNavigation.IsEnabled && AllMusicNavigation.IsEnabled
                 && !RemotePlaylistsNavigation.IsEnabled && !RemoteSettingsNavigation.IsEnabled);
             ViewModel.PlaybackRouter.Register(new RemoteCapabilityFixture(id, MusicSourceCapabilities.Browse));
             ConnectionCapabilitiesChanged(ViewModel, new(nameof(ViewModel.AuthenticatedClient)));
-            verify("read_only_browse_navigation", RemoteMusicNavigation.IsEnabled && RemoteAlbumsNavigation.IsEnabled && RemoteArtistsTab.IsEnabled
+            verify("read_only_browse_navigation", RemoteSongsTab.IsEnabled && RemoteAlbumsNavigation.IsEnabled && RemoteArtistsTab.IsEnabled
                 && !RemoteFavoritesTab.IsEnabled && !RemotePlaylistsNavigation.IsEnabled && !RemoteSettingsNavigation.IsEnabled
                 && !SearchInput.IsEnabled && !SearchAction.IsEnabled);
             await SwitchCollectionAsync(null);
@@ -73,14 +73,14 @@ public sealed partial class MainWindow
             await SearchAsync();
             verify("empty_search_requires_browse_preserves_search_results", currentQuery == "合成" && searchQuery == currentQuery
                 && ReferenceEquals(searchItems, TrackList.ItemsSource) && PageStatus.Text == searchPageStatus
-                && SearchAction.IsEnabled && !RemoteMusicNavigation.IsEnabled);
+                && SearchAction.IsEnabled && !RemoteSongsTab.IsEnabled);
             ViewModel.PlaybackRouter.Unregister(id);
             ViewModel.PlaybackRouter.Register(new RemoteCapabilityFixture(id, MusicSourceCapabilities.Browse));
             await SwitchCollectionAsync(null);
             items = TrackList.ItemsSource;
             ViewModel.PlaybackRouter.Unregister(id);
             ConnectionCapabilitiesChanged(ViewModel, new(nameof(ViewModel.AuthenticatedClient)));
-            verify("disconnected_remote_navigation_disabled", !RemoteMusicNavigation.IsEnabled && !RemoteFavoritesTab.IsEnabled
+            verify("disconnected_remote_navigation_disabled", !RemoteSongsTab.IsEnabled && !RemoteFavoritesTab.IsEnabled && AllMusicNavigation.IsEnabled
                 && !RemotePlaylistsNavigation.IsEnabled && !RemoteSettingsNavigation.IsEnabled);
             var panel = LibraryPanel.Visibility;
             await ShowLibraryAsync();

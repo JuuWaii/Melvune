@@ -14,7 +14,7 @@ public sealed partial class MainWindow
     {
         if (!RequireRemoteCapability(MusicSourceCapabilities.ReadFavorites)) return;
         AnimateViewEntry(LibraryPanel);
-        localView = false;
+        allMusicView = false; localView = false;
         favoritesView = true; parentArtist = null; collectionKind = null; collection = null;
         SearchInput.Text = searchQuery = ""; UpdateCollectionView(); await LoadPageAsync(1);
     }

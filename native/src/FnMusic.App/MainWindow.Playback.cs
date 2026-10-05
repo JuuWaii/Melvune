@@ -87,7 +87,7 @@ public sealed partial class MainWindow
     {
         if (!RequireRemoteCapability(MusicSourceCapabilities.Browse)) return;
         if (!await NavigateMainContentAsync(LibraryPanel)) return;
-        localView = false;
+        allMusicView = false; localView = false;
 #if DEBUG
         if (IsSyntheticPreview) { SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible; await SwitchCollectionAsync(null); return; }
 #endif
@@ -101,7 +101,7 @@ public sealed partial class MainWindow
     private async Task ShowSettingsPanelAsync()
     { await NavigateMainContentAsync(SettingsPanel); }
     private async void Refresh_Click(object sender, RoutedEventArgs e)
-    { if (localView) await LoadLocalPageAsync(1, true); else await LoadPageAsync(1); }
+    { if (allMusicView) await LoadAllMusicPageAsync(1, true); else if (localView) await LoadLocalPageAsync(1, true); else await LoadPageAsync(1); }
     private async void Previous_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page - 1);
     private async void Next_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page + 1);
     private async void Search_Click(object sender, RoutedEventArgs e) => await SearchAsync();
@@ -114,18 +114,19 @@ public sealed partial class MainWindow
     private async Task SearchAsync()
     {
         string query = SearchInput.Text.Trim();
-        if (!localView && !RequireRemoteCapability(query.Length == 0 ? MusicSourceCapabilities.Browse : MusicSourceCapabilities.Search)) return;
+        if (!allMusicView && !localView && !RequireRemoteCapability(query.Length == 0 ? MusicSourceCapabilities.Browse : MusicSourceCapabilities.Search)) return;
         favoritesView = false;
         parentArtist = null; collectionKind = null; collection = null; UpdateCollectionView();
         searchQuery = query;
         await LoadPageAsync(1);
     }
     private async void ClearSearch_Click(object sender, RoutedEventArgs e)
-    { if (localView) { SearchInput.Text = searchQuery = ""; await LoadPageAsync(1); } else await SwitchCollectionAsync(null); }
+    { if (allMusicView || localView) { SearchInput.Text = searchQuery = ""; await LoadPageAsync(1); } else await SwitchCollectionAsync(null); }
 
     private async Task LoadPageAsync(int requestedPage)
     {
         if (closed) return;
+        if (allMusicView) { await LoadAllMusicPageAsync(requestedPage); return; }
         if (localView) { await LoadLocalPageAsync(requestedPage); return; }
         if (!RequireRemoteCapability(favoritesView ? MusicSourceCapabilities.ReadFavorites
             : collectionKind is null && searchQuery.Length > 0 ? MusicSourceCapabilities.Search : MusicSourceCapabilities.Browse)) return;
@@ -226,7 +227,7 @@ public sealed partial class MainWindow
     {
         if (track.IsCue) { PlaybackStatus.Text = "CUE 分轨播放将在转码适配阶段接入。"; return; }
         if (TrackList.ItemsSource is not IEnumerable<MusicTrack> tracks || !queue.Replace(tracks, track.Reference)) return;
-        queueOrigin = localView ? "本地音乐当前页" : favoritesView ? "收藏当前页" : collectionKind is not null ? $"{CollectionLabel}详情当前页" : searchQuery.Length == 0 ? "曲库当前页" : "搜索结果当前页";
+        queueOrigin = allMusicView ? "所有音乐当前页" : localView ? "本地音乐当前页" : favoritesView ? "收藏当前页" : collectionKind is not null ? $"{CollectionLabel}详情当前页" : searchQuery.Length == 0 ? "曲库当前页" : "搜索结果当前页";
         await PlayTrackAsync(track);
     }
     private async void PreviousTrack_Click(object sender, RoutedEventArgs e)
@@ -426,6 +427,15 @@ public sealed partial class MainWindow
             PlaybackStatus.Text = queue.Count > 0 ? "旧飞牛播放已停止，本地条目保留在队列中。" : localView ? "本地音乐可直接播放。" : "登录后刷新曲库。";
         }
         UpdateQueueStatus();
+        if (allMusicView)
+        {
+            libraryWork.Cancel();
+            var localRows = (TrackList.ItemsSource as IEnumerable<MusicTrack>)?.Where(track => localSources.ContainsKey(track.SourceInstanceId)).ToArray() ?? [];
+            TrackList.ItemsSource = localRows; TrackList.SelectedIndex = localRows.Length > 0 ? 0 : -1;
+            page = 1; total = localRows.Length; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
+            PageStatus.Text = "飞牛连接已变化；当前保留本地歌曲，点击刷新重新汇总。";
+            UpdateFavoriteButton(); return;
+        }
         // 浏览来源与播放来源可以不同；保留本地筛选、分页及正在进行的扫描。
         if (localView) { UpdateFavoriteButton(); return; }
         libraryWork.Cancel();
