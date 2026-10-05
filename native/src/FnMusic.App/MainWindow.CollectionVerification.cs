@@ -173,6 +173,7 @@ public sealed partial class MainWindow
             UpdateLyricsPosition();
             Verify("lyrics_follow_seek", activeLyric >= 1 && LyricsList.SelectedIndex == activeLyric);
             await VerifyFullscreenPresentationAsync(Verify);
+            await VerifyPlayerControlsAsync(Verify);
             foreach (int target in new[] { 5, 45, 10 })
             {
                 var timer = System.Diagnostics.Stopwatch.StartNew();
@@ -223,7 +224,7 @@ public sealed partial class MainWindow
             ApplySystemTheme();
             await OpenNowPlayingAsync();
             UpdateAdaptiveLayout(800);
-            Verify("compact_player_rows", Microsoft.UI.Xaml.Controls.Grid.GetRow(TransportPanel) == 1 && Microsoft.UI.Xaml.Controls.Grid.GetColumnSpan(TransportPanel) == 3);
+            Verify("compact_player_rows", Microsoft.UI.Xaml.Controls.Grid.GetRow(TransportPanel) == 1 && Microsoft.UI.Xaml.Controls.Grid.GetColumnSpan(TransportPanel) == 2);
             Verify("compact_lyrics_readable_column", Microsoft.UI.Xaml.Controls.Grid.GetColumn(FullLyricsText) == 0
                 && Microsoft.UI.Xaml.Controls.Grid.GetColumnSpan(FullLyricsText) == 2 && FullArtworkPanel.Visibility == Visibility.Collapsed);
             UpdateCollectionView();

@@ -20,6 +20,14 @@
    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="White"/>
    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="White"/>
    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="White"/>
+   <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#202020"/>
+   <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#404040"/>
+   <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="#606060"/>
+   <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="White"/>
+   <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="White"/>
+   <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="White"/>
+   <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="#202020"/>
+   <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOver" Color="#404040"/>
 
    <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#202020"/>
    <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#404040"/>
@@ -48,6 +56,14 @@
    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundChecked" Color="#101010"/>
    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPointerOver" Color="#101010"/>
    <SolidColorBrush x:Key="CheckBoxCheckGlyphForegroundCheckedPressed" Color="#101010"/>
+   <SolidColorBrush x:Key="ToggleButtonBackgroundChecked" Color="#E5E5E5"/>
+   <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="#CCCCCC"/>
+   <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="#AAAAAA"/>
+   <SolidColorBrush x:Key="ToggleButtonForegroundChecked" Color="#101010"/>
+   <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPointerOver" Color="#101010"/>
+   <SolidColorBrush x:Key="ToggleButtonForegroundCheckedPressed" Color="#101010"/>
+   <SolidColorBrush x:Key="ToggleButtonBorderBrushChecked" Color="#E5E5E5"/>
+   <SolidColorBrush x:Key="ToggleButtonBorderBrushCheckedPointerOver" Color="#CCCCCC"/>
 
    <SolidColorBrush x:Key="AccentFillColorDefaultBrush" Color="#E5E5E5"/>
    <SolidColorBrush x:Key="AccentFillColorSecondaryBrush" Color="#CCCCCC"/>

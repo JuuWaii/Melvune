@@ -4,6 +4,10 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Automation;
+using Microsoft.UI.Xaml.Automation.Peers;
+using Microsoft.UI.Xaml.Automation.Provider;
+using FnMusic.Core;
 
 namespace FnMusic.App;
 
@@ -56,7 +60,7 @@ public sealed partial class MainWindow
         verify("now_playing_escape_wired_and_return_focused", Root.KeyboardAccelerators.Any(key => key.Key == global::Windows.System.VirtualKey.Escape)
             && ReferenceEquals(FocusManager.GetFocusedElement(Root.XamlRoot), NowPlayingBack));
         verify("now_playing_reuses_transport_volume_and_output_controls", ReferenceEquals(FullTransportHost.Content, TransportPanel)
-            && ReferenceEquals(FullOptionsHost.Content, PlayerOptionsPanel) && ReferenceEquals(FullOutputHost.Content, OutputDeviceButton)
+            && TransportPanel.Children.Contains(PlayerOptionsPanel) && PlayerOptionsPanel.Children.Contains(OutputDeviceButton)
             && !PlayerLayout.Children.Contains(TransportPanel) && PlayerBar.Visibility == Visibility.Collapsed
             && Microsoft.UI.Xaml.Controls.Grid.GetRowSpan(LyricsPanel) == 2);
         verify("now_playing_uses_current_presentation_and_same_audio", FullNowTitle.Text == ((FnMusic.Core.MusicTrack)NowCover.DataContext).Title
@@ -99,9 +103,9 @@ public sealed partial class MainWindow
         await Task.Delay(100);
         verify("now_playing_return_preserves_window_and_restores_controls", AppWindow.Presenter.Kind == presenter.Kind
             && AppWindow.Size.Width == originalSize.Width && AppWindow.Size.Height == originalSize.Height
-            && PlayerLayout.Children.Contains(TransportPanel) && PlayerLayout.Children.Contains(PlayerOptionsPanel)
-            && PlayerLayout.Children.Contains(OutputDeviceButton) && FullTransportHost.Content is null && FullOptionsHost.Content is null
-            && FullOutputHost.Content is null && PlayerBar.Visibility == Visibility.Visible);
+            && PlayerLayout.Children.Contains(TransportPanel) && TransportPanel.Children.Contains(PlayerOptionsPanel)
+            && PlayerOptionsPanel.Children.Contains(OutputDeviceButton) && FullTransportHost.Content is null
+            && PlayerBar.Visibility == Visibility.Visible);
         verify("now_playing_return_keeps_page_selection_and_playback", ReferenceEquals(TrackList.ItemsSource, items)
             && ReferenceEquals(TrackList.SelectedItem, selected) && page == originalPage
             && LibraryPanel.Visibility == libraryVisibility && SettingsPanel.Visibility == settingsVisibility
@@ -136,6 +140,110 @@ public sealed partial class MainWindow
         if (previousSelection is { } reference && TrackList.ItemsSource is IEnumerable<FnMusic.Core.MusicTrack> restored)
             TrackList.SelectedItem = restored.FirstOrDefault(track => track.Reference == reference);
         await OpenNowPlayingAsync();
+    }
+
+    private async Task VerifyPlayerControlsAsync(Action<string, bool> verify)
+    {
+        var size = AppWindow.Size;
+        var mode = queue.Mode;
+        double volume = music.Player.Volume;
+        bool muted = music.Player.IsMuted;
+        var audio = music.Player.Source;
+        var device = music.Player.AudioDevice;
+        bool ControlsFit()
+        {
+            Root.UpdateLayout();
+            var buttons = new FrameworkElement[] { QueueModeButton, PreviousTrackButton, PlayPauseButton, NextTrackButton,
+                StopButton, OutputDeviceButton, MuteToggle, VolumeSlider, QueueButton };
+            double center = PlayPauseButton.TransformToVisual(TransportPanel).TransformPoint(new(0, PlayPauseButton.ActualHeight / 2)).Y;
+            foreach (var control in buttons)
+            {
+                var bounds = control.TransformToVisual(TransportPanel).TransformBounds(new(0, 0, control.ActualWidth, control.ActualHeight));
+                if (!control.IsLoaded || bounds.Width <= 0 || bounds.X < -1 || bounds.Right > TransportPanel.ActualWidth + 1
+                    || Math.Abs(bounds.Y + bounds.Height / 2 - center) > 1) return false;
+            }
+            var speaker = MuteToggle.TransformToVisual(TransportPanel).TransformPoint(new());
+            var slider = VolumeSlider.TransformToVisual(TransportPanel).TransformPoint(new());
+            var list = QueueButton.TransformToVisual(TransportPanel).TransformPoint(new());
+            return speaker.X + MuteToggle.ActualWidth <= slider.X
+                && slider.X + VolumeSlider.ActualWidth <= list.X
+                && Math.Abs(list.X + QueueButton.ActualWidth - TransportPanel.ActualWidth) < 1;
+        }
+        try
+        {
+            // Playback is already paused by the preceding fixture; never emit audio while checking mute.
+            verify("player_controls_fixture_paused", music.Player.PlaybackSession.PlaybackState == global::Windows.Media.Playback.MediaPlaybackState.Paused);
+            foreach (int width in new[] { 1360, 980, 820 })
+            {
+                await CloseNowPlayingAsync();
+                AppWindow.Resize(new global::Windows.Graphics.SizeInt32(width, 680)); await Task.Delay(100);
+                verify("player_controls_same_row_main_" + width, ControlsFit() && PlayerBar.Visibility == Visibility.Visible);
+                await OpenNowPlayingAsync(); await Task.Delay(50);
+                verify("player_controls_same_row_lyrics_" + width, ControlsFit() && PlayerBar.Visibility == Visibility.Collapsed
+                    && ReferenceEquals(FullTransportHost.Content, TransportPanel));
+            }
+            foreach (var item in new[] { SequentialModeItem, RepeatAllModeItem, RepeatOneModeItem, ShuffleModeItem })
+            {
+                QueueModeButton.Flyout.ShowAt(QueueModeButton); await Task.Delay(30);
+                ((IToggleProvider)new ToggleMenuFlyoutItemAutomationPeer(item).GetPattern(PatternInterface.Toggle)).Toggle();
+                verify("player_mode_menu_" + item.Tag, queue.Mode.ToString() == (string)item.Tag
+                    && new[] { SequentialModeItem, RepeatAllModeItem, RepeatOneModeItem, ShuffleModeItem }.Count(option => option.IsChecked) == 1
+                    && item.IsChecked && AutomationProperties.GetName(QueueModeButton).Contains(item.Text)
+                    && QueueModeButton.Content is FontIcon { Glyph.Length: > 0 });
+                QueueModeButton.Flyout.Hide(); await Task.Delay(30);
+            }
+            music.Player.IsMuted = false; VolumeSlider.Value = 37; UpdateVolumeControl();
+            var toggle = (IToggleProvider)new ToggleButtonAutomationPeer(MuteToggle).GetPattern(PatternInterface.Toggle);
+            toggle.Toggle();
+            verify("player_speaker_mutes_without_losing_volume", music.Player.IsMuted && VolumeIcon.Glyph == "\uE74F"
+                && Math.Abs(music.Player.Volume - .37) < .001 && VolumeSlider.Value == 37 && AutomationProperties.GetName(MuteToggle) == "取消静音");
+            toggle.Toggle();
+            verify("player_speaker_unmutes_at_previous_volume", !music.Player.IsMuted && VolumeIcon.Glyph == "\uE767"
+                && Math.Abs(music.Player.Volume - .37) < .001 && AutomationProperties.GetName(MuteToggle) == "静音");
+            VolumeSlider.Value = 0;
+            verify("player_zero_volume_uses_silent_icon", !music.Player.IsMuted && VolumeIcon.Glyph == "\uE74F");
+            VolumeSlider.Value = 37; toggle.Toggle();
+            await CloseNowPlayingAsync(); await OpenNowPlayingAsync();
+            var presented = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            int frames = 0;
+            void Presented(object? sender, object args) { if (++frames >= 2) presented.TrySetResult(); }
+            CompositionTarget.Rendering += Presented;
+            try { await Task.WhenAny(presented.Task, Task.Delay(2000)); }
+            finally { CompositionTarget.Rendering -= Presented; }
+            verify("player_reparented_controls_rendered_before_input", presented.Task.IsCompleted && ControlsFit());
+            verify("player_page_switch_retains_mode_volume_device_and_audio", queue.Mode == QueueMode.Shuffle && music.Player.IsMuted
+                && VolumeSlider.Value == 37 && MuteToggle.IsChecked == true && ReferenceEquals(music.Player.Source, audio)
+                && music.Player.AudioDevice?.Id == device?.Id);
+            var outputOpened = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            void OutputOpened(object? sender, object args) => outputOpened.TrySetResult();
+            OutputDeviceButton.Flyout.Opened += OutputOpened;
+            try
+            {
+                ((IInvokeProvider)new ButtonAutomationPeer(OutputDeviceButton).GetPattern(PatternInterface.Invoke)).Invoke();
+                await Task.WhenAny(outputOpened.Task, Task.Delay(1500)); Root.UpdateLayout();
+            }
+            finally { OutputDeviceButton.Flyout.Opened -= OutputOpened; }
+            await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "player-output-diagnostic.json"),
+                System.Text.Json.JsonSerializer.Serialize(new { Loaded = OutputDevices.IsLoaded, Enabled = OutputDeviceButton.IsEnabled,
+                    Opened = outputOpened.Task.IsCompleted, Open = OutputDeviceButton.Flyout.IsOpen,
+                    Width = OutputDevices.ActualWidth, Height = OutputDevices.ActualHeight, SameRoot = OutputDevices.XamlRoot == Root.XamlRoot,
+                    ContentType = OutputDeviceButton.Content?.GetType().Name, AccessibleName = AutomationProperties.GetName(OutputDeviceButton) }));
+            verify("player_output_icon_opens_device_picker", outputOpened.Task.IsCompleted && OutputDeviceButton.Flyout.IsOpen
+                && OutputDevices.ActualWidth > 0 && OutputDevices.ActualHeight > 0 && OutputDevices.XamlRoot == Root.XamlRoot && OutputDeviceButton.Content is FontIcon
+                && AutomationProperties.GetName(OutputDeviceButton) == "音频输出设备");
+            OutputDeviceButton.Flyout.Hide(); await Task.Delay(50);
+            ((IInvokeProvider)new ButtonAutomationPeer(QueueButton).GetPattern(PatternInterface.Invoke)).Invoke(); await Task.Delay(50);
+            verify("player_rightmost_queue_icon_opens_drawer", queuePage is not null && QueueOverlay.Visibility == Visibility.Visible
+                && QueuePane.HorizontalAlignment == HorizontalAlignment.Right && QueueButton.Content is FontIcon);
+            await CloseQueuePageAsync();
+        }
+        finally
+        {
+            QueueModeButton.Flyout.Hide(); OutputDeviceButton.Flyout.Hide(); CloseQueuePage(force: true);
+            queue.Mode = mode; UpdateQueueModeControl();
+            VolumeSlider.Value = volume * 100; music.Player.IsMuted = muted; UpdateVolumeControl();
+            AppWindow.Resize(size); await Task.Delay(100); UpdateAdaptiveLayout(Root.ActualWidth);
+        }
     }
 }
 #endif

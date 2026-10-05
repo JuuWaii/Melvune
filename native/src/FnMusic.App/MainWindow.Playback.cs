@@ -30,6 +30,8 @@ public sealed partial class MainWindow
 
     private void InitializePlayback()
     {
+        UpdateQueueModeControl();
+        UpdateVolumeControl();
         // 单行 TextBox 会处理 Enter；仍接收该路由事件以提交搜索。
         SearchInput.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(Search_KeyDown), true);
         // Thumb 会处理指针事件，必须接收已处理事件才能可靠识别拖动结束。
@@ -238,8 +240,29 @@ public sealed partial class MainWindow
     { if (queue.Previous() is { } track) await PlayTrackAsync(track); }
     private async void NextTrack_Click(object sender, RoutedEventArgs e)
     { if (queue.Next(automatic: false) is { } track) await PlayTrackAsync(track); }
-    private void QueueMode_Changed(object sender, SelectionChangedEventArgs e)
-    { if (queue is not null && QueueModePicker.SelectedIndex is >= 0 and <= 3) queue.Mode = (QueueMode)QueueModePicker.SelectedIndex; }
+    private void QueueMode_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is ToggleMenuFlyoutItem { Tag: string value } && Enum.TryParse<QueueMode>(value, out var mode) && Enum.IsDefined(mode))
+        { queue.Mode = mode; UpdateQueueModeControl(); }
+    }
+    private void UpdateQueueModeControl()
+    {
+        var (name, glyph) = queue.Mode switch
+        {
+            QueueMode.RepeatAll => ("列表循环", "\uE8EE"),
+            QueueMode.RepeatOne => ("单曲循环", "\uE8ED"),
+            QueueMode.Shuffle => ("随机播放", "\uE8B1"),
+            _ => ("顺序播放", "\uE72A")
+        };
+        QueueModeIcon.Glyph = glyph;
+        string description = "播放模式：" + name;
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(QueueModeButton, description);
+        ToolTipService.SetToolTip(QueueModeButton, description);
+        SequentialModeItem.IsChecked = queue.Mode == QueueMode.Sequential;
+        RepeatAllModeItem.IsChecked = queue.Mode == QueueMode.RepeatAll;
+        RepeatOneModeItem.IsChecked = queue.Mode == QueueMode.RepeatOne;
+        ShuffleModeItem.IsChecked = queue.Mode == QueueMode.Shuffle;
+    }
     private async Task PlayTrackAsync(MusicTrack track)
     {
         if (closed) return;
@@ -292,8 +315,19 @@ public sealed partial class MainWindow
     { if (queuePage is not null) await CloseQueuePageAsync(); else ShowQueuePage(); }
     private void Resume_Click(object sender, RoutedEventArgs e) { if (mediaReady) { music.Player.Play(); PlaybackStatus.Text = "正在播放"; } }
     private void Stop_Click(object sender, RoutedEventArgs e) { ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false; PlaybackStatus.Text = "已停止"; NowPlaying.Text = ""; }
-    private void Mute_Click(object sender, RoutedEventArgs e) => music.Player.IsMuted = MuteToggle.IsChecked == true;
-    private void Volume_Changed(object sender, RangeBaseValueChangedEventArgs e) { if (music is not null) music.Player.Volume = e.NewValue / 100; }
+    private void Mute_Click(object sender, RoutedEventArgs e)
+    { music.Player.IsMuted = MuteToggle.IsChecked == true; UpdateVolumeControl(); }
+    private void Volume_Changed(object sender, RangeBaseValueChangedEventArgs e)
+    { if (music is not null) { music.Player.Volume = e.NewValue / 100; if (VolumeIcon is not null && MuteToggle is not null) UpdateVolumeControl(); } }
+    private void UpdateVolumeControl()
+    {
+        bool muted = music.Player.IsMuted;
+        MuteToggle.IsChecked = muted;
+        VolumeIcon.Glyph = muted || music.Player.Volume == 0 ? "\uE74F" : "\uE767";
+        string action = muted ? "取消静音" : "静音";
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(MuteToggle, action);
+        ToolTipService.SetToolTip(MuteToggle, $"{action}（音量 {music.Player.Volume * 100:0}%）");
+    }
     private void Seek_Changed(object sender, RangeBaseValueChangedEventArgs e)
     {
         if (updatingProgress || !mediaReady || !music.Player.PlaybackSession.CanSeek) return;

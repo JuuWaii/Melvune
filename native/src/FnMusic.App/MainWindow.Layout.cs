@@ -16,11 +16,10 @@ public sealed partial class MainWindow
         Grid.SetColumnSpan(NowPlayingDetails, compact ? 2 : 1);
         Grid.SetRow(TransportPanel, compact ? 1 : 0);
         Grid.SetColumn(TransportPanel, compact ? 0 : 1);
-        Grid.SetColumnSpan(TransportPanel, compact ? 3 : 1);
+        Grid.SetColumnSpan(TransportPanel, compact ? 2 : 1);
         while (PlayerLayout.RowDefinitions.Count < 4) PlayerLayout.RowDefinitions.Add(new() { Height = GridLength.Auto });
         Grid.SetRow(PlaybackStatus, compact ? 2 : 1);
         Grid.SetRow(QueueStatus, compact ? 3 : 2);
-        Grid.SetRow(OutputDeviceButton, compact ? 2 : 1);
         // Lyrics always own the page; short/narrow displays prioritize readable text.
         bool textOnly = width < 900 || Root.ActualHeight < 560;
         FullArtworkPanel.Visibility = textOnly ? Visibility.Collapsed : Visibility.Visible;

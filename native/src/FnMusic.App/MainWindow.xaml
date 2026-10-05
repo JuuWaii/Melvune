@@ -3,6 +3,9 @@
  xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
  <Grid x:Name="Root" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" Loaded="Root_Loaded">
   <Grid.Resources>
+   <Style x:Key="PlayerIconButtonStyle" TargetType="Button">
+    <Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="MinWidth" Value="32"/><Setter Property="Padding" Value="4"/>
+   </Style>
    <DataTemplate x:Key="QueueTrackTemplate">
     <Grid ColumnSpacing="10" Padding="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <Border Width="44" Height="44" CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="18"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
@@ -117,33 +120,39 @@
   </Grid>
   <Border x:Name="PlayerBar" Grid.Row="1" Grid.ColumnSpan="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="24,12">
    <Grid x:Name="PlayerLayout" ColumnSpacing="20" RowSpacing="6">
-    <Grid.ColumnDefinitions><ColumnDefinition x:Name="NowPlayingColumn" Width="270"/><ColumnDefinition Width="*"/><ColumnDefinition Width="230"/></Grid.ColumnDefinitions>
+    <Grid.ColumnDefinitions><ColumnDefinition x:Name="NowPlayingColumn" Width="270"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
     <Grid x:Name="NowPlayingDetails" ColumnSpacing="12">
      <Grid.ColumnDefinitions><ColumnDefinition Width="64"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
      <Button x:Name="NowCoverButton" Width="64" Height="64" Padding="0" CornerRadius="8" Click="Lyrics_Click" AutomationProperties.Name="打开或关闭全屏歌词" ToolTipService.ToolTip="全屏歌词 / 正在播放"><Grid><FontIcon Glyph="&#xE8D6;"/><Image x:Name="NowCover" Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Button>
      <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4"><TextBlock x:Name="NowPlaying" Text="选择歌曲，开始聆听" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="NowAlbum" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/></StackPanel>
     </Grid>
-    <StackPanel x:Name="TransportPanel" Grid.Column="1" Spacing="6" HorizontalAlignment="Stretch">
-     <StackPanel Orientation="Horizontal" Spacing="6" HorizontalAlignment="Center">
-      <Button Click="PreviousTrack_Click" AutomationProperties.Name="上一首" ToolTipService.ToolTip="上一首"><FontIcon Glyph="&#xE892;" FontSize="18"/></Button>
-      <Button x:Name="PlaySelectedButton" Content="播放所选" Click="PlaySelected_Click"/>
-      <Button x:Name="PlayPauseButton" Click="PlayPause_Click" AutomationProperties.Name="播放" ToolTipService.ToolTip="播放"><FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="22"/></Button>
-      <Button Click="NextTrack_Click" AutomationProperties.Name="下一首" ToolTipService.ToolTip="下一首"><FontIcon Glyph="&#xE893;" FontSize="18"/></Button>
-      <Button Click="Stop_Click" AutomationProperties.Name="停止" ToolTipService.ToolTip="停止"><FontIcon Glyph="&#xE71A;" FontSize="18"/></Button>
+    <Grid x:Name="TransportPanel" Grid.Column="1" ColumnSpacing="8" RowSpacing="6" HorizontalAlignment="Stretch">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
+     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+     <StackPanel x:Name="TransportButtons" Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
+      <Button x:Name="QueueModeButton" Style="{StaticResource PlayerIconButtonStyle}" AutomationProperties.Name="播放模式：顺序播放" ToolTipService.ToolTip="播放模式：顺序播放">
+       <FontIcon x:Name="QueueModeIcon" Glyph="&#xE72A;" FontSize="16"/>
+       <Button.Flyout><MenuFlyout><ToggleMenuFlyoutItem x:Name="SequentialModeItem" Text="顺序播放" Tag="Sequential" IsChecked="True" Click="QueueMode_Click"/><ToggleMenuFlyoutItem x:Name="RepeatAllModeItem" Text="列表循环" Tag="RepeatAll" Click="QueueMode_Click"/><ToggleMenuFlyoutItem x:Name="RepeatOneModeItem" Text="单曲循环" Tag="RepeatOne" Click="QueueMode_Click"/><ToggleMenuFlyoutItem x:Name="ShuffleModeItem" Text="随机播放" Tag="Shuffle" Click="QueueMode_Click"/></MenuFlyout></Button.Flyout>
+      </Button>
+      <Button x:Name="PreviousTrackButton" Style="{StaticResource PlayerIconButtonStyle}" Click="PreviousTrack_Click" AutomationProperties.Name="上一首" ToolTipService.ToolTip="上一首"><FontIcon Glyph="&#xE892;" FontSize="16"/></Button>
+      <Button x:Name="PlayPauseButton" Style="{StaticResource PlayerIconButtonStyle}" Click="PlayPause_Click" AutomationProperties.Name="播放" ToolTipService.ToolTip="播放"><FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="22"/></Button>
+      <Button x:Name="NextTrackButton" Style="{StaticResource PlayerIconButtonStyle}" Click="NextTrack_Click" AutomationProperties.Name="下一首" ToolTipService.ToolTip="下一首"><FontIcon Glyph="&#xE893;" FontSize="16"/></Button>
+      <Button x:Name="StopButton" Style="{StaticResource PlayerIconButtonStyle}" Click="Stop_Click" AutomationProperties.Name="停止" ToolTipService.ToolTip="停止"><FontIcon Glyph="&#xE71A;" FontSize="16"/></Button>
      </StackPanel>
-     <Slider x:Name="SeekSlider" AutomationProperties.Name="播放进度" Minimum="0" Maximum="1" IsEnabled="False" ValueChanged="Seek_Changed"/>
-     <TextBlock x:Name="PlaybackTime" Text="0:00 / 0:00" FontSize="12" HorizontalAlignment="Center"/>
-    </StackPanel>
-    <StackPanel x:Name="PlayerOptionsPanel" Grid.Column="2" Spacing="4">
-     <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="队列" Click="ManageQueue_Click"/><ComboBox x:Name="QueueModePicker" AutomationProperties.Name="播放模式" SelectedIndex="0" SelectionChanged="QueueMode_Changed"><ComboBoxItem Content="顺序播放"/><ComboBoxItem Content="列表循环"/><ComboBoxItem Content="单曲循环"/><ComboBoxItem Content="随机播放"/></ComboBox></StackPanel>
-     <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><CheckBox x:Name="MuteToggle" Content="静音" Click="Mute_Click"/><Slider Grid.Column="1" x:Name="VolumeSlider" AutomationProperties.Name="音量" Minimum="0" Maximum="100" Value="50" ValueChanged="Volume_Changed"/></Grid>
-    </StackPanel>
+     <StackPanel x:Name="PlayerOptionsPanel" Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
+      <Button x:Name="OutputDeviceButton" Style="{StaticResource PlayerIconButtonStyle}" AutomationProperties.Name="音频输出设备" ToolTipService.ToolTip="音频输出设备"><FontIcon Glyph="&#xE7F6;" FontSize="16"/>
+       <Button.Flyout><Flyout><StackPanel Spacing="8"><ComboBox x:Name="OutputDevices" Header="音频输出设备" MinWidth="240" DisplayMemberPath="Name" SelectionChanged="Output_Changed"/><Button Content="刷新设备" Click="Devices_Click"/></StackPanel></Flyout></Button.Flyout>
+      </Button>
+      <ToggleButton x:Name="MuteToggle" Width="32" Height="32" MinWidth="32" Padding="4" Click="Mute_Click" AutomationProperties.Name="静音" ToolTipService.ToolTip="静音"><FontIcon x:Name="VolumeIcon" Glyph="&#xE767;" FontSize="16"/></ToggleButton>
+      <Slider x:Name="VolumeSlider" Width="88" VerticalAlignment="Center" AutomationProperties.Name="音量" Minimum="0" Maximum="100" Value="50" ValueChanged="Volume_Changed"/>
+      <Button x:Name="QueueButton" Style="{StaticResource PlayerIconButtonStyle}" Click="ManageQueue_Click" AutomationProperties.Name="打开播放队列" ToolTipService.ToolTip="播放队列"><FontIcon Glyph="&#xE8FD;" FontSize="16"/></Button>
+     </StackPanel>
+     <Slider x:Name="SeekSlider" Grid.Row="1" Grid.ColumnSpan="2" AutomationProperties.Name="播放进度" Minimum="0" Maximum="1" IsEnabled="False" ValueChanged="Seek_Changed"/>
+     <TextBlock x:Name="PlaybackTime" Grid.Row="2" Grid.ColumnSpan="2" Text="0:00 / 0:00" FontSize="12" HorizontalAlignment="Center"/>
+    </Grid>
     <TextBlock x:Name="PlaybackStatus" Grid.Row="1" Grid.ColumnSpan="2" Text="选择本地音乐或连接飞牛开始播放。" FontSize="12" TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite"/>
     <TextBlock x:Name="QueueStatus" Grid.Row="2" Grid.ColumnSpan="2" Text="播放队列为空" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/>
-    <Button x:Name="OutputDeviceButton" Grid.Row="1" Grid.RowSpan="2" Grid.Column="2" Content="音频输出设备" HorizontalAlignment="Right">
-     <Button.Flyout><Flyout><StackPanel Spacing="8"><ComboBox x:Name="OutputDevices" Header="音频输出设备" MinWidth="240" DisplayMemberPath="Name" SelectionChanged="Output_Changed"/><Button Content="刷新设备" Click="Devices_Click"/></StackPanel></Flyout></Button.Flyout>
-    </Button>
    </Grid>
   </Border>
   </Grid></ContentControl>
@@ -160,8 +169,6 @@
       <Border x:Name="FullArtworkPanel" CornerRadius="12" Background="{ThemeResource ControlFillColorSecondaryBrush}" HorizontalAlignment="Center" Width="380" Height="380"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="80" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/><Image x:Name="FullNowCover" Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
       <StackPanel Spacing="4"><TextBlock x:Name="FullNowTitle" Text="尚未播放歌曲" FontSize="24" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock x:Name="FullNowArtist" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/></StackPanel>
       <ContentControl x:Name="FullTransportHost" HorizontalContentAlignment="Stretch"/>
-      <ContentControl x:Name="FullOptionsHost" HorizontalContentAlignment="Stretch"/>
-      <ContentControl x:Name="FullOutputHost" HorizontalContentAlignment="Stretch"/>
       <TextBlock Text="{Binding Text, ElementName=PlaybackStatus}" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis" AutomationProperties.LiveSetting="Polite"/>
      </StackPanel>
     </ScrollViewer>

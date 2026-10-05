@@ -36,7 +36,7 @@ public sealed partial class MainWindow
         if (Environment.GetCommandLineArgs().Contains("--preview-dark")) Root.RequestedTheme = ElementTheme.Dark;
         await LoadPageAsync(1);
         PlaybackStatus.Text = "合成音频交互验证，默认静音。";
-        music.Player.IsMuted = true; MuteToggle.IsChecked = true;
+        music.Player.IsMuted = true; UpdateVolumeControl();
         await LoadDevicesAsync();
         await RefreshPlaylistNavigationAsync();
         if (Environment.GetCommandLineArgs().Contains("--preview-management"))
