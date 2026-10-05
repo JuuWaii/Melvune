@@ -17,3 +17,5 @@
 真实 ContentDialog 打开后调用标题栏齿轮，旧代码仍会切换背后的主页面；返回和搜索已保护，但共用主导航入口缺少相同检查。先增加原生齿轮 Invoke 回归，旧代码在 `.review-audit/modal-before-app/ui-motion-verification.json` 的 `modal_dialog_blocks_titlebar_settings_navigation` 处失败。修复后，`NavigateMainContentAsync` 在 `themedDialogOpen` 时拒绝离开，避免隐藏或释放弹窗下的页面。
 
 完整窗口报告 `.review-audit/modal-fixed-app/collection-window-verification.json`，时间 `2026-10-05T17:22:40.9260406+08:00`，575/575、stage=complete、error 为空。新增检查在真实弹窗打开时调用原生齿轮按钮并验证首页保持；歌单命名弹窗检查也同时调用返回、搜索和齿轮，确认原管理页没有被释放。Debug/Release 构建零警告零错误。该修复将进入独立 preview.9 verified 包；初始 preview.9 包保留，不覆盖。实际鼠标输入与不同 DPI 的边界仍保留。
+
+随后在 preview.9 verified 固定包实际鼠标/键盘验收中，顶部焦点、中文输入、回车从管理页搜索、清空、齿轮进入设置、歌单详情返回、队列优先返回、歌词返回以及全屏音乐库返回已观察通过；命名弹窗打开时点击顶部齿轮和返回都保持原管理页。当前包还覆盖手动黑白切换，见 PREVIEW9_ACCEPTANCE.md。此记录补齐上述常用操作的实际输入证据；保存中操作、更多 DPI、完整登录和真实 NAS 新菜单写入等没有据此自动标记通过。

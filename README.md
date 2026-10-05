@@ -1,6 +1,6 @@
 # 飞牛音乐 Windows 原生客户端
 
-当前代码版本为 **0.2.0-preview.9**，包含顶部返回与搜索、两类歌单管理页、音乐库来源设置弹窗、右侧队列、封面歌词与黑白主题，以及 JSON/封面正文期限和关闭保护。使用范围、歌单格式升级和验证步骤见 [测试指南](docs/PREVIEW_VALIDATION.md)，源码阶段结果见 [开发清单](docs/NATIVE_BACKLOG.md)；旧 [preview.8 包验收](docs/PREVIEW8_ACCEPTANCE.md) 不替代本版包的启动及实际操作核验。尚非正式安装发行版。
+当前代码版本为 **0.2.0-preview.9**，包含顶部返回与搜索、两类歌单管理页、音乐库来源设置弹窗、右侧队列、封面歌词与黑白主题，以及 JSON/封面正文期限和关闭保护。可运行目录为 `dist/FnMusic-0.2.0-preview.9-win-x64-verified/`，保留整个目录并双击 Start-FnMusic.cmd；552 文件校验、仅 System32 PATH 启动及 39 项实际操作结果见 [preview.9 包验收](docs/PREVIEW9_ACCEPTANCE.md)。使用范围、歌单格式升级和验证步骤见 [测试指南](docs/PREVIEW_VALIDATION.md)，后续重点见 [开发清单](docs/NATIVE_BACKLOG.md)。尚非正式安装发行版。
 
 使用 C#、WinUI 3/XAML 和 FFmpeg 构建的非官方 NAS 音乐客户端，目前处于阶段 4 开发预览。
 
