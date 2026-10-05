@@ -44,7 +44,11 @@ public sealed partial class MainWindow
         {
             AppWindow.Resize(new global::Windows.Graphics.SizeInt32(820, 680));
             await Task.Delay(80); Root.UpdateLayout();
-            verify(prefix + "_compact_footer_and_status_visible", FooterFits() && view.Header.ScrollableHeight > 0);
+            await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, prefix + "-compact-layout.json"),
+                System.Text.Json.JsonSerializer.Serialize(new { Fits = FooterFits(), HeaderHeight = view.Header.ActualHeight,
+                    view.Header.MaxHeight, view.Header.ExtentHeight, view.Header.ViewportHeight, view.Header.ScrollableHeight }));
+            verify(prefix + "_compact_footer_and_status_visible", FooterFits() && view.Header.ActualHeight <= view.Header.MaxHeight + 1
+                && (view.Header.ExtentHeight <= view.Header.ViewportHeight + 1 || view.Header.ScrollableHeight > 0));
         }
         finally { AppWindow.Resize(size); await Task.Delay(80); Root.UpdateLayout(); }
     }
@@ -66,8 +70,8 @@ public sealed partial class MainWindow
         verify("playlist_sidebar_lists_same_name_by_distinct_identity", LocalPlaylistNavigation.Items.Count == 3
             && ((LocalPlaylist)LocalPlaylistNavigation.Items[0]).Id == first.Id && ((LocalPlaylist)LocalPlaylistNavigation.Items[1]).Id == second.Id);
         await ShowLocalPlaylistsAsync(second.Id);
-        verify("playlist_sidebar_entry_opens_requested_identity", activePlaylistPage?.Fields.Children.OfType<ComboBox>().Single().SelectedItem is LocalPlaylist chosen
-            && chosen.Id == second.Id && LocalPlaylistNavigation.SelectedItem is LocalPlaylist nav && nav.Id == second.Id);
+        verify("playlist_sidebar_entry_opens_requested_identity", activePlaylistPage?.LocalPlaylistId == second.Id
+            && LocalPlaylistNavigation.SelectedItem is LocalPlaylist nav && nav.Id == second.Id);
         var oldView = activePlaylistPage ?? throw new InvalidOperationException();
         await ShowLocalPlaylistsAsync(longPlaylist.Id);
         var view = activePlaylistPage ?? throw new InvalidOperationException();

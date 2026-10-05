@@ -15,13 +15,13 @@ public sealed partial class MainWindow
         && fullPageView is not { BlockNavigation: true } and not { Editor.IsEnabled: false }
         && queuePage is not { BlockNavigation: true } and not { Editor.IsEnabled: false };
 
-    private async Task<string?> RequestPlaylistNameAsync(bool remote)
+    private async Task<string?> RequestPlaylistNameAsync(bool remote, string? initialName = null)
     {
         if (!CanOpenPlaylistNameDialog()) return null;
         CloseTrackContextMenu();
-        var name = new TextBox { Header = "歌单名称", PlaceholderText = "为歌单起个名字", MaxLength = remote ? 32 : 120 };
-        var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = remote ? "新建飞牛歌单" : "新建本地歌单",
-            Content = name, PrimaryButtonText = "创建", CloseButtonText = "取消", IsPrimaryButtonEnabled = false,
+        var name = new TextBox { Header = "歌单名称", PlaceholderText = "为歌单起个名字", MaxLength = remote ? 32 : 120, Text = initialName ?? "" };
+        var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = initialName is not null ? "重命名歌单" : remote ? "新建飞牛歌单" : "新建本地歌单",
+            Content = name, PrimaryButtonText = initialName is null ? "创建" : "保存", CloseButtonText = "取消", IsPrimaryButtonEnabled = !string.IsNullOrWhiteSpace(name.Text),
             DefaultButton = ContentDialogButton.Primary };
         name.TextChanged += (_, _) => dialog.IsPrimaryButtonEnabled = !string.IsNullOrWhiteSpace(name.Text);
         dialog.PrimaryButtonClick += (_, args) => { if (string.IsNullOrWhiteSpace(name.Text)) args.Cancel = true; };
@@ -62,7 +62,7 @@ public sealed partial class MainWindow
         var name = await RequestPlaylistNameAsync(remote: true);
         if (name is null || !Writable()) return null;
         PlaylistReference? createdReference = null;
-        await WithContextPlaylistWriteAsync(async ct =>
+        await WithNasPlaylistWriteAsync(api, async ct =>
         {
             if (!Writable()) return;
             var created = await api.CreatePlaylistAsync(name, ct);

@@ -29,8 +29,11 @@ public sealed partial class MainWindow
         public Func<Task>? Reload { get; set; }
         public bool IsDisposed { get; private set; }
         public bool IsForm { get; private set; }
+        public TextBlock TitleText { get; } = new() { FontSize = 24, FontWeight = global::Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        public Guid? LocalPlaylistId { get; set; }
+        public PlaylistReference? RemotePlaylistReference { get; set; }
         public double HeaderHeightLimit { get; init; } = 260;
-        private readonly StackPanel heading = new() { Orientation = Orientation.Horizontal, Spacing = 12 };
+        private readonly Grid heading = new() { ColumnSpacing = 12 };
         private readonly ScrollViewer actionScroll;
         public PlaylistPageView(string title, StackPanel fields, ListView list, StackPanel actions, TextBlock status, CancellationToken lifetime)
         {
@@ -42,7 +45,11 @@ public sealed partial class MainWindow
                 Layout.RowDefinitions.Add(new RowDefinition { Height = height });
             heading.Children.Add(BackButton);
             heading.Children.Add(CancelButton);
-            heading.Children.Add(new TextBlock { Text = title, FontSize = 24, FontWeight = global::Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+            foreach (var width in new[] { GridLength.Auto, GridLength.Auto, new GridLength(1, GridUnitType.Star) })
+                heading.ColumnDefinitions.Add(new ColumnDefinition { Width = width });
+            Grid.SetColumn(CancelButton, 1); Grid.SetColumn(TitleText, 2);
+            TitleText.Text = title;
+            heading.Children.Add(TitleText);
             Header = new ScrollViewer { Content = fields, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled, HorizontalScrollMode = ScrollMode.Disabled, MaxHeight = 260 };
             Editor.Content = Header;

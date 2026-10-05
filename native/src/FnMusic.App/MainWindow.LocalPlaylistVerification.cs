@@ -22,8 +22,7 @@ public sealed partial class MainWindow
                 var editor = view.Editor;
                 await VerifyPlaylistPagePresentationAsync(verify, view, "playlist_page");
                 var panel = view.Fields;
-                var picker = panel.Children.OfType<ComboBox>().Single();
-                var name = panel.Children.OfType<TextBox>().Single();
+                verify("playlist_detail_has_no_catalog_form", !panel.Children.OfType<ComboBox>().Any() && !panel.Children.OfType<TextBox>().Any() && !panel.Children.OfType<CheckBox>().Any());
                 var list = view.List;
                 await VerifySharedSongRowAsync(verify, list, "playlist", artwork: true);
                 var buttons = panel.Children.OfType<Button>().Concat(panel.Children.OfType<StackPanel>().SelectMany(p => p.Children.OfType<Button>())).Concat(view.Actions.Children.OfType<Button>()).ToArray();
@@ -49,22 +48,10 @@ public sealed partial class MainWindow
                 var relinked = (await playlistStore.LoadAsync()).Playlists[0].Entries.Single();
                 verify("playlist_relink_keeps_entry_identity", relinked.Id == offline.Id && relinked.Track == available.Track && view.PlayButton.IsEnabled);
                 verify("playlist_relink_keeps_library_membership", relinked.ToTrack().LibraryIds.SequenceEqual(track.LibraryIds));
-                name.Text = "已改名"; await Click("改名");
+                await VerifyPlaylistCreationDialogAsync(verify, () => RenameLocalPlaylistAsync((LocalPlaylist)LocalPlaylistNavigation.Items[0]), "已改名", "playlist_sidebar_rename", 120, primaryLabel: "保存");
                 verify("playlist_rename_persisted", (await playlistStore.LoadAsync()).Playlists[0].Name == "已改名");
                 verify("playlist_sidebar_rename_updated", LocalPlaylistNavigation.Items.Cast<LocalPlaylist>().Single().Name == "已改名");
-                name.Text = "新建夹具"; await Click("新建");
-                verify("playlist_create_selected", picker.SelectedItem is LocalPlaylist { Name: "新建夹具" } && list.Items.Count == 0);
-                await Click("加入列表中所选歌曲");
-                await Click("加入列表中所选歌曲");
-                verify("playlist_add_deduplicated", (await playlistStore.LoadAsync()).Playlists[1].Entries.Count == 1);
-                panel.Children.OfType<CheckBox>().Single().IsChecked = true;
-                // Checkbox Click normally updates the button; invoke its automation toggle twice to fire UI events.
-                var check = panel.Children.OfType<CheckBox>().Single();
-                var toggle = (IToggleProvider)new CheckBoxAutomationPeer(check).GetPattern(PatternInterface.Toggle);
-                toggle.Toggle(); toggle.Toggle();
-                await Click("删除歌单");
-                verify("playlist_delete_only_catalog", (await playlistStore.LoadAsync()).Playlists.Count == 1 && PlaylistTrackAvailable(available));
-                verify("playlist_sidebar_delete_updated", LocalPlaylistNavigation.Items.Count == 1);
+                verify("playlist_sidebar_rename_updates_open_title", view.TitleText.Text == "已改名");
             }
             catch (Exception ex) { done.TrySetException(ex); }
             finally { if (ReferenceEquals(activePlaylistPage, view)) await ReturnFromPlaylistPageAsync(); }
@@ -72,6 +59,35 @@ public sealed partial class MainWindow
         };
         try { await ShowLocalPlaylistsAsync(); await done.Task.WaitAsync(TimeSpan.FromSeconds(15)); }
         finally { playlistPageOpened = null; }
+        await VerifyPlaylistCreationDialogAsync(verify, () => ShowLocalPlaylistsAsync(createNew: true), "新建夹具", "playlist_sidebar_new", 120);
+        var createdView = activePlaylistPage!;
+        verify("playlist_create_selected", createdView.TitleText.Text == "新建夹具" && createdView.List.Items.Count == 0);
+        var add = createdView.Fields.Children.OfType<Button>().Single();
+        for (int attempt = 0; attempt < 2; attempt++)
+        {
+            ((IInvokeProvider)new ButtonAutomationPeer(add).GetPattern(PatternInterface.Invoke)).Invoke();
+            await Task.Delay(100);
+        }
+        verify("playlist_add_deduplicated", (await playlistStore.LoadAsync()).Playlists[1].Entries.Count == 1);
+        var createdPlaylist = LocalPlaylistNavigation.Items.Cast<LocalPlaylist>().Single(p => p.Name == "新建夹具");
+        await VerifyPlaylistDeleteDialogAsync(() => DeleteLocalPlaylistAsync(createdPlaylist), accept: false);
+        verify("playlist_sidebar_cancel_delete_keeps_catalog", (await playlistStore.LoadAsync()).Playlists.Count == 2);
+        await VerifyPlaylistDeleteDialogAsync(() => DeleteLocalPlaylistAsync(createdPlaylist), accept: true);
+        verify("playlist_delete_only_catalog", (await playlistStore.LoadAsync()).Playlists.Count == 1 && PlaylistTrackAvailable(available));
+        verify("playlist_sidebar_delete_updated", LocalPlaylistNavigation.Items.Count == 1 && createdView.TitleText.Text == "已改名");
+        await ReturnFromPlaylistPageAsync();
+        var expected = (await playlistStore.LoadAsync()).Playlists.Single();
+        bool conflict = false;
+        try
+        {
+            await VerifyPlaylistCreationDialogAsync(verify, () => RenameLocalPlaylistAsync(expected), "过期改名", "playlist_sidebar_stale_rename", 120, primaryLabel: "保存", beforeSubmit: async () =>
+            {
+                var external = await playlistStore.LoadAsync();
+                await playlistStore.SaveAsync(external with { Playlists = external.Playlists.Select(p => p.Id == expected.Id ? p with { Name = "外部改名" } : p).ToArray() });
+            });
+        }
+        catch (PlaylistConflictException) { conflict = true; }
+        verify("playlist_sidebar_stale_rename_preserves_external_changes", conflict && (await playlistStore.LoadAsync()).Playlists.Single().Name == "外部改名" && !contextPlaylistWriteBusy && !themedDialogOpen);
         var final = (await playlistStore.LoadAsync()).Playlists.Single();
         await PlayLocalPlaylistAsync(final with { Entries = [available, offline] }, available);
         for (int i = 0; i < 80 && !mediaReady; i++) await Task.Delay(100);

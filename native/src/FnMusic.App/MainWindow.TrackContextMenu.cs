@@ -52,6 +52,11 @@ public sealed partial class MainWindow
     {
         CloseTrackContextMenu();
         var menu = CreateTrackContextMenu(list, track, favoriteStateKnown);
+        ShowContextMenu(menu, list, position, anchor);
+    }
+    private void ShowContextMenu(MenuFlyout menu, ListView list, global::Windows.Foundation.Point? position = null, FrameworkElement? anchor = null)
+    {
+        CloseTrackContextMenu();
         trackContextMenu = menu;
         void ThemeChanged(FrameworkElement _, object args)
         { if (ReferenceEquals(trackContextMenu, menu)) CloseTrackContextMenu(); else menu.Hide(); }

@@ -19,6 +19,8 @@ public sealed partial class MainWindow
         public int Writes;
         public Task? PauseListResponse;
         public TaskCompletionSource? ListResponseEntered;
+        public Task? PauseDetailResponse;
+        public TaskCompletionSource? DetailResponseEntered;
         private long version = 1;
         protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
@@ -26,6 +28,8 @@ public sealed partial class MainWindow
             string path = request.RequestUri!.AbsolutePath; object? data = null;
             if (request.Method == HttpMethod.Get && path.EndsWith("/playlist/list") && PauseListResponse is { } pause)
             { ListResponseEntered?.TrySetResult(); await pause; }
+            if (request.Method == HttpMethod.Get && path.EndsWith("/playlist/detail") && PauseDetailResponse is { } detailPause)
+            { DetailResponseEntered?.TrySetResult(); await detailPause; }
             if (request.Method == HttpMethod.Post)
             {
                 Writes++;
@@ -59,7 +63,8 @@ public sealed partial class MainWindow
             {
                 var editor = view.Editor; var panel = view.Fields;
                 await VerifyPlaylistPagePresentationAsync(verify, view, "nas_playlist_page");
-                var name = panel.Children.OfType<TextBox>().Single(); var list = view.List;
+                var list = view.List;
+                verify("nas_playlist_detail_has_no_catalog_form", !panel.Children.OfType<TextBox>().Any() && !panel.Children.OfType<ComboBox>().Any() && !panel.Children.OfType<CheckBox>().Any());
                 var status = view.Status;
                 var buttons = panel.Children.OfType<Button>().Concat(panel.Children.OfType<StackPanel>().SelectMany(item => item.Children.OfType<Button>())).Concat(view.Actions.Children.OfType<Button>()).ToArray();
                 async Task Click(string label)
@@ -72,36 +77,48 @@ public sealed partial class MainWindow
                     if (!editor.IsEnabled) throw new TimeoutException();
                 }
                 verify("nas_playlist_empty_play_disabled", !view.PlayButton.IsEnabled && list.Items.Count == 0);
-                name.Text = "新建飞牛夹具"; await Click("新建");
+                await VerifyPlaylistCreationDialogAsync(verify, async () => { await CreateNasPlaylistFromDialogAsync(api); }, "新建飞牛夹具", "nas_sidebar_new", 32);
                 verify("nas_playlist_ui_create", handler.Name == "新建飞牛夹具" && status.Text.Contains("核对"));
                 await Click("加入列表中所选飞牛歌曲");
                 verify("nas_playlist_ui_add", list.Items.Count == 1 && view.PlayButton.IsEnabled);
                 await VerifySharedSongRowAsync(verify, list, "nas_playlist", artwork: false);
-                name.Text = "客户端改名"; await Click("改名");
+                var expected = NasPlaylistNavigation.Items.Cast<NasPlaylist>().Single();
+                await VerifyPlaylistCreationDialogAsync(verify, () => RenameNasPlaylistAsync(api, expected), "客户端改名", "nas_sidebar_rename", 32, primaryLabel: "保存");
                 verify("nas_playlist_ui_rename", handler.Name == "客户端改名");
                 verify("nas_playlist_sidebar_rename_updated", NasPlaylistNavigation.Items.Cast<NasPlaylist>().Single().Name == "客户端改名");
                 int writes = handler.Writes;
                 handler.Name = "网页改名";
-                name.Text = "过期修改"; await Click("改名");
-                verify("nas_playlist_ui_conflict", handler.Writes == writes && status.Text.Contains("变化") && !view.PlayButton.IsEnabled);
+                expected = NasPlaylistNavigation.Items.Cast<NasPlaylist>().Single();
+                bool conflict = false;
+                try { await VerifyPlaylistCreationDialogAsync(verify, () => RenameNasPlaylistAsync(api, expected), "过期修改", "nas_sidebar_stale_rename", 32, primaryLabel: "保存"); }
+                catch (RemotePlaylistConflictException) { conflict = true; }
+                verify("nas_playlist_ui_conflict", conflict && handler.Writes == writes);
                 await Click("刷新");
-                verify("nas_playlist_ui_refresh", name.Text == "网页改名" && list.Items.Count == 1);
+                verify("nas_playlist_ui_refresh", view.TitleText.Text == "网页改名" && list.Items.Count == 1);
                 ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId);
                 ViewModel.PlaybackRouter.Register(new CapabilityPlaybackSource(new NasPlaybackSource(api), MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.Playback));
                 writes = handler.Writes;
                 await Click("刷新");
                 verify("nas_playlist_read_only_controls", list.Items.Count == 1 && view.PlayButton.IsEnabled
-                    && !name.IsEnabled && buttons.Where(button => button.Content.ToString() is not ("刷新" or "播放所选")).All(button => !button.IsEnabled));
+                    && buttons.Where(button => button.Content.ToString() is not ("刷新" or "播放所选")).All(button => !button.IsEnabled)
+                    && CreatePlaylistNavigationMenu(NasPlaylistNavigation.Items[0]).Items.OfType<MenuFlyoutItem>().Where(item => !Equals(item.Tag, "open")).All(item => !item.IsEnabled));
                 verify("nas_playlist_read_only_refresh_no_write", handler.Writes == writes && status.Text.Contains("核对"));
                 ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId);
                 ViewModel.PlaybackRouter.Register(new NasPlaybackSource(api));
                 await Click("刷新");
-                verify("nas_playlist_write_capability_restored", name.IsEnabled && buttons.Single(button => button.Content.ToString() == "移除所选歌曲").IsEnabled);
+                verify("nas_playlist_write_capability_restored", buttons.Single(button => button.Content.ToString() == "移除所选歌曲").IsEnabled
+                    && CreatePlaylistNavigationMenu(NasPlaylistNavigation.Items[0]).Items.OfType<MenuFlyoutItem>().All(item => item.IsEnabled));
                 await Click("移除所选歌曲");
                 verify("nas_playlist_ui_remove", list.Items.Count == 0 && handler.Tracks.Count == 0);
-                var checkbox = panel.Children.OfType<CheckBox>().Single();
-                ((IToggleProvider)new CheckBoxAutomationPeer(checkbox).GetPattern(PatternInterface.Toggle)).Toggle();
-                await Click("删除歌单");
+                await VerifyPlaylistDeleteDialogAsync(() => DeleteNasPlaylistAsync(api, NasPlaylistNavigation.Items.Cast<NasPlaylist>().Single()), accept: false);
+                verify("nas_playlist_sidebar_cancel_delete_keeps_server", handler.Exists);
+                var deleteExpected = NasPlaylistNavigation.Items.Cast<NasPlaylist>().Single();
+                bool deleteConflict = false;
+                try { await VerifyPlaylistDeleteDialogAsync(() => DeleteNasPlaylistAsync(api, deleteExpected), true, beforeAccept: () => handler.Tracks.Add("网页新增")); }
+                catch (RemotePlaylistConflictException) { deleteConflict = true; }
+                verify("nas_playlist_sidebar_delete_preserves_concurrent_tracks", deleteConflict && handler.Exists && handler.Tracks.Contains("网页新增"));
+                await Click("刷新"); await Click("移除所选歌曲");
+                await VerifyPlaylistDeleteDialogAsync(() => DeleteNasPlaylistAsync(api, NasPlaylistNavigation.Items.Cast<NasPlaylist>().Single()), accept: true);
                 verify("nas_playlist_ui_delete", !handler.Exists && list.Items.Count == 0);
                 verify("nas_playlist_sidebar_delete_updated", NasPlaylistNavigation.Items.Count == 0);
             }
@@ -131,6 +148,19 @@ public sealed partial class MainWindow
                 beforeAccept: () => playlistTestClient = null);
             verify("nas_plus_session_change_before_accept_never_writes", handler.Writes == createWrites);
             playlistTestClient = api;
+            var deleteEntered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var deleteRelease = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            handler.DetailResponseEntered = deleteEntered; handler.PauseDetailResponse = deleteRelease.Task;
+            var pendingDelete = DeleteNasPlaylistAsync(api, NasPlaylistNavigation.Items.Cast<NasPlaylist>().Single());
+            try
+            {
+                await deleteEntered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+                await ShowHomeAsync();
+                deleteRelease.TrySetResult(); await pendingDelete.WaitAsync(TimeSpan.FromSeconds(5));
+                verify("nas_playlist_sidebar_late_delete_read_cannot_open_dialog_or_write", !themedDialogOpen && handler.Writes == createWrites
+                    && HomePanel.Visibility == Microsoft.UI.Xaml.Visibility.Visible);
+            }
+            finally { deleteRelease.TrySetResult(); await pendingDelete.WaitAsync(TimeSpan.FromSeconds(5)); handler.PauseDetailResponse = null; }
             handler.Exists = true; handler.Name = "旧账号歌单夹具";
             var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);

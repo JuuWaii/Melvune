@@ -40,27 +40,20 @@ public sealed partial class MainWindow
         }
         var picked = pickedTrack ?? TrackList.SelectedItem as MusicTrack;
         NasPlaylistSnapshot? snapshot = null;
-        bool busy = false, rendering = false;
-        var picker = new ComboBox { Header = "选择飞牛歌单", DisplayMemberPath = "Name", HorizontalAlignment = HorizontalAlignment.Stretch };
-        var name = new TextBox { Header = "歌单名称", MaxLength = 32, PlaceholderText = "输入名称后新建或改名" };
+        bool busy = false;
+        PlaylistReference? currentReference = selectedPlaylist;
         var list = new ListView { Height = 200, SelectionMode = ListViewSelectionMode.Single };
         ConfigureSongList(list);
         list.ContextRequested += TrackList_ContextRequested;
         list.ContextCanceled += TrackContext_Canceled;
-        var confirm = new CheckBox { Content = "确认从飞牛服务器删除所选歌单" };
         var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
         var panel = new StackPanel { Spacing = 10, MinWidth = 300 };
         panel.Children.Add(new TextBlock { Text = "同步当前飞牛账号。编辑前检查服务端状态，写入后回读；网页端修改后点击刷新。最多管理 10000 首的歌单。", TextWrapping = TextWrapping.Wrap });
-        panel.Children.Add(picker); panel.Children.Add(name);
-        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var create = new Button { Content = "新建" }; var rename = new Button { Content = "改名" };
-        var delete = new Button { Content = "删除歌单" }; var refresh = new Button { Content = "刷新" };
-        foreach (var button in new[] { create, rename, delete, refresh }) actions.Children.Add(button);
-        panel.Children.Add(actions); panel.Children.Add(confirm);
+        var refresh = new Button { Content = "刷新" };
         var add = new Button { Content = "加入列表中所选飞牛歌曲" }; var remove = new Button { Content = "移除所选歌曲" };
         panel.Children.Add(add);
         var entryButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        entryButtons.Children.Add(remove);
+        entryButtons.Children.Add(remove); entryButtons.Children.Add(refresh);
         var view = new PlaylistPageView("飞牛歌单", panel, list, entryButtons, status, localLifetime.Token) { RemoteSource = api.SourceInstanceId };
         var editor = view.Editor;
         var ct = view.Lifetime.Token;
@@ -68,23 +61,23 @@ public sealed partial class MainWindow
         {
             bool selected = snapshot is not null;
             bool writable = IsCurrentPlaylistClient(api) && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.WritePlaylists);
-            create.IsEnabled = name.IsEnabled = confirm.IsEnabled = writable;
-            rename.IsEnabled = writable && selected; delete.IsEnabled = writable && selected && confirm.IsChecked == true;
             add.IsEnabled = writable && selected && picked is not null && picked.SourceInstanceId == api.SourceInstanceId;
             remove.IsEnabled = writable && selected && list.SelectedItem is MusicTrack;
             view.PlayButton.IsEnabled = !busy && selected && list.SelectedItem is MusicTrack { IsCue: false } song && ViewModel.PlaybackRouter.CanPlay(song.Reference);
         }
         void RenderSnapshot()
         {
-            name.Text = snapshot?.Playlist.Name ?? ""; confirm.IsChecked = false;
+            view.TitleText.Text = snapshot?.Playlist.Name ?? "飞牛歌单";
+            view.RemotePlaylistReference = snapshot?.Playlist.Reference;
             list.ItemsSource = snapshot?.Tracks; list.SelectedIndex = list.Items.Count > 0 ? 0 : -1;
             UpdateButtons();
-            if (ReferenceEquals(activePlaylistPage, view)) NasPlaylistNavigation.SelectedItem = playlists.FirstOrDefault(item => item.Reference == snapshot?.Playlist.Reference);
+            if (snapshot is { } current) playlists = playlists.Select(item => item.Reference == current.Playlist.Reference ? current.Playlist : item).ToArray();
+            if (ReferenceEquals(activePlaylistPage, view)) RenderNasPlaylistNavigation(api, playlists, snapshot?.Playlist.Reference);
         }
         async Task LoadSelected()
         {
             snapshot = null; RenderSnapshot();
-            if (picker.SelectedItem is NasPlaylist selected) snapshot = await api.ReadPlaylistSnapshotAsync(selected.Reference, ct);
+            if (currentReference is { } selected) snapshot = await api.ReadPlaylistSnapshotAsync(selected, ct);
             ct.ThrowIfCancellationRequested();
             if (!IsCurrentPlaylistClient(api)) throw new OperationCanceledException(ct);
             RenderSnapshot();
@@ -93,12 +86,9 @@ public sealed partial class MainWindow
         {
             playlists = await api.ListPlaylistsAsync(ct); ct.ThrowIfCancellationRequested();
             if (!IsCurrentPlaylistClient(api)) throw new OperationCanceledException(ct);
-            rendering = true;
-            picker.ItemsSource = playlists;
-            picker.SelectedItem = playlists.FirstOrDefault(item => item.Reference == selected) ?? playlists.FirstOrDefault();
-            rendering = false;
+            currentReference = (playlists.FirstOrDefault(item => item.Reference == selected) ?? playlists.FirstOrDefault())?.Reference;
             await LoadSelected();
-            if (ReferenceEquals(activePlaylistPage, view)) RenderNasPlaylistNavigation(api, playlists, (picker.SelectedItem as NasPlaylist)?.Reference);
+            if (ReferenceEquals(activePlaylistPage, view)) RenderNasPlaylistNavigation(api, playlists, currentReference);
         }
         async Task Run(Func<Task> operation, bool mutation = false)
         {
@@ -121,23 +111,7 @@ public sealed partial class MainWindow
                 busy = view.BlockNavigation = false; editor.IsEnabled = true; UpdateButtons();
             }
         }
-        picker.SelectionChanged += async (_, _) => { if (!rendering) await Run(LoadSelected); };
-        list.SelectionChanged += (_, _) => UpdateButtons(); confirm.Click += (_, _) => UpdateButtons();
-        create.Click += async (_, _) => await Run(async () =>
-        {
-            var created = await api.CreatePlaylistAsync(name.Text, ct);
-            await Refresh(created.Reference);
-        }, true);
-        rename.Click += async (_, _) =>
-        {
-            if (snapshot is not { } current) return;
-            await Run(async () => { var renamed = await api.RenamePlaylistAsync(current.Playlist, name.Text, ct); await Refresh(renamed.Reference); }, true);
-        };
-        delete.Click += async (_, _) =>
-        {
-            if (snapshot is not { } current || confirm.IsChecked != true) return;
-            await Run(async () => { await api.DeletePlaylistAsync(current, ct); await Refresh(); }, true);
-        };
+        list.SelectionChanged += (_, _) => UpdateButtons();
         add.Click += async (_, _) =>
         {
             if (snapshot is not { } current || picked is null || picked.SourceInstanceId != api.SourceInstanceId) return;
@@ -148,8 +122,8 @@ public sealed partial class MainWindow
             if (snapshot is not { } current || list.SelectedItem is not MusicTrack track) return;
             await Run(async () => { snapshot = await api.ChangePlaylistTracksAsync(current, [track.Reference], false, ct); ct.ThrowIfCancellationRequested(); RenderSnapshot(); }, true);
         };
-        refresh.Click += async (_, _) => await Run(() => Refresh((picker.SelectedItem as NasPlaylist)?.Reference));
-        view.Reload = () => Run(() => Refresh((picker.SelectedItem as NasPlaylist)?.Reference));
+        refresh.Click += async (_, _) => await Run(() => Refresh(currentReference));
+        view.Reload = () => Run(() => Refresh(currentReference));
         view.PlayButton.Click += async (_, _) =>
         {
             if (ct.IsCancellationRequested || closed || !IsCurrentPlaylistClient(api) || snapshot is not { } selected || list.SelectedItem is not MusicTrack { IsCue: false } start) return;

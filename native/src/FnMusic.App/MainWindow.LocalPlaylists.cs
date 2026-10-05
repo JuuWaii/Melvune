@@ -58,24 +58,14 @@ public sealed partial class MainWindow
             selectedPlaylist = created;
         }
         var pickedTrack = picked ?? TrackList.SelectedItem as MusicTrack;
-        var picker = new ComboBox { Header = "选择本地歌单", DisplayMemberPath = "Name", HorizontalAlignment = HorizontalAlignment.Stretch };
-        var name = new TextBox { Header = "歌单名称", MaxLength = 120, PlaceholderText = "输入名称后新建或改名" };
         var list = new ListView { SelectionMode = ListViewSelectionMode.Single, Height = 180 };
         ConfigureSongList(list);
         list.ContextRequested += TrackList_ContextRequested;
         list.ContextCanceled += TrackContext_Canceled;
         var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
-        var confirmDelete = new CheckBox { Content = "确认删除所选歌单（不会删除音乐文件）" };
         var panel = new StackPanel { Spacing = 8, MinWidth = 300 };
         panel.Children.Add(new TextBlock { Text = "保存在本机，可混合已接入来源。离线或缺失条目保留，播放时跳过不可用条目。", TextWrapping = TextWrapping.Wrap });
-        panel.Children.Add(picker); panel.Children.Add(name);
-        var catalogButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
-        var create = new Button { Content = "新建" };
-        var rename = new Button { Content = "改名" };
-        var delete = new Button { Content = "删除歌单" };
         var refresh = new Button { Content = "刷新" };
-        foreach (var button in new[] { create, rename, delete, refresh }) catalogButtons.Children.Add(button);
-        panel.Children.Add(catalogButtons); panel.Children.Add(confirmDelete);
         panel.Children.Add(new TextBlock { Text = pickedTrack is null ? "曲目列表尚未选择歌曲。" : "列表中所选歌曲：" + pickedTrack.Title + " · " + pickedTrack.Artist, TextWrapping = TextWrapping.Wrap });
         var add = new Button { Content = "加入列表中所选歌曲", IsEnabled = pickedTrack is { SourceInstanceId: var sourceId } && sourceId != Guid.Empty };
         var relink = new Button { Content = "将所选条目重新关联到列表歌曲" };
@@ -83,16 +73,16 @@ public sealed partial class MainWindow
         panel.Children.Add(new TextBlock { Text = "文件移动或改名后，先在曲目列表选中新歌曲，再重新关联歌单条目；保留条目的顺序。", TextWrapping = TextWrapping.Wrap });
         var entryButtons = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         var up = new Button { Content = "上移" }; var down = new Button { Content = "下移" }; var remove = new Button { Content = "移除歌曲" };
-        foreach (var button in new[] { up, down, remove, relink }) entryButtons.Children.Add(button);
+        foreach (var button in new[] { up, down, remove, relink, refresh }) entryButtons.Children.Add(button);
         var view = new PlaylistPageView("本地歌单", panel, list, entryButtons, status, localLifetime.Token);
         var editor = view.Editor;
         var ct = view.Lifetime.Token;
-        bool rendering = false, busy = false;
-        LocalPlaylist? Selected() => picker.SelectedItem as LocalPlaylist;
+        bool busy = false;
+        Guid? currentId = selectedPlaylist;
+        LocalPlaylist? Selected() => catalog.Playlists.FirstOrDefault(item => item.Id == currentId);
         void UpdateButtons()
         {
             var current = Selected(); var row = list.SelectedItem as PlaylistRow;
-            rename.IsEnabled = current is not null; delete.IsEnabled = current is not null && confirmDelete.IsChecked == true;
             remove.IsEnabled = row is not null;
             up.IsEnabled = row is not null && list.SelectedIndex > 0;
             down.IsEnabled = row is not null && list.SelectedIndex < list.Items.Count - 1;
@@ -100,10 +90,11 @@ public sealed partial class MainWindow
             add.IsEnabled = current is not null && pickedTrack is not null && pickedTrack.SourceInstanceId != Guid.Empty;
             relink.IsEnabled = row is not null && add.IsEnabled;
         }
-        void ShowEntries(bool refreshName = true)
+        void ShowEntries()
         {
             var current = Selected();
-            if (refreshName) { name.Text = current?.Name ?? ""; confirmDelete.IsChecked = false; }
+            view.TitleText.Text = current?.Name ?? "本地歌单";
+            view.LocalPlaylistId = current?.Id;
             list.ItemsSource = current?.Entries.Select(entry => new PlaylistRow(entry,
                 $"{(PlaylistTrackAvailable(entry) ? "" : "[离线/不可用] ")}{entry.Title} · {entry.Artist} · {PlaylistSourceLabel(entry)}")
                 { IsUnavailable = !PlaylistTrackAvailable(entry), SourceLabel = PlaylistSourceLabel(entry) }).ToArray();
@@ -111,13 +102,11 @@ public sealed partial class MainWindow
         }
         void Render(Guid? playlistId = null, Guid? entryId = null)
         {
-            rendering = true;
-            picker.ItemsSource = catalog.Playlists;
-            picker.SelectedItem = catalog.Playlists.FirstOrDefault(item => item.Id == playlistId) ?? catalog.Playlists.FirstOrDefault();
+            currentId = (catalog.Playlists.FirstOrDefault(item => item.Id == playlistId) ?? catalog.Playlists.FirstOrDefault())?.Id;
             ShowEntries();
             if (entryId is not null) list.SelectedItem = list.Items.Cast<PlaylistRow>().FirstOrDefault(row => row.Entry.Id == entryId);
-            rendering = false; UpdateButtons();
-            if (ReferenceEquals(activePlaylistPage, view)) RenderLocalPlaylistNavigation(catalog, (picker.SelectedItem as LocalPlaylist)?.Id);
+            UpdateButtons();
+            if (ReferenceEquals(activePlaylistPage, view)) RenderLocalPlaylistNavigation(catalog, currentId);
         }
         async Task Save(LocalPlaylistCatalog next, Guid? playlistId, Guid? entryId = null)
         {
@@ -139,31 +128,7 @@ public sealed partial class MainWindow
         }
         async Task Replace(LocalPlaylist current, IReadOnlyList<LocalPlaylistEntry> entries, Guid? entryId = null) =>
             await Save(catalog with { Playlists = catalog.Playlists.Select(item => item.Id == current.Id ? current with { Entries = entries } : item).ToArray() }, current.Id, entryId);
-        picker.SelectionChanged += (_, _) =>
-        {
-            if (rendering) return;
-            ShowEntries();
-            if (ReferenceEquals(activePlaylistPage, view)) LocalPlaylistNavigation.SelectedItem =
-                (LocalPlaylistNavigation.ItemsSource as IEnumerable<LocalPlaylist>)?.FirstOrDefault(item => item.Id == Selected()?.Id);
-        };
         list.SelectionChanged += (_, _) => UpdateButtons();
-        confirmDelete.Click += (_, _) => UpdateButtons();
-        create.Click += async (_, _) =>
-        {
-            if (string.IsNullOrWhiteSpace(name.Text)) { status.Text = "请输入歌单名称。"; return; }
-            var item = new LocalPlaylist(Guid.NewGuid(), name.Text.Trim(), []);
-            await Save(catalog with { Playlists = catalog.Playlists.Append(item).ToArray() }, item.Id);
-        };
-        rename.Click += async (_, _) =>
-        {
-            if (Selected() is not { } current || string.IsNullOrWhiteSpace(name.Text)) { status.Text = "请输入歌单名称。"; return; }
-            await Save(catalog with { Playlists = catalog.Playlists.Select(item => item.Id == current.Id ? item with { Name = name.Text.Trim() } : item).ToArray() }, current.Id);
-        };
-        delete.Click += async (_, _) =>
-        {
-            if (Selected() is { } current && confirmDelete.IsChecked == true)
-                await Save(catalog with { Playlists = catalog.Playlists.Where(item => item.Id != current.Id).ToArray() }, null);
-        };
         add.Click += async (_, _) =>
         {
             if (Selected() is not { } current || pickedTrack is null || pickedTrack.SourceInstanceId == Guid.Empty) return;
@@ -210,7 +175,7 @@ public sealed partial class MainWindow
         view.SourceChanged = () =>
         {
             var selected = (list.SelectedItem as PlaylistRow)?.Entry.Id;
-            ShowEntries(false);
+            ShowEntries();
             list.SelectedItem = list.Items.Cast<PlaylistRow>().FirstOrDefault(row => row.Entry.Id == selected);
         };
         if (!await MountPlaylistPageAsync(view)) return;
@@ -219,7 +184,7 @@ public sealed partial class MainWindow
         {
             await RestoreLocalSourcesAsync(ct); catalog = await playlistStore.LoadAsync(ct); ct.ThrowIfCancellationRequested();
             Render(selectedPlaylist);
-            status.Text = catalog.Playlists.Count == 0 ? "暂无本地歌单，输入名称即可新建。" : "本地歌单已加载。";
+            status.Text = catalog.Playlists.Count == 0 ? "暂无本地歌单，点击左侧 + 新建。" : "本地歌单已加载；右键左侧歌单可重命名或删除。";
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { return; }
         catch (Exception) { status.Text = "本地歌单无法读取，原文件已保留；请刷新后重试。"; }
