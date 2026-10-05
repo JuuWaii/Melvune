@@ -20,7 +20,7 @@ public sealed partial class MainWindow
         if (!RequireRemoteCapability(MusicSourceCapabilities.ReadPlaylists)) return;
         var api = ViewModel.AuthenticatedClient;
         if (api is null) { PlaybackStatus.Text = "请先连接飞牛并登录，再打开飞牛歌单。"; return; }
-        try { await ShowNasPlaylistsAsync(api); }
+        try { await ShowPlaylistManagerAsync(true, api); }
         catch (OperationCanceledException) { }
         catch (MusicApiException ex) when (ex.Failure == MusicFailure.Unauthorized)
         { if (!closed && ReferenceEquals(api, ViewModel.AuthenticatedClient)) await ViewModel.ExpireSessionAsync(); }

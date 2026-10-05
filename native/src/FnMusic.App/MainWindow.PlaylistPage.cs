@@ -27,6 +27,7 @@ public sealed partial class MainWindow
         public Action? Closing { get; set; }
         public Action? SourceChanged { get; set; }
         public Func<Task>? Reload { get; set; }
+        public Func<Task>? ReturnNavigation { get; set; }
         public bool IsDisposed { get; private set; }
         public bool IsForm { get; private set; }
         public TextBlock TitleText { get; } = new() { FontSize = 24, FontWeight = global::Microsoft.UI.Text.FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
@@ -164,6 +165,12 @@ public sealed partial class MainWindow
     }
     private async Task ReturnFromPlaylistPageAsync()
     {
+        if (activePlaylistPage?.ReturnNavigation is { } returnNavigation)
+        {
+            if (activePlaylistPage.BlockNavigation)
+            { activePlaylistPage.Status.Text = "正在保存，请等待核对完成后返回。"; return; }
+            await returnNavigation(); return;
+        }
         var previous = playlistReturnPanel ?? HomePanel;
         var focus = playlistReturnFocus;
         var scroll = playlistReturnScroll; var list = playlistReturnList; var items = playlistReturnItems;

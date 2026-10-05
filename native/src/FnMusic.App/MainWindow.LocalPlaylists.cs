@@ -41,7 +41,7 @@ public sealed partial class MainWindow
     private async void LocalPlaylists_Click(object sender, RoutedEventArgs e)
     {
         if (closed) return;
-        try { await ShowLocalPlaylistsAsync(); }
+        try { await ShowPlaylistManagerAsync(false); }
         catch (OperationCanceledException) { }
         catch (Exception) { if (!closed) PlaybackStatus.Text = "本地歌单无法读取，原文件已保留。"; }
     }

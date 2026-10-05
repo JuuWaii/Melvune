@@ -306,6 +306,7 @@ public sealed partial class MainWindow
             await VerifyNasPlaylistWindowAsync(Verify);
             await VerifyNasSettingsWindowAsync(Verify);
             await VerifyPlaylistPageNavigationAsync(Verify);
+            await VerifyPlaylistManagersAsync(Verify);
             await VerifyTrackContextWindowAsync(Verify);
             await VerifyManagementFullPagesAsync(Verify);
             await VerifyAllMusicWindowAsync(Verify);
