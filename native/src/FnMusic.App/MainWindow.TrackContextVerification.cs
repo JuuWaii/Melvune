@@ -32,6 +32,27 @@ public sealed partial class MainWindow
                 var themedMenu = CreateTrackContextMenu(TrackList, track, true);
                 verify("context_menu_theme_" + mode.ToString().ToLowerInvariant(), themedMenu.MenuFlyoutPresenterStyle.Setters.OfType<Setter>()
                     .Any(s => s.Property == FrameworkElement.RequestedThemeProperty && Equals(s.Value, mode)));
+                themedMenu.ShowAt(TrackList);
+                await Task.Delay(120);
+                var presenter = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(Root.XamlRoot)
+                    .Select(popup => FindSongVisual<MenuFlyoutPresenter>(popup.Child)).FirstOrDefault(value => value is not null);
+                bool light = mode == ElementTheme.Light;
+                verify("context_menu_rendered_surface_" + mode, presenter is { IsLoaded: true, ActualWidth: > 0 }
+                    && presenter.Background is Microsoft.UI.Xaml.Media.SolidColorBrush background
+                    && background.Color.A == 255 && (light ? background.Color.R > 230 : background.Color.R < 70));
+                var text = presenter is null ? null : FindSongVisual<TextBlock>(presenter, value => value.Text == "播放");
+                verify("context_menu_rendered_text_" + mode, text?.Foreground is Microsoft.UI.Xaml.Media.SolidColorBrush foreground
+                    && (light ? foreground.Color.R < 70 : foreground.Color.R > 230));
+                var submenu = themedMenu.Items.OfType<MenuFlyoutSubItem>().Single(value => Equals(value.Tag, "local-playlists"));
+                var peer = FrameworkElementAutomationPeer.CreatePeerForElement(submenu)!;
+                ((IExpandCollapseProvider)peer.GetPattern(PatternInterface.ExpandCollapse)).Expand();
+                await Task.Delay(100);
+                var surfaces = Microsoft.UI.Xaml.Media.VisualTreeHelper.GetOpenPopupsForXamlRoot(Root.XamlRoot)
+                    .Select(popup => FindSongVisual<MenuFlyoutPresenter>(popup.Child)).OfType<MenuFlyoutPresenter>().ToArray();
+                verify("context_submenu_rendered_surface_" + mode, surfaces.Length >= 2 && surfaces.All(surface =>
+                    surface.Background is Microsoft.UI.Xaml.Media.SolidColorBrush brush && brush.Color.A == 255
+                    && (light ? brush.Color.R > 230 : brush.Color.R < 70)));
+                themedMenu.Hide(); await Task.Delay(60);
             }
             ShowTrackContextMenu(TrackList, track, true); await Task.Delay(50);
             Root.RequestedTheme = ElementTheme.Light; await Task.Delay(80);

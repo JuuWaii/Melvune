@@ -76,6 +76,7 @@ public sealed partial class MainWindow
                 verify("nas_playlist_ui_create", handler.Name == "新建飞牛夹具" && status.Text.Contains("核对"));
                 await Click("加入列表中所选飞牛歌曲");
                 verify("nas_playlist_ui_add", list.Items.Count == 1 && view.PlayButton.IsEnabled);
+                await VerifySharedSongRowAsync(verify, list, "nas_playlist", artwork: false);
                 name.Text = "客户端改名"; await Click("改名");
                 verify("nas_playlist_ui_rename", handler.Name == "客户端改名");
                 verify("nas_playlist_sidebar_rename_updated", NasPlaylistNavigation.Items.Cast<NasPlaylist>().Single().Name == "客户端改名");

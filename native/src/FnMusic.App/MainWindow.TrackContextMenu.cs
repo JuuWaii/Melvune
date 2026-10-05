@@ -24,7 +24,7 @@ public sealed partial class MainWindow
     private static MusicTrack? ContextTrack(object? item) => item switch
     {
         MusicTrack track => track,
-        PlaylistRow row => row.Entry.ToTrack(),
+        PlaylistRow row => row.Track,
         _ => null
     };
     private static object? ResolveContextItem(ListView list, DependencyObject? origin, bool keyboard)
@@ -72,9 +72,6 @@ public sealed partial class MainWindow
     private MenuFlyout CreateTrackContextMenu(ListView list, MusicTrack track, bool favoriteStateKnown)
     {
         var menu = new MenuFlyout();
-        var style = new Style { TargetType = typeof(MenuFlyoutPresenter) };
-        style.Setters.Add(new Setter(FrameworkElement.RequestedThemeProperty, Root.ActualTheme));
-        menu.MenuFlyoutPresenterStyle = style;
         MenuFlyoutItem Command(string text, object tag, bool enabled, Func<Task> run)
         {
             var command = new MenuFlyoutItem { Text = text, Tag = tag, IsEnabled = enabled };
@@ -125,6 +122,7 @@ public sealed partial class MainWindow
         menu.Items.Add(artists);
         menu.Items.Add(Command("查看专辑", "album", ContextRemoteBrowse(track) && !string.IsNullOrEmpty(track.AlbumId),
             () => OpenContextCollectionAsync(track, CollectionKind.Album, track.AlbumId!, track.Album)));
+        ApplyMenuTheme(menu);
         return menu;
     }
     private async Task RunContextCommandAsync(Func<Task> run)

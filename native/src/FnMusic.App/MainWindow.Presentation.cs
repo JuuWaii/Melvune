@@ -181,10 +181,11 @@ public sealed partial class MainWindow
     private async Task LoadArtworkAsync(Image image)
     {
         object? context = image.DataContext;
-        object? source = context is MusicTrack track && localSources.TryGetValue(track.SourceInstanceId, out var local)
+        var track = ContextTrack(context);
+        object? source = track is not null && localSources.TryGetValue(track.SourceInstanceId, out var local)
             ? local : ViewModel.AuthenticatedClient;
         bool canLoad = !closed && (!ReferenceEquals(image, FullNowCover) || LyricsPanel.Visibility == Visibility.Visible)
-            && (context is MusicTrack song ? TrackSupports(song, MusicSourceCapabilities.Artwork)
+            && (track is not null ? TrackSupports(track, MusicSourceCapabilities.Artwork)
                 : ViewModel.AuthenticatedClient is { } currentApi && ViewModel.PlaybackRouter.Supports(currentApi.SourceInstanceId, MusicSourceCapabilities.Artwork));
         if (canLoad && artworkLoads.TryGetValue(image, out var pending)
             && ReferenceEquals(pending.Context, context) && ReferenceEquals(pending.Source, source))
@@ -207,20 +208,21 @@ public sealed partial class MainWindow
         if (ReferenceEquals(image, FullNowCover) && LyricsPanel.Visibility != Visibility.Visible) return;
         int decodeEdge = ReferenceEquals(image, FullNowCover) ? Services.ArtworkDecoder.FullCoverEdge : Services.ArtworkDecoder.ThumbnailEdge;
         object? context = image.DataContext;
-        if (context is MusicTrack unsupported && !TrackSupports(unsupported, MusicSourceCapabilities.Artwork)) return;
+        var track = ContextTrack(context);
+        if (track is not null && !TrackSupports(track, MusicSourceCapabilities.Artwork)) return;
         using var request = CancellationTokenSource.CreateLinkedTokenSource(localLifetime.Token);
         image.Tag = request; request.CancelAfter(TimeSpan.FromSeconds(15)); var ct = request.Token;
         var api = ViewModel.AuthenticatedClient;
-        var source = context is MusicTrack localContext ? localSources.GetValueOrDefault(localContext.SourceInstanceId) : null;
-        string? coverId = context is MusicTrack track ? track.CoverId : context is MusicCollection album ? album.CoverId : null;
-        string? key = context is MusicTrack song && source?.Source.Id == song.SourceInstanceId ? "local:" + song.Reference
+        var source = track is not null ? localSources.GetValueOrDefault(track.SourceInstanceId) : null;
+        string? coverId = track?.CoverId ?? (context as MusicCollection)?.CoverId;
+        string? key = track is not null && source?.Source.Id == track.SourceInstanceId ? "local:" + track.Reference
             : api is not null && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.Artwork)
-                && !string.IsNullOrEmpty(coverId) && (context is not MusicTrack remote || remote.SourceInstanceId == api.SourceInstanceId)
+                && !string.IsNullOrEmpty(coverId) && (track is null || track.SourceInstanceId == api.SourceInstanceId)
                 ? api.SourceInstanceId + ":" + coverId : null;
         if (key is null) { image.Tag = null; return; }
         key += ":" + decodeEdge;
         bool IsCurrent() => !ct.IsCancellationRequested && !closed && ReferenceEquals(image.DataContext, context)
-            && (context is not MusicTrack presented || TrackSupports(presented, MusicSourceCapabilities.Artwork))
+            && (track is null || TrackSupports(track, MusicSourceCapabilities.Artwork))
             && (source is not null ? ReferenceEquals(localSources.GetValueOrDefault(source.Source.Id), source)
                 : ReferenceEquals(api, ViewModel.AuthenticatedClient) && api is not null
                     && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.Artwork));
@@ -233,7 +235,7 @@ public sealed partial class MainWindow
                 if (!IsCurrent()) return;
                 if (coverCache.TryGetValue(key, out cached)) { image.Source = cached; return; }
                 BitmapSource? bitmap = null;
-                if (context is MusicTrack local && source?.Source.Id == local.SourceInstanceId)
+                if (track is { } local && source?.Source.Id == local.SourceInstanceId)
                 {
                     await foreach (var candidate in source.GetSidecarCoversAsync(local.Reference, ct))
                     {

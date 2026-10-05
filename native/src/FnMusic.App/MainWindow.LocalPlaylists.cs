@@ -8,7 +8,17 @@ namespace FnMusic.App;
 public sealed partial class MainWindow
 {
     private readonly LocalPlaylistStore playlistStore = new(ThemeSettingsDirectory());
-    private sealed record PlaylistRow(LocalPlaylistEntry Entry, string Text);
+    private sealed record PlaylistRow(LocalPlaylistEntry Entry, string Text)
+    {
+        public MusicTrack Track { get; } = Entry.ToTrack();
+        public bool IsUnavailable { get; init; }
+        public string SourceLabel { get; init; } = "";
+        public string Title => Track.Title;
+        public string BrowseArtist => (IsUnavailable ? "[离线/不可用] " : "")
+            + string.Join(" · ", new[] { Track.BrowseArtist, SourceLabel }.Where(value => !string.IsNullOrWhiteSpace(value)));
+        public string Album => Track.Album;
+        public string DisplayDuration => Track.DisplayDuration;
+    }
 #if DEBUG
     private Action<PlaylistPageView>? playlistPageOpened;
 #endif
@@ -43,7 +53,8 @@ public sealed partial class MainWindow
         var pickedTrack = picked ?? TrackList.SelectedItem as MusicTrack;
         var picker = new ComboBox { Header = "选择本地歌单", DisplayMemberPath = "Name", HorizontalAlignment = HorizontalAlignment.Stretch };
         var name = new TextBox { Header = "歌单名称", MaxLength = 120, PlaceholderText = "输入名称后新建或改名" };
-        var list = new ListView { DisplayMemberPath = "Text", SelectionMode = ListViewSelectionMode.Single, Height = 180 };
+        var list = new ListView { SelectionMode = ListViewSelectionMode.Single, Height = 180 };
+        ConfigureSongList(list);
         list.ContextRequested += TrackList_ContextRequested;
         list.ContextCanceled += TrackContext_Canceled;
         var status = new TextBlock { TextWrapping = TextWrapping.Wrap };
@@ -87,7 +98,8 @@ public sealed partial class MainWindow
             var current = Selected();
             if (refreshName) { name.Text = current?.Name ?? ""; confirmDelete.IsChecked = false; }
             list.ItemsSource = current?.Entries.Select(entry => new PlaylistRow(entry,
-                $"{(PlaylistTrackAvailable(entry) ? "" : "[离线/不可用] ")}{entry.Title} · {entry.Artist} · {PlaylistSourceLabel(entry)}")).ToArray();
+                $"{(PlaylistTrackAvailable(entry) ? "" : "[离线/不可用] ")}{entry.Title} · {entry.Artist} · {PlaylistSourceLabel(entry)}")
+                { IsUnavailable = !PlaylistTrackAvailable(entry), SourceLabel = PlaylistSourceLabel(entry) }).ToArray();
             list.SelectedIndex = list.Items.Count > 0 ? 0 : -1; UpdateButtons();
         }
         void Render(Guid? playlistId = null, Guid? entryId = null)

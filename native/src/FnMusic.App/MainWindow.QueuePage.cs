@@ -35,6 +35,7 @@ public sealed partial class MainWindow
         ToolTipService.SetToolTip(view.BackButton, "关闭播放队列 (Esc)");
         list.ContextRequested += TrackList_ContextRequested;
         list.ContextCanceled += TrackContext_Canceled;
+        EnableSongDoubleTap(list);
         list.ContainerContentChanging += QueueItem_ContainerContentChanging;
         void UpdateButtons()
         {
@@ -47,11 +48,6 @@ public sealed partial class MainWindow
             if (ContextPlayable(track) && queue.Select(track.Reference) is { } selected) await PlayTrackAsync(selected);
         }
         list.SelectionChanged += (_, _) => UpdateButtons();
-        list.DoubleTapped += async (_, args) =>
-        {
-            if (ResolveContextItem(list, args.OriginalSource as DependencyObject, false) is MusicTrack track)
-            { args.Handled = true; await Play(track); }
-        };
         view.PlayButton.Click += async (_, _) => { if (list.SelectedItem is MusicTrack track) await Play(track); };
         remove.Click += (_, _) =>
         {

@@ -36,7 +36,8 @@ public sealed partial class MainWindow
         bool busy = false, rendering = false;
         var picker = new ComboBox { Header = "选择飞牛歌单", DisplayMemberPath = "Name", HorizontalAlignment = HorizontalAlignment.Stretch };
         var name = new TextBox { Header = "歌单名称", MaxLength = 32, PlaceholderText = "输入名称后新建或改名" };
-        var list = new ListView { DisplayMemberPath = "Title", Height = 200, SelectionMode = ListViewSelectionMode.Single };
+        var list = new ListView { Height = 200, SelectionMode = ListViewSelectionMode.Single };
+        ConfigureSongList(list);
         list.ContextRequested += TrackList_ContextRequested;
         list.ContextCanceled += TrackContext_Canceled;
         var confirm = new CheckBox { Content = "确认从飞牛服务器删除所选歌单" };

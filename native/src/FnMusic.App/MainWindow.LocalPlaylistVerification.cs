@@ -25,6 +25,7 @@ public sealed partial class MainWindow
                 var picker = panel.Children.OfType<ComboBox>().Single();
                 var name = panel.Children.OfType<TextBox>().Single();
                 var list = view.List;
+                await VerifySharedSongRowAsync(verify, list, "playlist", artwork: true);
                 var buttons = panel.Children.OfType<Button>().Concat(panel.Children.OfType<StackPanel>().SelectMany(p => p.Children.OfType<Button>())).Concat(view.Actions.Children.OfType<Button>()).ToArray();
                 async Task Click(string label)
                 {

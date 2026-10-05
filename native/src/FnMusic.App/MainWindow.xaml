@@ -6,6 +6,14 @@
    <Style x:Key="PlayerIconButtonStyle" TargetType="Button">
     <Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="MinWidth" Value="32"/><Setter Property="Padding" Value="4"/>
    </Style>
+   <DataTemplate x:Key="SongRowTemplate">
+    <Grid Padding="8" ColumnSpacing="16" Background="Transparent">
+     <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
+     <Border Width="44" Height="44" CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="20"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
+     <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding BrowseArtist}" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
+     <TextBlock Grid.Column="2" Text="{Binding Album}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding DisplayDuration}" HorizontalAlignment="Right"/>
+    </Grid>
+   </DataTemplate>
    <DataTemplate x:Key="QueueTrackTemplate">
     <Grid ColumnSpacing="10" Padding="0,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
      <Border Width="44" Height="44" CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="18"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
@@ -109,13 +117,6 @@
     </DataTemplate></ListView.ItemTemplate>
    </ListView>
    <ListView x:Name="TrackList" Grid.Row="1" SelectionMode="Single" SelectionChanged="TrackSelection_Changed" ContextRequested="TrackList_ContextRequested" ContextCanceled="TrackContext_Canceled">
-    <ListView.ItemTemplate><DataTemplate>
-     <Grid Padding="8" ColumnSpacing="16" Background="Transparent" DoubleTapped="Track_DoubleTapped">
-      <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions><Border Width="44" Height="44" CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}"><Grid><FontIcon Glyph="&#xE8D6;" FontSize="20"/><Image Stretch="UniformToFill" Loaded="Artwork_Loaded" DataContextChanged="Artwork_DataContextChanged" Unloaded="Artwork_Unloaded"/></Grid></Border>
-      <StackPanel Grid.Column="1" VerticalAlignment="Center"><TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding BrowseArtist}" TextTrimming="CharacterEllipsis" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/></StackPanel>
-      <TextBlock Grid.Column="2" Text="{Binding Album}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis"/><TextBlock Grid.Column="3" VerticalAlignment="Center" Text="{Binding DisplayDuration}" HorizontalAlignment="Right"/>
-     </Grid>
-    </DataTemplate></ListView.ItemTemplate>
    </ListView>
   </Grid>
   <Border x:Name="PlayerBar" Grid.Row="1" Grid.ColumnSpan="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource DividerStrokeColorDefaultBrush}" BorderThickness="0,1,0,0" Padding="24,12">

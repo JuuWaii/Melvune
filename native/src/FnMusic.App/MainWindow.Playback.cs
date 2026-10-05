@@ -222,13 +222,6 @@ public sealed partial class MainWindow
         if (TrackList.SelectedItem is not MusicTrack track) return;
         await StartQueueAsync(track);
     }
-    private async void Track_DoubleTapped(object sender, DoubleTappedRoutedEventArgs e)
-    {
-        if (sender is not FrameworkElement { DataContext: MusicTrack track }) return;
-        e.Handled = true;
-        TrackList.SelectedItem = track;
-        await StartQueueAsync(track);
-    }
     private async Task StartQueueAsync(MusicTrack track)
     {
         if (track.IsCue) { PlaybackStatus.Text = "CUE 分轨播放将在转码适配阶段接入。"; return; }

@@ -10,6 +10,9 @@ public sealed partial class MainWindow : Window
     {
         InitializeComponent();
         ApplyMonochromeResources(Root);
+        ConfigureSongList(TrackList);
+        QueueModeButton.Flyout.Opening += PlayerMenu_Opening;
+        OutputDeviceButton.Flyout.Opening += PlayerOutput_Opening;
         Title = "飞牛音乐 · 原生预览";
         AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1360, 900));
         InitializePlayback();
