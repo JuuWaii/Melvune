@@ -99,11 +99,29 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
     }
     public async Task<Lyrics> GetLyricsAsync(TrackReference track, CancellationToken ct)
     {
-        string sidecar = Path.ChangeExtension(GetFilePath(track), ".lrc");
-        var bytes = await ReadSidecarAsync(sidecar, 512000, ct);
-        if (bytes is null) return Lyrics.Empty;
         ct.ThrowIfCancellationRequested();
-        return Lyrics.Parse(LyricsTextDecoder.Decode(bytes));
+        using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        deadline.CancelAfter(TimeSpan.FromSeconds(3));
+        try { return await Task.Run(() => ReadLyricsAsync(track, deadline.Token), deadline.Token).ConfigureAwait(false); }
+        catch (OperationCanceledException) when (!ct.IsCancellationRequested) { return Lyrics.Empty; }
+    }
+    private async Task<Lyrics> ReadLyricsAsync(TrackReference track, CancellationToken ct)
+    {
+        string file = GetFilePath(track), sidecar = Path.ChangeExtension(file, ".lrc");
+        try
+        {
+            var bytes = await ReadSidecarAsync(sidecar, 512000, ct);
+            ct.ThrowIfCancellationRequested();
+            if (bytes is not null)
+            {
+                var lyrics = Lyrics.Parse(LyricsTextDecoder.Decode(bytes));
+                if (lyrics.Lines.Any(line => !string.IsNullOrWhiteSpace(line.Text))) return lyrics;
+            }
+        }
+        catch (Exception ex) when (ex is InvalidDataException or IOException or UnauthorizedAccessException or ArgumentException) { }
+        ct.ThrowIfCancellationRequested(); EnsureRegularPath(file);
+        using var input = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, FileOptions.Asynchronous);
+        return await EmbeddedLyricsReader.ReadAsync(input, ct).ConfigureAwait(false);
     }
     public async Task<byte[]?> GetSidecarCoverAsync(TrackReference track, CancellationToken ct)
     {

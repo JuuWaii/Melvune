@@ -150,24 +150,43 @@ public sealed partial class MainWindow
         bool muted = music.Player.IsMuted;
         var audio = music.Player.Source;
         var device = music.Player.AudioDevice;
+        async Task<bool> WaitForPlayerFramesAsync()
+        {
+            var presented = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            int frames = 0;
+            void Presented(object? sender, object args) { if (++frames >= 2) presented.TrySetResult(); }
+            CompositionTarget.Rendering += Presented;
+            try { await Task.WhenAny(presented.Task, Task.Delay(2000)); return presented.Task.IsCompleted; }
+            finally { CompositionTarget.Rendering -= Presented; }
+        }
         bool ControlsFit()
         {
             Root.UpdateLayout();
             var buttons = new FrameworkElement[] { QueueModeButton, PreviousTrackButton, PlayPauseButton, NextTrackButton,
                 StopButton, OutputDeviceButton, MuteToggle, VolumeSlider, QueueButton };
+            bool Failure(string reason)
+            {
+                File.WriteAllText(Path.Combine(AppContext.BaseDirectory, "player-layout-failure.json"), System.Text.Json.JsonSerializer.Serialize(new
+                {
+                    reason, rootWidth = Root.ActualWidth, lyrics = LyricsPanel.Visibility.ToString(), transportWidth = TransportPanel.ActualWidth,
+                    controls = buttons.Select(control => new { control.Name, control.IsLoaded, bounds = control.TransformToVisual(TransportPanel).TransformBounds(new(0, 0, control.ActualWidth, control.ActualHeight)) })
+                }));
+                return false;
+            }
             double center = PlayPauseButton.TransformToVisual(TransportPanel).TransformPoint(new(0, PlayPauseButton.ActualHeight / 2)).Y;
             foreach (var control in buttons)
             {
                 var bounds = control.TransformToVisual(TransportPanel).TransformBounds(new(0, 0, control.ActualWidth, control.ActualHeight));
                 if (!control.IsLoaded || bounds.Width <= 0 || bounds.X < -1 || bounds.Right > TransportPanel.ActualWidth + 1
-                    || Math.Abs(bounds.Y + bounds.Height / 2 - center) > 1) return false;
+                    || Math.Abs(bounds.Y + bounds.Height / 2 - center) > 1) return Failure(control.Name);
             }
             var speaker = MuteToggle.TransformToVisual(TransportPanel).TransformPoint(new());
             var slider = VolumeSlider.TransformToVisual(TransportPanel).TransformPoint(new());
             var list = QueueButton.TransformToVisual(TransportPanel).TransformPoint(new());
-            return speaker.X + MuteToggle.ActualWidth <= slider.X
+            bool fits = speaker.X + MuteToggle.ActualWidth <= slider.X
                 && slider.X + VolumeSlider.ActualWidth <= list.X
                 && Math.Abs(list.X + QueueButton.ActualWidth - TransportPanel.ActualWidth) < 1;
+            return fits || Failure("speaker-slider-queue-spacing");
         }
         try
         {
@@ -176,10 +195,10 @@ public sealed partial class MainWindow
             foreach (int width in new[] { 1360, 980, 820 })
             {
                 await CloseNowPlayingAsync();
-                AppWindow.Resize(new global::Windows.Graphics.SizeInt32(width, 680)); await Task.Delay(100);
-                verify("player_controls_same_row_main_" + width, ControlsFit() && PlayerBar.Visibility == Visibility.Visible);
-                await OpenNowPlayingAsync(); await Task.Delay(50);
-                verify("player_controls_same_row_lyrics_" + width, ControlsFit() && PlayerBar.Visibility == Visibility.Collapsed
+                AppWindow.Resize(new global::Windows.Graphics.SizeInt32(width, 680));
+                verify("player_controls_same_row_main_" + width, await WaitForPlayerFramesAsync() && ControlsFit() && PlayerBar.Visibility == Visibility.Visible);
+                await OpenNowPlayingAsync();
+                verify("player_controls_same_row_lyrics_" + width, await WaitForPlayerFramesAsync() && ControlsFit() && PlayerBar.Visibility == Visibility.Collapsed
                     && ReferenceEquals(FullTransportHost.Content, TransportPanel));
                 verify("lyrics_player_scrollbar_cannot_cover_queue_button_" + width,
                     FullPlayerColumn.VerticalScrollBarVisibility == ScrollBarVisibility.Hidden
@@ -210,13 +229,7 @@ public sealed partial class MainWindow
             verify("player_zero_volume_uses_silent_icon", !music.Player.IsMuted && VolumeIcon.Glyph == "\uE74F");
             VolumeSlider.Value = 37; toggle.Toggle();
             await CloseNowPlayingAsync(); await OpenNowPlayingAsync();
-            var presented = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            int frames = 0;
-            void Presented(object? sender, object args) { if (++frames >= 2) presented.TrySetResult(); }
-            CompositionTarget.Rendering += Presented;
-            try { await Task.WhenAny(presented.Task, Task.Delay(2000)); }
-            finally { CompositionTarget.Rendering -= Presented; }
-            verify("player_reparented_controls_rendered_before_input", presented.Task.IsCompleted && ControlsFit());
+            verify("player_reparented_controls_rendered_before_input", await WaitForPlayerFramesAsync() && ControlsFit());
             verify("player_page_switch_retains_mode_volume_device_and_audio", queue.Mode == QueueMode.Shuffle && music.Player.IsMuted
                 && VolumeSlider.Value == 37 && MuteToggle.IsChecked == true && ReferenceEquals(music.Player.Source, audio)
                 && music.Player.AudioDevice?.Id == device?.Id);

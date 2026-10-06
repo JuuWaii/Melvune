@@ -32,6 +32,8 @@ public sealed partial class MainWindow : Window
     {
         Root.Loaded -= Root_Loaded;
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-embedded-lyrics-window") && IsSyntheticPreview)
+        { await VerifyEmbeddedLyricsWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-metadata-window") && IsSyntheticPreview)
         { await VerifyMetadataStandaloneWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-all-music-window") && IsSyntheticPreview)

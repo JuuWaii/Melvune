@@ -39,6 +39,8 @@ public sealed partial class MainWindow
         music.Player.IsMuted = true; UpdateVolumeControl();
         await LoadDevicesAsync();
         await RefreshPlaylistNavigationAsync();
+        if (Environment.GetCommandLineArgs().Contains("--preview-embedded-lyrics"))
+        { await LoadEmbeddedLyricsPreviewAsync(); return; }
         if (Environment.GetCommandLineArgs().Contains("--preview-management"))
         { await ShowLocalLibraryManagementAsync(createNew: true); return; }
         if (Environment.GetCommandLineArgs().Contains("--preview-playlists"))

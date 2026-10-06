@@ -15,6 +15,17 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+if (args.Length == 2 && args[0] == "--verify-embedded-producer")
+{ await Test("independent FFmpeg tags and unchanged valid audio files", () => EmbeddedLyricsVerification.ProducerAsync(args[1])); return; }
+async Task VerifyEmbeddedLyricsAsync()
+{
+    await Test("embedded lyric containers cover ID3 FLAC MP4 Ogg Opus APE WAV AIFF and ASF", EmbeddedLyricsVerification.ContainersAsync);
+    await Test("embedded ID3 handles text encodings synchronized entries extended headers and unsynchronisation", EmbeddedLyricsVerification.Id3Async);
+    await Test("embedded lyrics reject truncated malformed oversized and foreign tag structures", EmbeddedLyricsVerification.InvalidAsync);
+    await Test("embedded lyrics skip multi-gigabyte audio payloads and cancel bounded reads", EmbeddedLyricsVerification.SparseAsync);
+    await Test("local lyric sidecar precedence falls back to embedded tags without changing the audio file", EmbeddedLyricsVerification.SidecarsAsync);
+}
+if (args.Contains("--verify-embedded-lyrics")) { await VerifyEmbeddedLyricsAsync(); Console.WriteLine($"Embedded lyric checks: {passed} passed."); return; }
 await Test("complete metadata catalog includes final rows beyond six pages and empty boundaries", TrackCatalogVerification.CompleteAsync);
 await Test("metadata catalog rejects repeated changed truncated and oversized pages", TrackCatalogVerification.InconsistentAsync);
 await Test("metadata catalog cancellation does not return a partial snapshot or issue later requests", TrackCatalogVerification.CancelAsync);
@@ -24,6 +35,7 @@ await Test("metadata failures retain the catalog and assets while an empty permi
 await Test("metadata cancellation and expired authentication prevent later catalog commits", MetadataCacheVerification.CancelAsync);
 await Test("metadata rejects corrupt oversized mixed-source duplicate and cancelled documents", MetadataCacheVerification.CorruptionAsync);
 if (args.Contains("--verify-metadata")) { Console.WriteLine($"Catalog and metadata checks: {passed} passed."); return; }
+await VerifyEmbeddedLyricsAsync();
 if (args.Contains("--verify-cover-requests"))
 {
     await Test("cover partial body timeout closes TCP input and permits an explicit retry", CoverRequestVerification.BodyTimeoutAsync);

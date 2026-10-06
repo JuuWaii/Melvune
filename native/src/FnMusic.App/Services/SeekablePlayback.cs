@@ -1,5 +1,7 @@
 using FFmpegInteropX;
 using Windows.Storage.Streams;
+using FnMusic.Core;
+using FnMusic.Infrastructure;
 
 namespace FnMusic.App.Services;
 
@@ -10,14 +12,23 @@ internal sealed class SeekablePlayback
     private IRandomAccessStream? random;
     private int stopped;
     private readonly object cleanupGate = new();
+    private readonly CancellationTokenSource reading = new();
     private Task? cleanup;
     public Task<FFmpegMediaSource> Opening { get; }
+    public Lyrics EmbeddedLyrics { get; private set; } = Lyrics.Empty;
 
     public SeekablePlayback(Stream input)
     {
         this.input = input;
         Opening = Task.Run(async () =>
         {
+            if (input.CanSeek)
+            {
+                long position = input.Position;
+                EmbeddedLyrics = await EmbeddedLyricsReader.ReadAsync(input, reading.Token).ConfigureAwait(false);
+                reading.Token.ThrowIfCancellationRequested(); input.Position = position;
+            }
+            reading.Token.ThrowIfCancellationRequested();
             random = input.AsRandomAccessStream();
             var config = new MediaSourceConfig();
             // Only the supplied managed stream may access media. Nested file/network
@@ -33,13 +44,14 @@ internal sealed class SeekablePlayback
         {
             if (cleanup is not null) return cleanup;
             Interlocked.Exchange(ref stopped, 1);
+            reading.Cancel();
             // HttpRangeStream.Dispose cancels both pending headers and body reads.
             input.Dispose();
             return cleanup = Task.Run(async () =>
             {
                 try { using var source = await Opening.ConfigureAwait(false); }
                 catch (Exception) { /* Cancellation/invalid media: observed, no private details logged. */ }
-                finally { random?.Dispose(); }
+                finally { random?.Dispose(); reading.Dispose(); }
             });
         }
     }

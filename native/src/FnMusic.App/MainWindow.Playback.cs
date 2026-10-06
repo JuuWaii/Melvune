@@ -275,9 +275,12 @@ public sealed partial class MainWindow
     {
         if (closed) return;
         CancelWork(); music.Stop(); mediaReady = false;
+        ClearDecoderLyrics();
         UpdateQueueStatus();
         if (!IsSyntheticPreview && !ViewModel.PlaybackRouter.CanPlay(track.Reference))
         { ClearPresentation(); NowPlaying.Text = ""; PlaybackStatus.Text = "歌曲来源未连接或不支持播放。"; return; }
+        var embedded = new TaskCompletionSource<Lyrics>(TaskCreationOptions.RunContinuationsAsynchronously);
+        decoderLyrics = embedded; decoderLyricsReference = track.Reference;
         _ = LoadLyricsAsync(track);
         var ct = work.Token;
         PlaybackStatus.Text = "正在加载音频…";
@@ -287,6 +290,7 @@ public sealed partial class MainWindow
             if (ct.IsCancellationRequested || closed) { stream.Dispose(); return; }
             NowPlaying.Text = track.Title + " · " + track.Artist;
             await music.OpenAsync(stream, ct);
+            embedded.TrySetResult(music.EmbeddedLyrics);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (MusicApiException error) when (error.Failure == MusicFailure.Unauthorized)
@@ -300,6 +304,7 @@ public sealed partial class MainWindow
         }
         catch (FileNotFoundException) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "音频文件或 FFmpeg 不可用，请检查文件位置与解码器安装。"; }
         catch (Exception) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "音频加载失败，请检查网络、登录状态或选择其他曲目。"; }
+        finally { embedded.TrySetResult(Lyrics.Empty); }
     }
     private void Pause_Click(object sender, RoutedEventArgs e) { music.Player.Pause(); if (mediaReady) PlaybackStatus.Text = "已暂停"; }
     private async void PlayPause_Click(object sender, RoutedEventArgs e)
@@ -322,7 +327,7 @@ public sealed partial class MainWindow
     private async void ManageQueue_Click(object sender, RoutedEventArgs e)
     { if (queuePage is not null) await CloseQueuePageAsync(); else ShowQueuePage(); }
     private void Resume_Click(object sender, RoutedEventArgs e) { if (mediaReady) { music.Player.Play(); PlaybackStatus.Text = "正在播放"; } }
-    private void Stop_Click(object sender, RoutedEventArgs e) { ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false; PlaybackStatus.Text = "已停止"; NowPlaying.Text = ""; }
+    private void Stop_Click(object sender, RoutedEventArgs e) { ClearDecoderLyrics(); ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false; PlaybackStatus.Text = "已停止"; NowPlaying.Text = ""; }
     private void Mute_Click(object sender, RoutedEventArgs e)
     { music.Player.IsMuted = MuteToggle.IsChecked == true; UpdateVolumeControl(); }
     private void Volume_Changed(object sender, RangeBaseValueChangedEventArgs e)
@@ -437,7 +442,7 @@ public sealed partial class MainWindow
             || !ViewModel.PlaybackRouter.CanPlay(track.Reference)).ToArray()) queue.Remove(track.Reference);
         if (!preserveLocalQueue)
         {
-            ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false;
+            ClearDecoderLyrics(); ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false;
             NowPlaying.Text = "";
             PlaybackStatus.Text = queue.Count > 0 ? "旧飞牛播放已停止，本地条目保留在队列中。" : localView ? "本地音乐可直接播放。" : "登录后刷新曲库。";
         }

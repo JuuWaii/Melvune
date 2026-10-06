@@ -318,13 +318,14 @@ public sealed partial class MainWindow
             if (source is not null) result = await source.GetLyricsAsync(track.Reference, ct);
             else if (api is not null && api.SourceInstanceId == track.SourceInstanceId) result = await ReadRemoteLyricsAsync(api, track.Reference, ct);
             else result = Lyrics.Empty;
+            if (source is null && result.Lines.Count == 0) result = await ReadDecoderLyricsAsync(track, ct);
 #if DEBUG
             if (lyricsBeforeCommit is { } beforeCommit) await beforeCommit();
 #endif
             if (ct.IsCancellationRequested || closed) return;
             if (!SourceIsCurrent()) { lyricsNeedsRetry = true; LyricsStatus.Text = "歌曲来源已变化或不支持歌词，打开歌词可重试。"; return; }
             currentLyrics = result; LyricsList.ItemsSource = result.Lines;
-            LyricsStatus.Text = result.Lines.Count == 0 ? "暂无歌词。本地音乐可放置同名 .lrc 文件。" : result.IsTimed ? "随播放高亮 · 点击歌词跳转" : "纯文本歌词（无时间轴）";
+            LyricsStatus.Text = result.Lines.Count == 0 ? "暂无可用歌词。本地音乐可使用内嵌歌词或同名 .lrc 文件。" : result.IsTimed ? "随播放高亮 · 点击歌词跳转" : "纯文本歌词（无时间轴）";
             UpdateLyricsPosition();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }

@@ -1,4 +1,5 @@
 using Windows.Media.Playback;
+using FnMusic.Core;
 
 namespace FnMusic.App.Services;
 
@@ -9,6 +10,7 @@ public sealed class NativeMusicPlayer : IDisposable
     private SeekablePlayback? seekable;
     private readonly object cleanupGate = new();
     public Task PendingCleanup { get; private set; } = Task.CompletedTask;
+    public Lyrics EmbeddedLyrics { get; private set; } = Lyrics.Empty;
 
     public async Task OpenAsync(Stream stream, CancellationToken ct = default)
     {
@@ -22,6 +24,7 @@ public sealed class NativeMusicPlayer : IDisposable
             ct.ThrowIfCancellationRequested();
             if (!ReferenceEquals(seekable, opening) || opening.IsStopped)
                 throw new OperationCanceledException("Playback was replaced.");
+            EmbeddedLyrics = opening.EmbeddedLyrics;
             Player.Source = decoded.CreateMediaPlaybackItem();
             Player.Play();
         }
@@ -41,6 +44,7 @@ public sealed class NativeMusicPlayer : IDisposable
 
     public void Stop()
     {
+        EmbeddedLyrics = Lyrics.Empty;
         var previous = seekable; seekable = null;
         Player.Pause();
         Player.Source = null;
