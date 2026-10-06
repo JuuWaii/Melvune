@@ -66,7 +66,7 @@ public sealed partial class MainWindow
             view.Status.Text = !loaded ? "读取失败，请刷新重试；现有歌单保持。" : rows.Count == 0 ? "暂无歌单，点击右上方新建。"
                 : filtered.Length == 0 ? "没有匹配的歌单。" : $"{rows.Count} 个歌单 · 当前显示 {filtered.Length} 个。";
         }
-        async Task Reload()
+        async Task Reload(bool cached = false)
         {
             if (busy || !Current()) return;
             busy = true; view.Editor.IsEnabled = false; view.Status.Text = "正在读取歌单…";
@@ -75,10 +75,10 @@ public sealed partial class MainWindow
                 if (remote)
                 {
                     if (!CanReadRemote()) throw new MusicApiException(MusicFailure.Unavailable);
-                    var data = await api!.ListPlaylistsAsync(ct); ct.ThrowIfCancellationRequested();
+                    var data = cached ? CurrentMetadata(api)?.Playlists.Select(item => item.Playlist).ToArray() ?? await api!.ListPlaylistsAsync(ct) : await api!.ListPlaylistsAsync(ct); ct.ThrowIfCancellationRequested();
                     if (!Current() || !CanReadRemote()) return;
                     rows = data.Select(item => new PlaylistManagerRow(item, true, CanWrite())).ToList();
-                    RenderNasPlaylistNavigation(api, data);
+                    RenderNasPlaylistNavigation(api!, data);
                 }
                 else
                 {
@@ -153,13 +153,13 @@ public sealed partial class MainWindow
             { args.Handled = true; await Execute(row, "open"); }
         };
         search.TextChanged += (_, _) => { if (loaded && !busy && Current()) Render(); };
-        create.Click += async (_, _) => await Execute(null, "create"); refresh.Click += async (_, _) => await Reload();
-        view.Reload = Reload;
+        create.Click += async (_, _) => await Execute(null, "create"); refresh.Click += async (_, _) => { if (remote) RequestMetadataSync(refresh: true); await Reload(); };
+        view.Reload = () => { if (remote) RequestMetadataSync(refresh: true); return Reload(); };
         view.SourceChanged = () => { if (Current()) { if (remote && !CanReadRemote()) loaded = false; Render(); } };
         if (!await MountPlaylistPageAsync(view)) return;
         playlistManagerAction = (row, action) => Execute(row, action);
         view.Closing = () => playlistManagerAction = null;
-        await Reload();
+        await Reload(cached: true);
 #if DEBUG
         if (Current()) playlistManagerOpened?.Invoke(view);
 #endif

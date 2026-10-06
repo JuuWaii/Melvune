@@ -257,10 +257,17 @@ public sealed partial class MainWindow
                 }
                 else
                 {
-                    var bytes = await api!.GetCoverAsync(coverId!, decodeEdge == Services.ArtworkDecoder.FullCoverEdge
+                    var bytes = await ReadRemoteCoverAsync(api!, coverId!, decodeEdge == Services.ArtworkDecoder.FullCoverEdge
                         ? FnMusic.Infrastructure.NasCoverSize.Large : FnMusic.Infrastructure.NasCoverSize.Medium, ct);
                     if (bytes is null || bytes.Length == 0) return;
-                    bitmap = await Services.ArtworkDecoder.DecodeAsync(bytes, decodeEdge, ct);
+                    try { bitmap = await Services.ArtworkDecoder.DecodeAsync(bytes, decodeEdge, ct); }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception)
+                    {
+                        metadataCache.RemoveInvalidCover(api!.SourceInstanceId, coverId!, FnMusic.Infrastructure.NasCoverSize.Large);
+                        metadataCache.RemoveInvalidCover(api.SourceInstanceId, coverId!, FnMusic.Infrastructure.NasCoverSize.Medium);
+                        throw;
+                    }
                 }
 #if DEBUG
                 if (source is not null && localArtworkBeforeCommit is { } beforeCommit) await beforeCommit(image);
@@ -309,7 +316,7 @@ public sealed partial class MainWindow
             else
 #endif
             if (source is not null) result = await source.GetLyricsAsync(track.Reference, ct);
-            else if (api is not null && api.SourceInstanceId == track.SourceInstanceId) result = await api.GetLyricsAsync(track.Reference, ct);
+            else if (api is not null && api.SourceInstanceId == track.SourceInstanceId) result = await ReadRemoteLyricsAsync(api, track.Reference, ct);
             else result = Lyrics.Empty;
 #if DEBUG
             if (lyricsBeforeCommit is { } beforeCommit) await beforeCommit();

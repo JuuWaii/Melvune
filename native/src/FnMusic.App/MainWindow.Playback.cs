@@ -102,7 +102,7 @@ public sealed partial class MainWindow
     { if (await NavigateMainContentAsync(SettingsPanel) && category is not null) SettingsCategories.SelectedItem = category; }
     private async void ConnectionSettings_Click(object sender, RoutedEventArgs e) => await ShowSettingsPanelAsync(ConnectionCategory);
     private async void Refresh_Click(object sender, RoutedEventArgs e)
-    { if (allMusicView) await LoadAllMusicPageAsync(1, true); else if (localView) await LoadLocalPageAsync(1, true); else await LoadPageAsync(1); }
+    { RequestMetadataSync(refresh: true); if (allMusicView) await LoadAllMusicPageAsync(1, true); else if (localView) await LoadLocalPageAsync(1, true); else await LoadPageAsync(1); }
     private async void Previous_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page - 1);
     private async void Next_Click(object sender, RoutedEventArgs e) => await LoadPageAsync(page + 1);
     private async void Search_Click(object sender, RoutedEventArgs e) => await SearchFromTopAsync();
@@ -163,7 +163,13 @@ public sealed partial class MainWindow
                 if (IsSyntheticPreview) collections = GetSyntheticCollections(kind.Value, Math.Max(1, requestedPage));
                 else
 #endif
-                collections = artist is null
+                collections = artist is null && CurrentMetadata(api) is { } cachedCollections
+                    ? new CollectionPage((kind == CollectionKind.Album ? cachedCollections.Albums : cachedCollections.Artists)
+                        .Select(item => item.Detail).Skip((Math.Max(1, requestedPage) - 1) * 50).Take(50).ToArray(),
+                        (kind == CollectionKind.Album ? cachedCollections.Albums : cachedCollections.Artists).Count)
+                    : artist is not null && CurrentMetadata(api)?.Artists.FirstOrDefault(item => item.Detail.Id == artist.Id) is { } cachedArtist
+                    ? new CollectionPage(cachedArtist.Albums.Skip((Math.Max(1, requestedPage) - 1) * 50).Take(50).ToArray(), cachedArtist.Albums.Count)
+                    : artist is null
                     ? await api!.ListCollectionsAsync(kind.Value, Math.Max(1, requestedPage), 50, ct)
                     : await api!.ListArtistAlbumsAsync(artist.Id, Math.Max(1, requestedPage), 50, ct);
                 if (ct.IsCancellationRequested || closed) return;
@@ -183,8 +189,13 @@ public sealed partial class MainWindow
                 else
 #endif
                 {
-                    detail = await api!.GetCollectionAsync(kind.Value, selectedCollection.Id, ct);
-                    result = await api.ListCollectionTracksAsync(kind.Value, selectedCollection.Id, Math.Max(1, requestedPage), 50, ct);
+                    var cached = CurrentMetadata(api);
+                    var entry = (kind == CollectionKind.Album ? cached?.Albums : cached?.Artists)?.FirstOrDefault(item => item.Detail.Id == selectedCollection.Id);
+                    if (entry is not null)
+                    { detail = entry.Detail; result = new(entry.Tracks.Skip((Math.Max(1, requestedPage) - 1) * 50).Take(50).ToArray(), entry.Tracks.Count); }
+                    else
+                    { detail = await api!.GetCollectionAsync(kind.Value, selectedCollection.Id, ct);
+                      result = await api.ListCollectionTracksAsync(kind.Value, selectedCollection.Id, Math.Max(1, requestedPage), 50, ct); }
                 }
                 if (ct.IsCancellationRequested || closed) return;
                 collection = detail; UpdateCollectionView();
@@ -195,7 +206,8 @@ public sealed partial class MainWindow
             if (IsSyntheticPreview) result = await GetSyntheticPageAsync(query, Math.Max(1, requestedPage), favoritesView);
             else
 #endif
-            result = favoritesView ? await api!.ListFavoritesAsync(Math.Max(1, requestedPage), 50, ct) : query.Length == 0
+            result = CurrentMetadata(api) is { } cachedTracks ? CachedTrackPage(cachedTracks, requestedPage, favoritesView, query)
+                : favoritesView ? await api!.ListFavoritesAsync(Math.Max(1, requestedPage), 50, ct) : query.Length == 0
                 ? await api!.ListTracksAsync(Math.Max(1, requestedPage), 50, ct)
                 : await api!.SearchTracksAsync(query, Math.Max(1, requestedPage), 50, ct);
             }
@@ -413,6 +425,7 @@ public sealed partial class MainWindow
     private void CancelWork() { ResetSeek(); work.Cancel(); work.Dispose(); work = new(); }
     private void ResetLibrary()
     {
+        ResetMetadataSync();
         ResetPlaylistNavigation();
         coverCache.Clear();
         favoriteWork.Cancel(); favoriteWork.Dispose(); favoriteWork = new();

@@ -74,6 +74,7 @@ public sealed partial class MainWindow
             await api!.SetFavoriteAsync(track.Reference, desired, ct);
             if (closed || ct.IsCancellationRequested || !ReferenceEquals(api, ViewModel.AuthenticatedClient)) return;
             FavoriteStatus.Text = desired ? "已收藏" : "已取消收藏";
+            metadataSnapshot = null; RequestMetadataSync(refresh: true);
             // 只更新操作开始时的页面；浏览切换不影响正在进行的写入。
             if (!viewToken.IsCancellationRequested && TrackList.ItemsSource is IEnumerable<MusicTrack> tracks)
             {

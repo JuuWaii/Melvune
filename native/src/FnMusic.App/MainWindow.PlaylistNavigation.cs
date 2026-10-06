@@ -57,7 +57,7 @@ public sealed partial class MainWindow
             { if (!closed) ClearNasPlaylistNavigation(); return; }
             try
             {
-                var playlists = await api.ListPlaylistsAsync(ct);
+                var playlists = CurrentMetadata(api)?.Playlists.Select(item => item.Playlist).ToArray() ?? await api.ListPlaylistsAsync(ct);
                 ct.ThrowIfCancellationRequested();
                 if (nasVersion == nasNavigationVersion) RenderNasPlaylistNavigation(api, playlists, (NasPlaylistNavigation.SelectedItem as NasPlaylist)?.Reference, background: true);
             }

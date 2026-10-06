@@ -114,6 +114,7 @@ public sealed partial class MainWindow
             if (!closed && ReferenceEquals(api, ViewModel.AuthenticatedClient)) await ViewModel.ExpireSessionAsync();
             throw;
         }
+        finally { metadataSnapshot = null; RequestMetadataSync(refresh: true); }
     }
 
     private async Task RenameNasPlaylistAsync(NasApiClient api, NasPlaylist expected)

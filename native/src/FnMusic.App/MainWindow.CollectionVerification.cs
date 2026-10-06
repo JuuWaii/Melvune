@@ -310,6 +310,7 @@ public sealed partial class MainWindow
             await VerifyTrackContextWindowAsync(Verify);
             await VerifyManagementFullPagesAsync(Verify);
             await VerifyAllMusicWindowAsync(Verify);
+            await VerifyMetadataWindowAsync(Verify);
             await VerifyCategorizedSettingsWindowAsync(Verify);
             await VerifyTopNavigationAsync(Verify);
             await VerifyUiMotionAsync(Verify);

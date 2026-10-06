@@ -29,7 +29,8 @@ public sealed partial class MainWindow
     private void ConnectionCapabilitiesChanged(object? sender, PropertyChangedEventArgs args)
     {
         if (args.PropertyName is nameof(ConnectionViewModel.AuthenticatedClient) or nameof(ConnectionViewModel.IsReady)) UpdateSourceCommands();
-        if (args.PropertyName == nameof(ConnectionViewModel.AuthenticatedClient) && !closed) _ = RefreshPlaylistNavigationAsync();
+        if (args.PropertyName == nameof(ConnectionViewModel.AuthenticatedClient) && !closed)
+        { ResetMetadataSync(); RequestMetadataSync(); _ = RefreshPlaylistNavigationAsync(); }
     }
     private void UpdateSourceCommands()
     {

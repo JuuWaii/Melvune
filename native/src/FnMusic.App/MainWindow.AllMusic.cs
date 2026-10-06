@@ -12,6 +12,7 @@ public sealed partial class MainWindow
     private BrowseScope browseScope;
 #if DEBUG
     private NasApiClient? allMusicTestClient;
+    private Func<Task>? allMusicBeforeCommit;
 #endif
     private NasApiClient? AllMusicClient =>
 #if DEBUG
@@ -62,6 +63,7 @@ public sealed partial class MainWindow
         PageStatus.Text = rescan ? "正在扫描并汇总音乐…" : "正在读取所有音乐…";
         try
         {
+            allMusicLoads++;
             var catalog = await localLibraryStore.LoadAsync(ct);
             var definitions = catalog.Libraries.Where(item => (selectedLocalGroup is null || item.Group == selectedLocalGroup)
                 && (selectedLocalLibrary is null || item.SourceId == selectedLocalLibrary)).ToArray();
@@ -118,7 +120,8 @@ public sealed partial class MainWindow
                         });
                         try
                         {
-                            remoteTracks = (await TrackCatalogReader.ReadAsync((index, _) => ReadRemote(index), ct, progress))
+                            remoteTracks = (CurrentMetadata(api) is { } cached ? cached.Tracks.Where(track => MetadataMatches(track, query)).ToArray()
+                                : await TrackCatalogReader.ReadAsync((index, _) => ReadRemote(index), ct, progress))
                                 .Select(track => track with { SourceLabel = "飞牛音乐" }).ToArray();
                         }
                         finally { reading = false; }
@@ -136,6 +139,9 @@ public sealed partial class MainWindow
             ct.ThrowIfCancellationRequested();
             if (closed || !allMusicView || !ReferenceEquals(api, AllMusicClient)) return;
             if ((await localLibraryStore.LoadAsync(ct)).Revision != catalog.Revision) throw new LocalLibraryConflictException();
+#if DEBUG
+            if (allMusicBeforeCommit is { } beforeCommit) await beforeCommit();
+#endif
             ct.ThrowIfCancellationRequested();
             if (closed || !allMusicView || !ReferenceEquals(api, AllMusicClient)) return;
             if (!localCatalogLoaded || localCatalog.Revision != catalog.Revision || !localCatalog.Libraries.SequenceEqual(catalog.Libraries)) ApplyLocalCatalog(catalog);
@@ -163,5 +169,10 @@ public sealed partial class MainWindow
         }
         catch (Exception)
         { if (!closed && !ct.IsCancellationRequested) { PageStatus.Text = "本地音乐库配置读取失败或已变更，请刷新重试；原列表保留。"; PreviousPage.IsEnabled = oldBack; NextPage.IsEnabled = oldNext; } }
+        finally
+        {
+            allMusicLoads--;
+            if (!closed && !ct.IsCancellationRequested && CurrentMetadata(api) is not null) ApplyMetadataToVisibleCatalog(api!);
+        }
     }
 }

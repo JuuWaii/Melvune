@@ -40,6 +40,7 @@ public sealed partial class MainWindow
         }
         var picked = pickedTrack ?? TrackList.SelectedItem as MusicTrack;
         NasPlaylistSnapshot? snapshot = null;
+        bool usedMetadataCache = false;
         bool busy = false;
         PlaylistReference? currentReference = selectedPlaylist;
         var list = new ListView { Height = 200, SelectionMode = ListViewSelectionMode.Single };
@@ -74,20 +75,22 @@ public sealed partial class MainWindow
             if (snapshot is { } current) playlists = playlists.Select(item => item.Reference == current.Playlist.Reference ? current.Playlist : item).ToArray();
             if (ReferenceEquals(activePlaylistPage, view)) RenderNasPlaylistNavigation(api, playlists, snapshot?.Playlist.Reference);
         }
-        async Task LoadSelected()
+        async Task LoadSelected(bool cached = false)
         {
             snapshot = null; RenderSnapshot();
-            if (currentReference is { } selected) snapshot = await api.ReadPlaylistSnapshotAsync(selected, ct);
+            if (currentReference is { } selected) snapshot = cached ? CurrentMetadata(api)?.Playlists.FirstOrDefault(item => item.Playlist.Reference == selected) : null;
+            if (currentReference is { } remoteSelected && snapshot is null) snapshot = await api.ReadPlaylistSnapshotAsync(remoteSelected, ct);
             ct.ThrowIfCancellationRequested();
             if (!IsCurrentPlaylistClient(api)) throw new OperationCanceledException(ct);
             RenderSnapshot();
         }
-        async Task Refresh(PlaylistReference? selected = null)
+        async Task Refresh(PlaylistReference? selected = null, bool cached = false)
         {
-            playlists = await api.ListPlaylistsAsync(ct); ct.ThrowIfCancellationRequested();
+            usedMetadataCache = cached && CurrentMetadata(api) is not null;
+            playlists = cached ? CurrentMetadata(api)?.Playlists.Select(item => item.Playlist).ToArray() ?? await api.ListPlaylistsAsync(ct) : await api.ListPlaylistsAsync(ct); ct.ThrowIfCancellationRequested();
             if (!IsCurrentPlaylistClient(api)) throw new OperationCanceledException(ct);
             currentReference = (playlists.FirstOrDefault(item => item.Reference == selected) ?? playlists.FirstOrDefault())?.Reference;
-            await LoadSelected();
+            await LoadSelected(cached);
             if (ReferenceEquals(activePlaylistPage, view)) RenderNasPlaylistNavigation(api, playlists, currentReference);
         }
         async Task Run(Func<Task> operation, bool mutation = false)
@@ -97,8 +100,10 @@ public sealed partial class MainWindow
             if (!ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, required))
             { status.Text = "当前来源不支持歌单" + (mutation ? "写入。" : "读取。"); UpdateButtons(); return; }
             busy = true; view.BlockNavigation = mutation; editor.IsEnabled = false; view.PlayButton.IsEnabled = false;
+            usedMetadataCache = false;
             status.Text = "正在同步飞牛歌单…";
-            try { await operation(); ct.ThrowIfCancellationRequested(); status.Text = "已与飞牛服务器核对。"; }
+            try { await operation(); ct.ThrowIfCancellationRequested(); status.Text = usedMetadataCache ? "已加载缓存歌单，后台同步最新资料。" : "已与飞牛服务器核对。";
+                  if (mutation) { metadataSnapshot = null; RequestMetadataSync(refresh: true); } }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
             catch (RemotePlaylistConflictException)
             { snapshot = null; RenderSnapshot(); status.Text = "服务端歌单已变化或结果不一致，请刷新核对后重试。"; }
@@ -122,8 +127,8 @@ public sealed partial class MainWindow
             if (snapshot is not { } current || list.SelectedItem is not MusicTrack track) return;
             await Run(async () => { snapshot = await api.ChangePlaylistTracksAsync(current, [track.Reference], false, ct); ct.ThrowIfCancellationRequested(); RenderSnapshot(); }, true);
         };
-        refresh.Click += async (_, _) => await Run(() => Refresh(currentReference));
-        view.Reload = () => Run(() => Refresh(currentReference));
+        refresh.Click += async (_, _) => { RequestMetadataSync(refresh: true); await Run(() => Refresh(currentReference)); };
+        view.Reload = () => { RequestMetadataSync(refresh: true); return Run(() => Refresh(currentReference)); };
         view.PlayButton.Click += async (_, _) =>
         {
             if (ct.IsCancellationRequested || closed || !IsCurrentPlaylistClient(api) || snapshot is not { } selected || list.SelectedItem is not MusicTrack { IsCue: false } start) return;
@@ -132,7 +137,7 @@ public sealed partial class MainWindow
         };
         if (!await MountPlaylistPageAsync(view)) return;
         if (!IsCurrentPlaylistClient(api)) { if (ReferenceEquals(activePlaylistPage, view)) ClosePlaylistPage(); return; }
-        await Run(() => Refresh(selectedPlaylist));
+        await Run(() => Refresh(selectedPlaylist, cached: true));
         if (ct.IsCancellationRequested || closed || !IsCurrentPlaylistClient(api)) return;
 #if DEBUG
         if (ReferenceEquals(activePlaylistPage, view)) nasPlaylistPageOpened?.Invoke(view);

@@ -19,6 +19,11 @@ await Test("complete metadata catalog includes final rows beyond six pages and e
 await Test("metadata catalog rejects repeated changed truncated and oversized pages", TrackCatalogVerification.InconsistentAsync);
 await Test("metadata catalog cancellation does not return a partial snapshot or issue later requests", TrackCatalogVerification.CancelAsync);
 if (args.Contains("--verify-catalog")) { Console.WriteLine($"Catalog checks: {passed} passed."); return; }
+await Test("metadata snapshot and assets survive restart with source isolation and no credentials or audio requests", MetadataCacheVerification.PersistenceAsync);
+await Test("metadata failures retain the catalog and assets while an empty permission catalog replaces old rows", MetadataCacheVerification.FailureAsync);
+await Test("metadata cancellation and expired authentication prevent later catalog commits", MetadataCacheVerification.CancelAsync);
+await Test("metadata rejects corrupt oversized mixed-source duplicate and cancelled documents", MetadataCacheVerification.CorruptionAsync);
+if (args.Contains("--verify-metadata")) { Console.WriteLine($"Catalog and metadata checks: {passed} passed."); return; }
 if (args.Contains("--verify-cover-requests"))
 {
     await Test("cover partial body timeout closes TCP input and permits an explicit retry", CoverRequestVerification.BodyTimeoutAsync);
