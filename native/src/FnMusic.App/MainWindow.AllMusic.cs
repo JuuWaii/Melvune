@@ -68,6 +68,7 @@ public sealed partial class MainWindow
             var definitions = catalog.Libraries.Where(item => (selectedLocalGroup is null || item.Group == selectedLocalGroup)
                 && (selectedLocalLibrary is null || item.SourceId == selectedLocalLibrary)).ToArray();
             var staged = new Dictionary<Guid, LocalMusicSource>();
+            var cachedSources = new HashSet<Guid>();
             var failed = new List<Guid>();
             if (scope != BrowseScope.Nas)
                 foreach (var definition in definitions)
@@ -76,11 +77,13 @@ public sealed partial class MainWindow
                         && string.Equals(LocalLibraryStore.NormalizePath(source.Settings.Directory), LocalLibraryStore.NormalizePath(definition.Directory), StringComparison.OrdinalIgnoreCase)) continue;
                     try
                     {
-                        staged[definition.SourceId] = await ScanLocalAsync(definition.Settings, ct
+                        var cached = !rescan ? await ReadLocalIndexAsync(definition.Settings, ct) : null;
+                        staged[definition.SourceId] = cached ?? await ScanLocalAsync(definition.Settings, ct
 #if DEBUG
                             , localPageMetadataReader
 #endif
                         );
+                        if (cached is not null) cachedSources.Add(definition.SourceId);
                     }
                     catch (OperationCanceledException) { throw; }
                     catch (Exception) { failed.Add(definition.SourceId); }
@@ -146,6 +149,10 @@ public sealed partial class MainWindow
             if (closed || !allMusicView || !ReferenceEquals(api, AllMusicClient)) return;
             if (!localCatalogLoaded || localCatalog.Revision != catalog.Revision || !localCatalog.Libraries.SequenceEqual(catalog.Libraries)) ApplyLocalCatalog(catalog);
             foreach (var source in staged.Values) ReplaceLocalSource(source);
+            foreach (var source in staged.Values)
+            { if (cachedSources.Contains(source.Source.Id)) RequestLocalIndexRefresh(source.Source.Id); else await SaveLocalIndexAsync(source); }
+            ct.ThrowIfCancellationRequested();
+            if (closed || !allMusicView || !ReferenceEquals(api, AllMusicClient)) return;
             foreach (var id in failed) unavailableLibraries.Add(id);
             RenderLocalFilters();
             total = checked(remoteTotal + localTracks.Length);
@@ -173,6 +180,7 @@ public sealed partial class MainWindow
         {
             allMusicLoads--;
             if (!closed && !ct.IsCancellationRequested && CurrentMetadata(api) is not null) ApplyMetadataToVisibleCatalog(api!);
+            if (!closed && !ct.IsCancellationRequested && localIndexVisibleRefreshPending) RefreshVisibleLocalIndex();
         }
     }
 }

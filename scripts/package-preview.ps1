@@ -1,4 +1,4 @@
-param([string]$Name = ('FnMusic-0.2.0-preview.10-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss')))
+param([string]$Name = ('FnMusic-0.2.0-preview.11-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss')))
 $ErrorActionPreference = 'Stop'
 if ($Name -notmatch '^[a-zA-Z0-9._-]+$' -or $Name -in @('.', '..')) { throw 'Invalid package name' }
 $repo = Split-Path $PSScriptRoot -Parent
@@ -34,6 +34,7 @@ cd /d "%~dp0"
 start "" "%~dp0FnMusic.App.exe"
 '@ | Set-Content -LiteralPath (Join-Path $destination 'Start-FnMusic.cmd') -Encoding ascii
 $files = Get-ChildItem -LiteralPath $destination -Recurse -File
+if ($files | Where-Object { [IO.Path]::GetRelativePath($destination, $_.FullName) -match '^(local-index|nas-metadata)[\\/]' }) { throw 'Personal music index found in preview' }
 if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|appearance)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Unexpected development or personal artifact in preview' }
 $manifest = $files | Sort-Object FullName | ForEach-Object {
     [ordered]@{ path = [IO.Path]::GetRelativePath($destination, $_.FullName); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }

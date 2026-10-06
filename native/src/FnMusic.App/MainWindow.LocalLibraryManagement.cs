@@ -192,6 +192,7 @@ public sealed partial class MainWindow
                 if (closed) return;
                 ApplyLocalCatalog(catalog);
                 if (rescanned is not null) ReplaceLocalSource(rescanned);
+                if (rescanned is not null) await SaveLocalIndexAsync(rescanned);
                 rows = rows.Where(row => row.Local?.SourceId != updated.SourceId).ToList();
                 rows.Insert(0, new(updated, null, true)); Render("local:" + updated.SourceId);
                 view.Status.Text = rescanned is null ? "音乐库设置已保存。" : $"音乐库已保存，扫描到 {rescanned.Tracks.Count} 首。";
@@ -237,6 +238,7 @@ public sealed partial class MainWindow
                 operationCt.ThrowIfCancellationRequested();
                 if ((await localLibraryStore.LoadAsync(operationCt)).Revision != expected.Revision) throw new LocalLibraryConflictException();
                 ApplyLocalCatalog(expected); foreach (var source in scanned) ReplaceLocalSource(source);
+                foreach (var source in scanned) await SaveLocalIndexAsync(source);
                 view.Status.Text = $"扫描完成，{scanned.Count} 个本地音乐库，共 {scanned.Sum(source => source.Tracks.Count)} 首。";
                 await RefreshVisibleLocalCatalogAsync();
             }, true, background: true);

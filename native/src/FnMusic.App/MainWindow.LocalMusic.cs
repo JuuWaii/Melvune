@@ -94,7 +94,14 @@ public sealed partial class MainWindow
         foreach (var definition in localCatalog.Libraries)
         {
             if (localSources.ContainsKey(definition.SourceId)) continue;
-            try { ReplaceLocalSource(await ScanLocalAsync(definition.Settings, ct)); }
+            try
+            {
+                var cached = await ReadLocalIndexAsync(definition.Settings, ct);
+                var source = cached ?? await ScanLocalAsync(definition.Settings, ct);
+                ReplaceLocalSource(source);
+                if (cached is not null) RequestLocalIndexRefresh(definition.SourceId);
+                else await SaveLocalIndexAsync(source);
+            }
             catch (OperationCanceledException) { throw; }
             catch (Exception) { unavailableLibraries.Add(definition.SourceId); }
         }
@@ -159,19 +166,22 @@ public sealed partial class MainWindow
             if (rescan) ApplyLocalCatalog(await localLibraryStore.LoadAsync(ct));
             var definitions = FilteredLocalLibraries().ToArray();
             var scannedSources = new List<LocalMusicSource>();
+            var cachedSources = new HashSet<Guid>();
             var failedSources = new List<Guid>();
             foreach (var definition in definitions)
             {
                 if (!rescan && localSources.ContainsKey(definition.SourceId)) continue;
                 try
                 {
-                    var source = await ScanLocalAsync(definition.Settings, ct
+                    var cached = !rescan ? await ReadLocalIndexAsync(definition.Settings, ct) : null;
+                    var source = cached ?? await ScanLocalAsync(definition.Settings, ct
 #if DEBUG
                         , localPageMetadataReader
 #endif
                     );
                     if (ct.IsCancellationRequested || closed) return;
                     scannedSources.Add(source);
+                    if (cached is not null) cachedSources.Add(source.Source.Id);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception) { failedSources.Add(definition.SourceId); }
@@ -179,6 +189,9 @@ public sealed partial class MainWindow
             if (ct.IsCancellationRequested || closed) return;
             // Commit only after every scan finishes. Cancellation must not replace earlier libraries.
             foreach (var source in scannedSources) ReplaceLocalSource(source);
+            foreach (var source in scannedSources)
+            { if (cachedSources.Contains(source.Source.Id)) RequestLocalIndexRefresh(source.Source.Id); else await SaveLocalIndexAsync(source); }
+            if (ct.IsCancellationRequested || closed) return;
             foreach (var id in failedSources) unavailableLibraries.Add(id);
             RenderLocalFilters();
             var result = definitions.Where(item => localSources.ContainsKey(item.SourceId))
@@ -204,10 +217,11 @@ public sealed partial class MainWindow
             }
         }
         catch (Exception) { if (!closed && !ct.IsCancellationRequested) PageStatus.Text = "本地音乐库配置无法读取，原文件保留，请检查后重试。"; }
+        finally { if (!closed && !ct.IsCancellationRequested && localIndexVisibleRefreshPending) RefreshVisibleLocalIndex(); }
     }
 
     private void CancelLocalScan_Click(object sender, RoutedEventArgs e)
-    { if (localLibraryWork is { IsCancellationRequested: false } background) background.Cancel(); else localScan?.Cancel(); }
+    { if (localLibraryWork is { IsCancellationRequested: false } background) background.Cancel(); else if (localScan is not null) localScan.Cancel(); else localIndexWork?.Cancel(); }
 
     private async Task<LocalMusicSource> ScanLocalAsync(LocalMusicSettings settings, CancellationToken parent,
         Func<string, CancellationToken, Task<LocalMusicMetadata>>? reader = null, bool background = false)

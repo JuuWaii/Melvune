@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [string]$ExpectedVersion = '0.2.0-preview.10'
+    [string]$ExpectedVersion = '0.2.0-preview.11'
 )
 $ErrorActionPreference = 'Stop'
 $previewRoot = (Get-Item -LiteralPath $Path).FullName
@@ -27,6 +27,7 @@ $contents = @(Get-ChildItem -LiteralPath $previewRoot -Recurse -Force)
 if (($contents | Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 }) -or
     ((Get-Item -LiteralPath $previewRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Package contains a link' }
 $files = @($contents | Where-Object { -not $_.PSIsContainer -and $_.FullName -ne $manifestPath })
+if ($files | Where-Object { [IO.Path]::GetRelativePath($previewRoot, $_.FullName) -match '^(local-index|nas-metadata)[\\/]' }) { throw 'Personal music index found in preview' }
 if ($files.Count -ne $manifest.Count -or @($files | Where-Object { -not $known.Contains($_.FullName) }).Count -gt 0) { throw 'Manifest does not describe every package file' }
 if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|appearance)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Development or personal artifact found' }
 foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.dll', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf',

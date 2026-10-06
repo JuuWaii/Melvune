@@ -15,7 +15,8 @@ public sealed partial class MainWindow
     {
         if (closed) return;
         bool remote = metadataWork is { IsCancellationRequested: false };
-        bool local = localLibraryWork is { IsCancellationRequested: false } || localScan is { IsCancellationRequested: false } || libraryReadWorkCount > 0;
+        bool local = localLibraryWork is { IsCancellationRequested: false } || localScan is { IsCancellationRequested: false }
+            || localIndexWork is { IsCancellationRequested: false } || libraryReadWorkCount > 0;
         MetadataActivity.IsActive = remote || local;
         MetadataActivity.Visibility = remote || local ? Visibility.Visible : Visibility.Collapsed;
         ToolTipService.SetToolTip(MetadataActivity, string.Join("\n", new[] { remote ? metadataActivitySummary : "", local ? localActivitySummary : "" }.Where(text => text.Length > 0)));
