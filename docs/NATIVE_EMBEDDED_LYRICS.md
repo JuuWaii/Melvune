@@ -39,3 +39,19 @@
 实际 Release 恢复既有飞牛会话，选择一个接口歌词缓存为空的歌曲，播放时钟 00:11→01:19、封面进入和队列右侧覆盖/Escape 正常；这首仍显示无可用歌词，未建立其文件含内嵌歌词的事实，因此不作为真实 NAS 内嵌成功证据。停止、恢复原静音状态后正常关闭，八配置/会话文件哈希不变，9 项观察记录 `.review-audit/embedded-nas-real-verification.json`。真实 NAS 含已知内嵌标签的正例仍保留扩展验收。
 
 Debug/Release 构建零警告零错误；隐私专项 8/8，源码扫描通过。最终独立 Release 在 `.review-audit/embedded-verified-release-app/`；上述实际 NAS 操作使用生产源码相同的 `embedded-shared-stream-release-app`，之后仅调整 Debug 验证等待/诊断。本次不改写 preview.9 固定验证包。
+
+## 真实 NAS 正例与只读播放流检查
+
+新增 Debug 专用 `--verify-native-embedded-lyrics`，恢复既有会话，使用正式来源路由、HttpRangeStream 与 NativeMusicPlayer。默认优先选择至多十首空歌词缓存候选，再补三首其他歌曲；实时读取接口歌词并静音播放，验证标签读取、时间推进与停止清理。报告只含固定阶段、计数、布尔值和异常类型，不记录曲目 ID、目录、地址、会话、歌词正文或文件哈希。没有写入 NAS 设置/媒体，未把它当作鼠标界面验收。
+
+实际 13 首、41/41 检查通过，报告 `.review-audit/nas-embedded-probe-app/nas-embedded-lyrics-verification.json`，时间 `2026-10-06T19:08:06.0467829+08:00`、error 为空。这包含当前缓存全部十首接口空歌词候选；所选播放流均未读到可用内嵌歌词，其他三首接口分别提供 51/22/46 行。报告 stage=complete_with_skips，两个跳过项明确保留，不能把这些样本当作内嵌正例。
+
+用户随后提供确认含内嵌歌词的“栖凰”FLAC。独立 FFprobe 确认 `lyrics` 字段含 LRC 标记，原生解析器读到 99 行定时歌词；遍历真实索引并要求唯一文件名匹配，再比较完整编码音频 SHA-256，证明匹配到的 NAS 播放流与本地样本是同一文件。不是按标题或行数推断文件身份。
+
+最终正例 13/13 检查通过，报告 `.review-audit/nas-known-embedded-final-app/nas-embedded-lyrics-verification.json`，时间 `2026-10-06T19:17:24.5528865+08:00`、error 为空。本地与实际播放流的 99 行文本/时间戳逐项相同；接口当前也返回同一时间轴和文本。实际静音播放时间推进，暂停后定位到一行中部时间，播放器位置对应正确歌词索引，停止清空快照。原样本完整哈希与八份已有配置/会话文件哈希均保持，独立进程已结束。
+
+该文件的接口歌词有效，因此报告仍为 complete_with_skips，仅保留 `no_empty_api_with_embedded_positive_sample`。真实 NAS 内嵌标签正例已建立；“接口空歌词而文件有内嵌”的实际回退场景没有被这首证明，也未为验收修改用户服务端歌词。已有六格式/65 项窗口专项与这次正式 NAS 流验证分别记录。Debug 构建零警告零错误，8/8 隐私专项及源码扫描通过。
+
+如需复验明确文件，可使用同一 Debug 入口加 `--embedded-sample-file <音乐文件路径>`；必须能恢复当前会话，并能在其 NAS 索引中唯一匹配文件。会全流计算哈希以核对文件身份，静音后作一次原生定位；没有用户凭据命令行参数。
+
+同轮尝试独立音乐库完整导入鼠标验收，窗口工具激活及一次重新选取恢复均返回 `failed to activate captured window`，按 Computer Use 指引停止该操作路径，正常关闭本次独立进程。未开始导入或保存配置，准备的十二份生成音频副本哈希保持。系统文件夹选择器最终确认、新界面实际导入与跨库歌单流程仍待工具可用时继续，不能由本次只读流检查代替。

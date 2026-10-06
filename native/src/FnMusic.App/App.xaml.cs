@@ -9,6 +9,8 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-native-embedded-lyrics"))
+        { RunNativeEmbeddedLyricsVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-library-lifecycle"))
         { RunLibraryLifecycleVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-library-directory"))
@@ -47,6 +49,8 @@ public partial class App : Application
         window.Activate();
     }
 #if DEBUG
+    private async void RunNativeEmbeddedLyricsVerification()
+    { await Services.NasEmbeddedLyricsVerification.RunAsync(); Exit(); }
     private async void RunLibraryLifecycleVerification()
     { await Services.LibraryLifecycleVerification.RunAsync(); Exit(); }
     private async void RunLibraryDirectoryDiscovery()
