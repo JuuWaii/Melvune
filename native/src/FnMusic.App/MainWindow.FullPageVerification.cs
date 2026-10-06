@@ -190,6 +190,7 @@ public sealed partial class MainWindow
             await VerifyLibraryHeadingAsync(verify, view);
             await VerifyLibraryCardScanAsync(verify, view);
             await VerifyLibraryEditorWindowAsync(verify, view, selectedLibrary, audio);
+            view = await VerifyBackgroundLibraryWindowAsync(verify, view);
             view.BlockNavigation = true;
             verify("management_full_page_write_blocks_back", !CloseFullPage() && ReferenceEquals(fullPageView, view) && !view.IsDisposed);
             view.BlockNavigation = false;
@@ -242,7 +243,7 @@ public sealed partial class MainWindow
         {
             ((IInvokeProvider)new ButtonAutomationPeer(FindFullPageButton(view, "扫描音乐库")).GetPattern(PatternInterface.Invoke)).Invoke();
             await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            verify("local_library_cards_scan_blocks_navigation_and_top_actions", view.BlockNavigation && !CloseFullPage()
+            verify("local_library_cards_scan_allows_navigation_and_blocks_duplicate_writes", !view.BlockNavigation && view.BackButton.IsEnabled && MetadataActivity.IsActive
                 && view.CancelButton.IsEnabled && view.CancelButton.Visibility == Visibility.Visible
                 && !FindFullPageButton(view, "新建音乐库").IsEnabled);
             ((IInvokeProvider)new ButtonAutomationPeer(view.CancelButton).GetPattern(PatternInterface.Invoke)).Invoke();

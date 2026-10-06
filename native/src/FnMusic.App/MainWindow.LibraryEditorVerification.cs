@@ -17,7 +17,7 @@ public sealed partial class MainWindow
         var button = FindSongVisual<Button>(container, b => AutomationProperties.GetName(b) == label) ?? throw new InvalidOperationException();
         ((IInvokeProvider)new ButtonAutomationPeer(button).GetPattern(PatternInterface.Invoke)).Invoke();
     }
-    private async Task WithLibraryEditorAsync(PlaylistPageView view, Action open, Func<LibraryEditorView, Task> configure, bool save, Func<Task>? afterSubmit = null)
+    private async Task WithLibraryEditorAsync(PlaylistPageView view, Action open, Func<LibraryEditorView, Task> configure, bool save, Func<Task>? afterSubmit = null, bool allowClosed = false)
     {
         ContentDialog? opened = null;
         var done = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -37,6 +37,7 @@ public sealed partial class MainWindow
         {
             open(); await done.Task.WaitAsync(TimeSpan.FromSeconds(10));
             if (afterSubmit is not null) await afterSubmit();
+            if (allowClosed && view.IsDisposed) return;
             for (int i = 0; i < 200 && (themedDialogOpen || !view.Editor.IsEnabled); i++) await Task.Delay(50);
             if (themedDialogOpen || !view.Editor.IsEnabled) throw new TimeoutException();
         }
@@ -121,7 +122,7 @@ public sealed partial class MainWindow
             await WithLibraryEditorAsync(view, Edit(), editor => { editor.LocalPath.Text = moved; return Task.CompletedTask; }, true, async () =>
             {
                 await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-                verify("library_dialog_relink_scan_cancel_visible_and_navigation_blocked", view.CancelButton.IsEnabled && view.CancelButton.Visibility == Visibility.Visible && view.BlockNavigation && !CloseFullPage());
+                verify("library_dialog_relink_scan_cancel_visible_and_navigation_available", view.CancelButton.IsEnabled && view.CancelButton.Visibility == Visibility.Visible && !view.BlockNavigation && view.BackButton.IsEnabled && MetadataActivity.IsActive);
                 ((IInvokeProvider)new ButtonAutomationPeer(view.CancelButton).GetPattern(PatternInterface.Invoke)).Invoke();
             });
             verify("library_dialog_relink_cancel_preserves_catalog", (await localLibraryStore.LoadAsync()).Revision == revision && view.Status.Text.Contains("取消") && ReferenceEquals(audio, music.Player.Source));

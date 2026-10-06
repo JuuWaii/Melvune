@@ -11,7 +11,7 @@
     <TextBox x:Name="SearchInput" Grid.Column="1" PlaceholderText="搜索音乐" AutomationProperties.Name="搜索音乐" MaxLength="256" MinWidth="64"/>
     <Button x:Name="SearchAction" Grid.Column="2" Width="32" Height="32" Padding="6" Click="Search_Click" AutomationProperties.Name="搜索音乐" ToolTipService.ToolTip="搜索音乐"><FontIcon Glyph="&#xE721;" FontSize="14"/></Button>
     <Button x:Name="ClearSearchAction" Grid.Column="3" Width="32" Height="32" Padding="6" Click="ClearSearch_Click" AutomationProperties.Name="清空搜索" ToolTipService.ToolTip="清空搜索"><FontIcon Glyph="&#xE894;" FontSize="14"/></Button>
-    <ProgressRing x:Name="MetadataActivity" Grid.Column="4" Width="20" Height="20" IsActive="False" Visibility="Collapsed" AutomationProperties.Name="后台同步飞牛资料" ToolTipService.ToolTip="正在后台同步飞牛资料…"/>
+    <ProgressRing x:Name="MetadataActivity" Grid.Column="4" Width="20" Height="20" IsActive="False" Visibility="Collapsed" AutomationProperties.Name="后台加载音乐资料" ToolTipService.ToolTip="正在后台加载音乐资料…"/>
    </Grid></TitleBar.Content>
    <TitleBar.RightHeader><Button x:Name="TitleBarSettings" Click="Settings_Click" Width="36" Height="32" Padding="6" AutomationProperties.Name="设置" ToolTipService.ToolTip="设置"><FontIcon Glyph="&#xE713;" FontSize="16"/></Button></TitleBar.RightHeader>
   </TitleBar>

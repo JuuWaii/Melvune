@@ -17,7 +17,7 @@ public sealed partial class MainWindow
 #endif
     private async Task ShowLocalLibraryManagementAsync(bool createNew = false)
     {
-        if (localImportBusy || closed) return;
+        if (closed) return;
         var catalog = LocalLibraryCatalog.Empty;
         bool busy = false, loaded = false, admin = false;
         NasApiClient? api = null;
@@ -53,40 +53,63 @@ public sealed partial class MainWindow
             && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.ReadSettings
                 | (write ? MusicSourceCapabilities.WriteSettings : MusicSourceCapabilities.None)) && (!write || admin);
         void UpdateButtons()
-        { add.IsEnabled = loaded; scan.IsEnabled = loaded && catalog.Libraries.Count > 0; }
+        { add.IsEnabled = loaded && !localImportBusy; scan.IsEnabled = loaded && !localImportBusy && catalog.Libraries.Count > 0; }
         void Render(string? key)
-        { list.ItemsSource = rows.ToArray(); list.SelectedItem = rows.FirstOrDefault(row => row.Key == key); UpdateButtons(); }
+        {
+            if (view.IsDisposed) return;
+            list.ItemsSource = rows.Select(row => row with { CanEdit = row.CanEdit && !localImportBusy, CanDelete = row.CanDelete && !localImportBusy }).ToArray();
+            list.SelectedItem = list.Items.Cast<LibraryManagerRow>().FirstOrDefault(row => row.Key == key); UpdateButtons();
+        }
         void InvalidateRows()
         {
             loaded = false; rows = rows.Select(row => row with { CanEdit = false, CanDelete = false }).ToList();
             Render((list.SelectedItem as LibraryManagerRow)?.Key);
         }
-        async Task Run(Func<Task> operation, bool mutation)
+        async Task Run(Func<CancellationToken, Task> operation, bool mutation, bool background = false)
         {
             if (busy || ct.IsCancellationRequested || (mutation && localImportBusy)) return;
-            busy = true; view.Editor.IsEnabled = false; view.BlockNavigation = mutation;
+            using var detached = background ? CancellationTokenSource.CreateLinkedTokenSource(localLifetime.Token) : null;
+            var operationCt = detached?.Token ?? ct;
+            if (background) { localLibraryWork = detached; localLibraryWorkOwner = view; }
+            if (!mutation)
+            { libraryReadWorkCount++; if (localLibraryWork is null) localActivitySummary = "正在读取音乐库…"; UpdateBackgroundActivity(); }
+            busy = true; view.Editor.IsEnabled = false; view.BlockNavigation = mutation && !background;
             if (mutation) localImportBusy = true;
-            try { await operation(); }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested || mutation)
-            { if (!ct.IsCancellationRequested) view.Status.Text = "扫描已取消，原音乐库保留。"; }
+            if (background)
+            { CancelLocalScan.Visibility = view.CancelButton.Visibility = Visibility.Visible; ReportLocalLoading("正在后台加载音乐库…", true); }
+            try
+            {
+                await operation(operationCt);
+                if (background && !closed) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); }
+            }
+            catch (OperationCanceledException) when (operationCt.IsCancellationRequested || mutation)
+            { if (!closed) { view.Status.Text = "扫描已取消，原音乐库保留。"; if (background) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); } } }
             catch (LocalLibraryConflictException)
-            { view.Status.Text = "音乐库已在其他窗口修改，请刷新核对后重试。原配置未被覆盖。"; InvalidateRows(); }
+            { view.Status.Text = "音乐库已在其他窗口修改，请刷新核对后重试。原配置未被覆盖。"; InvalidateRows(); if (background && !closed) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); } }
             catch (RemoteSettingsConflictException)
             { view.Status.Text = "飞牛音乐库已改变，请刷新核对后重试。"; InvalidateRows(); }
             catch (MusicApiException ex)
             {
-                if (!ct.IsCancellationRequested)
+                if (!operationCt.IsCancellationRequested)
                 {
                     view.Status.Text = ex.Failure == MusicFailure.Unavailable ? "连接失败或请求超时，请刷新核对音乐库状态后重试。" : "飞牛音乐库操作未完成，请检查连接和权限后刷新。";
                     if (ex.Failure == MusicFailure.Unauthorized && api is not null && ReferenceEquals(api, ViewModel.AuthenticatedClient)) await ViewModel.ExpireSessionAsync();
                 }
             }
             catch (Exception)
-            { if (!ct.IsCancellationRequested) view.Status.Text = "操作未完成，请检查名称、目录或重复路径。原音乐库保留。"; }
+            { if (!closed) { view.Status.Text = "操作未完成，请检查名称、目录或重复路径。原音乐库保留。"; if (background) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); } } }
             finally
             {
                 busy = false; view.BlockNavigation = false;
-                if (mutation) localImportBusy = false;
+                if (mutation)
+                { localImportBusy = false; Render((list.SelectedItem as LibraryManagerRow)?.Key); }
+                if (background && ReferenceEquals(localLibraryWork, detached))
+                {
+                    localLibraryWork = null;
+                    if (!closed && localScan is null) CancelLocalScan.Visibility = Visibility.Collapsed;
+                    UpdateBackgroundActivity(); libraryBackgroundStateChanged?.Invoke(); localLibraryWorkOwner = null;
+                }
+                if (!mutation) { libraryReadWorkCount--; UpdateBackgroundActivity(); }
                 if (!view.IsDisposed) { view.Editor.IsEnabled = true; view.CancelButton.Visibility = Visibility.Collapsed; UpdateButtons(); }
             }
         }
@@ -126,22 +149,22 @@ public sealed partial class MainWindow
         }
         async Task Edit(LibraryManagerRow? selected)
         {
-            if (busy || !loaded || ct.IsCancellationRequested || themedDialogOpen || (selected is not null && !rows.Contains(selected))) return;
+            if (busy || localImportBusy || !loaded || ct.IsCancellationRequested || themedDialogOpen || (selected is not null && !rows.Any(row => row.Key == selected.Key))) return;
             var expected = catalog; var expectedApi = api;
             var request = await EditLibraryDialogAsync(selected, api, CurrentRemote(true), authorizedPaths, ct);
             if (request is null || ct.IsCancellationRequested || !ReferenceEquals(fullPageView, view)) return;
-            await Run(async () =>
+            await Run(async operationCt =>
             {
                 if (request.Kind == 1)
                 {
                     if (expectedApi is null || !ReferenceEquals(api, expectedApi) || !CurrentRemote(true)) throw new MusicApiException(MusicFailure.Rejected);
                     var updatedRemote = selected?.Remote is { } remote
-                        ? await expectedApi.UpdateSharedLibraryAsync(remote, request.Lyric, request.Metadata, ct)
-                        : await expectedApi.CreateSharedLibraryAsync(request.Path, request.Lyric, request.Metadata, ct);
+                        ? await expectedApi.UpdateSharedLibraryAsync(remote, request.Lyric, request.Metadata, operationCt)
+                        : await expectedApi.CreateSharedLibraryAsync(request.Path, request.Lyric, request.Metadata, operationCt);
                     await Refresh("nas:" + updatedRemote.Library.Id); view.Status.Text = "音乐库设置已同步到飞牛。"; return;
                 }
                 if (request.Kind != 0 || selected?.Remote is not null) return;
-                if ((await localLibraryStore.LoadAsync(ct)).Revision != expected.Revision) throw new LocalLibraryConflictException();
+                if ((await localLibraryStore.LoadAsync(operationCt)).Revision != expected.Revision) throw new LocalLibraryConflictException();
                 if (!Path.IsPathFullyQualified(request.Path)) throw new ArgumentException();
                 string directory = LocalLibraryStore.NormalizePath(request.Path);
                 var existing = selected?.Local ?? expected.Libraries.FirstOrDefault(item => string.Equals(LocalLibraryStore.NormalizePath(item.Directory), directory, StringComparison.OrdinalIgnoreCase));
@@ -154,28 +177,33 @@ public sealed partial class MainWindow
                 if (existing is null || !string.Equals(directory, LocalLibraryStore.NormalizePath(existing.Directory), StringComparison.OrdinalIgnoreCase))
                 {
                     view.Status.Text = "正在扫描本地音乐…"; view.CancelButton.Visibility = Visibility.Visible;
-                    rescanned = await ScanLocalAsync(updated.Settings, ct
+                    rescanned = await ScanLocalAsync(updated.Settings, operationCt
 #if DEBUG
                         , localPageMetadataReader
 #endif
-                    );
+                        , background: true);
                 }
-                catalog = await localLibraryStore.SaveAsync(expected with { Libraries = existing is null ? expected.Libraries.Append(updated).ToArray()
-                    : expected.Libraries.Select(item => item.SourceId == updated.SourceId ? updated : item).ToArray() }, ct);
-                ct.ThrowIfCancellationRequested(); ApplyLocalCatalog(catalog);
+                if (!view.IsDisposed) view.BlockNavigation = true;
+                try
+                { catalog = await localLibraryStore.SaveAsync(expected with { Libraries = existing is null ? expected.Libraries.Append(updated).ToArray()
+                    : expected.Libraries.Select(item => item.SourceId == updated.SourceId ? updated : item).ToArray() }, operationCt); }
+                finally { view.BlockNavigation = false; }
+                // SaveAsync has committed atomically; reflect that committed revision even if cancel arrives just afterwards.
+                if (closed) return;
+                ApplyLocalCatalog(catalog);
                 if (rescanned is not null) ReplaceLocalSource(rescanned);
                 rows = rows.Where(row => row.Local?.SourceId != updated.SourceId).ToList();
                 rows.Insert(0, new(updated, null, true)); Render("local:" + updated.SourceId);
-                view.Status.Text = PlaybackStatus.Text = rescanned is null ? "音乐库设置已保存。" : $"音乐库已保存，扫描到 {rescanned.Tracks.Count} 首。";
-                if (localView || allMusicView) await LoadPageAsync(page);
-            }, true);
+                view.Status.Text = rescanned is null ? "音乐库设置已保存。" : $"音乐库已保存，扫描到 {rescanned.Tracks.Count} 首。";
+                await RefreshVisibleLocalCatalogAsync();
+            }, true, background: request.Kind == 0);
         }
         async Task Delete(LibraryManagerRow selected)
         {
-            if (busy || !loaded || ct.IsCancellationRequested || themedDialogOpen || !rows.Contains(selected) || !selected.CanDelete) return;
+            if (busy || localImportBusy || !loaded || ct.IsCancellationRequested || themedDialogOpen || !rows.Any(row => row.Key == selected.Key) || !selected.CanDelete) return;
             var expected = catalog; var expectedApi = api;
             if (!await ConfirmLibraryDeleteAsync(selected, ct) || ct.IsCancellationRequested || !ReferenceEquals(fullPageView, view)) return;
-            await Run(async () =>
+            await Run(async _ =>
             {
                 if (selected.Remote is { } remote)
                 {
@@ -190,30 +218,30 @@ public sealed partial class MainWindow
             }, true);
         }
         add.Click += async (_, _) => await Edit(null);
-        refresh.Click += async (_, _) => await Run(() => Refresh((list.SelectedItem as LibraryManagerRow)?.Key), false);
+        refresh.Click += async (_, _) => await Run(_ => Refresh((list.SelectedItem as LibraryManagerRow)?.Key), false);
         view.CancelButton.Click += CancelLocalScan_Click;
         scan.Click += async (_, _) =>
         {
             if (!loaded || catalog.Libraries.Count == 0) return;
-            await Run(async () =>
+            await Run(async operationCt =>
             {
                 var expected = catalog;
-                if ((await localLibraryStore.LoadAsync(ct)).Revision != expected.Revision) throw new LocalLibraryConflictException();
+                if ((await localLibraryStore.LoadAsync(operationCt)).Revision != expected.Revision) throw new LocalLibraryConflictException();
                 var scanned = new List<LocalMusicSource>(); view.CancelButton.Visibility = Visibility.Visible;
                 foreach (var definition in expected.Libraries)
-                    scanned.Add(await ScanLocalAsync(definition.Settings, ct
+                    scanned.Add(await ScanLocalAsync(definition.Settings, operationCt
 #if DEBUG
                         , localPageMetadataReader
 #endif
-                    ));
-                ct.ThrowIfCancellationRequested();
-                if ((await localLibraryStore.LoadAsync(ct)).Revision != expected.Revision) throw new LocalLibraryConflictException();
+                        , background: true));
+                operationCt.ThrowIfCancellationRequested();
+                if ((await localLibraryStore.LoadAsync(operationCt)).Revision != expected.Revision) throw new LocalLibraryConflictException();
                 ApplyLocalCatalog(expected); foreach (var source in scanned) ReplaceLocalSource(source);
-                view.Status.Text = PlaybackStatus.Text = $"扫描完成，{scanned.Count} 个本地音乐库，共 {scanned.Sum(source => source.Tracks.Count)} 首。";
-                if (localView || allMusicView) await LoadPageAsync(page);
-            }, true);
+                view.Status.Text = $"扫描完成，{scanned.Count} 个本地音乐库，共 {scanned.Sum(source => source.Tracks.Count)} 首。";
+                await RefreshVisibleLocalCatalogAsync();
+            }, true, background: true);
         };
-        view.Reload = () => Run(() => Refresh((list.SelectedItem as LibraryManagerRow)?.Key), false);
+        view.Reload = () => Run(_ => Refresh((list.SelectedItem as LibraryManagerRow)?.Key), false);
         view.SourceChanged = () =>
         {
             if (!CurrentRemote()) admin = false;
@@ -222,8 +250,20 @@ public sealed partial class MainWindow
         };
         if (!MountFullPage(view)) return;
         libraryCardEdit = row => Edit(row); libraryCardDelete = Delete;
-        view.Closing = () => { libraryCardEdit = libraryCardDelete = null; };
-        await Run(() => Refresh(selectedLocalLibrary is { } id ? "local:" + id : null), false);
+        bool observedBackgroundBusy = localImportBusy;
+        Action backgroundChanged = () =>
+        {
+            if (view.IsDisposed || !ReferenceEquals(fullPageView, view)) return;
+            if (observedBackgroundBusy != localImportBusy) { observedBackgroundBusy = localImportBusy; Render((list.SelectedItem as LibraryManagerRow)?.Key); }
+            else UpdateButtons();
+            if (localLibraryWork is not null) { view.Status.Text = localActivitySummary; view.CancelButton.Visibility = Visibility.Visible; }
+            else if (!busy)
+            { view.CancelButton.Visibility = Visibility.Collapsed; if (!ReferenceEquals(localLibraryWorkOwner, view) && view.Reload is { } reload) _ = reload(); }
+        };
+        libraryBackgroundStateChanged = backgroundChanged;
+        view.Closing = () => { libraryCardEdit = libraryCardDelete = null; if (ReferenceEquals(libraryBackgroundStateChanged, backgroundChanged)) libraryBackgroundStateChanged = null; };
+        await Run(_ => Refresh(selectedLocalLibrary is { } id ? "local:" + id : null), false);
+        if (localLibraryWork is not null && !view.IsDisposed) backgroundChanged();
 #if DEBUG
         if (!view.IsDisposed) localLibraryPageOpened?.Invoke(view);
 #endif

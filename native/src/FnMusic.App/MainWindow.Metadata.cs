@@ -42,7 +42,7 @@ public sealed partial class MainWindow
     {
         metadataWork?.Cancel(); metadataWork = null;
         metadataClient = null; metadataTask = null; metadataSnapshot = null; metadataRefreshPending = false;
-        MetadataActivity.IsActive = false; MetadataActivity.Visibility = Visibility.Collapsed;
+        UpdateBackgroundActivity();
         MetadataNotice.Visibility = Visibility.Collapsed;
         metadataNoticeTimer?.Stop();
     }
@@ -56,7 +56,7 @@ public sealed partial class MainWindow
         var work = CancellationTokenSource.CreateLinkedTokenSource(localLifetime.Token);
         metadataWork = work; metadataClient = api;
         MetadataNotice.Visibility = Visibility.Collapsed;
-        MetadataActivity.IsActive = true; MetadataActivity.Visibility = Visibility.Visible;
+        UpdateBackgroundActivity();
         metadataTask = SyncMetadataAsync(api, work);
     }
     private async Task SyncMetadataAsync(NasApiClient api, CancellationTokenSource work)
@@ -66,8 +66,11 @@ public sealed partial class MainWindow
             && ReferenceEquals(metadataWork, work);
         var progress = new Progress<MetadataSyncProgress>(value =>
         {
-            if (Current()) ToolTipService.SetToolTip(MetadataActivity, "同步飞牛" + value.Stage
-                + (value.Total > 0 ? $" · {value.Completed}/{value.Total}" : "…"));
+            if (Current())
+            {
+                metadataActivitySummary = "同步飞牛" + value.Stage + (value.Total > 0 ? $" · {value.Completed}/{value.Total}" : "…");
+                UpdateBackgroundActivity();
+            }
         });
         try
         {
@@ -110,7 +113,7 @@ public sealed partial class MainWindow
         finally
         {
             if (ReferenceEquals(metadataWork, work))
-            { MetadataActivity.IsActive = false; MetadataActivity.Visibility = Visibility.Collapsed; metadataWork = null; }
+            { metadataWork = null; UpdateBackgroundActivity(); }
             work.Dispose();
         }
     }

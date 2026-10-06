@@ -206,23 +206,23 @@ public sealed partial class MainWindow
         catch (Exception) { if (!closed && !ct.IsCancellationRequested) PageStatus.Text = "本地音乐库配置无法读取，原文件保留，请检查后重试。"; }
     }
 
-    private void CancelLocalScan_Click(object sender, RoutedEventArgs e) => localScan?.Cancel();
+    private void CancelLocalScan_Click(object sender, RoutedEventArgs e)
+    { if (localLibraryWork is { IsCancellationRequested: false } background) background.Cancel(); else localScan?.Cancel(); }
 
     private async Task<LocalMusicSource> ScanLocalAsync(LocalMusicSettings settings, CancellationToken parent,
-        Func<string, CancellationToken, Task<LocalMusicMetadata>>? reader = null)
+        Func<string, CancellationToken, Task<LocalMusicMetadata>>? reader = null, bool background = false)
     {
-        localScan?.Cancel();
+        if (!background) localScan?.Cancel();
         using var scan = CancellationTokenSource.CreateLinkedTokenSource(parent, localLifetime.Token);
-        localScan = scan;
+        if (background) backgroundLocalScan = scan; else localScan = scan;
+        bool Current() => ReferenceEquals(background ? backgroundLocalScan : localScan, scan);
         CancelLocalScan.Visibility = Visibility.Visible;
-        LocalScanStatus.Text = "正在扫描本地音乐…";
+        ReportLocalLoading("正在扫描本地音乐…", background); UpdateBackgroundActivity();
         var progress = new Progress<int>(count =>
         {
-            if (!closed && ReferenceEquals(localScan, scan) && !scan.IsCancellationRequested)
+            if (!closed && Current() && !scan.IsCancellationRequested)
             {
-                LocalScanStatus.Text = $"已读取 {count} 首，正在扫描…";
-                if (fullPageView is { IsDisposed: false } view && view.CancelButton.Visibility == Visibility.Visible)
-                    view.Status.Text = LocalScanStatus.Text;
+                ReportLocalLoading($"已读取 {count} 首，正在扫描…", background);
             }
         });
         try
@@ -230,25 +230,26 @@ public sealed partial class MainWindow
             var result = await LocalMusicSource.ScanAsync(settings, scan.Token, reader ?? Services.LocalMusicMetadataReader.ReadAsync, progress,
                 reader is null ? localSources.GetValueOrDefault(settings.SourceId) : null);
             scan.Token.ThrowIfCancellationRequested();
-            if (!closed && ReferenceEquals(localScan, scan)) LocalScanStatus.Text = $"扫描完成，共 {result.Tracks.Count} 首。";
+            if (!closed && Current()) ReportLocalLoading($"扫描完成，共 {result.Tracks.Count} 首。", background);
             return result;
         }
         catch (OperationCanceledException)
         {
-            if (!closed && ReferenceEquals(localScan, scan)) LocalScanStatus.Text = "扫描已取消，原音乐库保留。";
+            if (!closed && Current()) ReportLocalLoading("扫描已取消，原音乐库保留。", background);
             throw;
         }
         catch
         {
-            if (!closed && ReferenceEquals(localScan, scan)) LocalScanStatus.Text = "扫描失败，原音乐库保留。";
+            if (!closed && Current()) ReportLocalLoading("扫描失败，原音乐库保留。", background);
             throw;
         }
         finally
         {
-            if (ReferenceEquals(localScan, scan))
+            if (Current())
             {
-                localScan = null;
-                if (!closed) CancelLocalScan.Visibility = Visibility.Collapsed;
+                if (background) backgroundLocalScan = null; else localScan = null;
+                if (!closed && localScan is null && backgroundLocalScan is null && localLibraryWork is null) CancelLocalScan.Visibility = Visibility.Collapsed;
+                UpdateBackgroundActivity();
             }
         }
     }
