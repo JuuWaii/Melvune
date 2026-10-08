@@ -30,6 +30,16 @@ public sealed partial class MainWindow
 
     private void InitializePlayback()
     {
+        // Flyout content owns a separate namescope; bind directly to the status objects.
+        PlaybackInfoStatus.SetBinding(TextBlock.TextProperty, new global::Microsoft.UI.Xaml.Data.Binding { Source = PlaybackStatus, Path = new PropertyPath("Text") });
+        PlaybackInfoQueue.SetBinding(TextBlock.TextProperty, new global::Microsoft.UI.Xaml.Data.Binding { Source = QueueStatus, Path = new PropertyPath("Text") });
+        PlaybackStatus.RegisterPropertyChangedCallback(TextBlock.TextProperty, (_, _) =>
+        {
+            if (closed) return;
+            string text = PlaybackStatus.Text;
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(PlaybackInfoButton, "播放状态：" + text);
+            if (text.Contains("失败") || text.Contains("无法") || text.Contains("失效") || text.Contains("超时")) ShowMetadataNotice(text);
+        });
         UpdateQueueModeControl();
         UpdateVolumeControl();
         // 单行 TextBox 会处理 Enter；仍接收该路由事件以提交搜索。
@@ -345,7 +355,7 @@ public sealed partial class MainWindow
     {
         if (updatingProgress || !mediaReady || !music.Player.PlaybackSession.CanSeek) return;
         pendingSeek = e.NewValue;
-        PlaybackTime.Text = $"{TimeSpan.FromSeconds(e.NewValue):mm\\:ss} / {music.Player.PlaybackSession.NaturalDuration:mm\\:ss}";
+        UpdatePlaybackTimes(TimeSpan.FromSeconds(e.NewValue), music.Player.PlaybackSession.NaturalDuration);
         if (!draggingSeek) { seekTimer?.Stop(); seekTimer?.Start(); }
     }
     private void Seek_Pressed(object sender, PointerRoutedEventArgs e)
@@ -384,7 +394,7 @@ public sealed partial class MainWindow
         if (!mediaReady)
         {
             updatingProgress = true;
-            try { SeekSlider.IsEnabled = false; SeekSlider.Value = 0; PlaybackTime.Text = "00:00 / 00:00"; }
+            try { SeekSlider.IsEnabled = false; SeekSlider.Value = 0; UpdatePlaybackTimes(TimeSpan.Zero, TimeSpan.Zero); }
             finally { updatingProgress = false; }
             return;
         }
@@ -401,10 +411,15 @@ public sealed partial class MainWindow
             if (!draggingSeek && pendingSeek is null && submittedSeek is null)
             {
                 SeekSlider.Value = Math.Clamp(session.Position.TotalSeconds, 0, SeekSlider.Maximum);
-                PlaybackTime.Text = $"{session.Position:mm\\:ss} / {session.NaturalDuration:mm\\:ss}";
+                UpdatePlaybackTimes(session.Position, session.NaturalDuration);
             }
         }
         finally { updatingProgress = false; }
+    }
+    private void UpdatePlaybackTimes(TimeSpan position, TimeSpan duration)
+    {
+        PlaybackTime.Text = $"{position:mm\\:ss}";
+        PlaybackDuration.Text = $"{duration:mm\\:ss}";
     }
     private async void Devices_Click(object sender, RoutedEventArgs e) => await LoadDevicesAsync();
     private async Task LoadDevicesAsync()

@@ -192,11 +192,28 @@ public sealed partial class MainWindow
         {
             // Playback is already paused by the preceding fixture; never emit audio while checking mute.
             verify("player_controls_fixture_paused", music.Player.PlaybackSession.PlaybackState == global::Windows.Media.Playback.MediaPlaybackState.Paused);
+            PlaybackInfoButton.Flyout.ShowAt(PlaybackInfoButton); await Task.Delay(80);
+            verify("player_status_popover_retains_live_status_and_queue", PlaybackInfoStatus.IsLoaded && PlaybackInfoQueue.IsLoaded
+                && PlaybackInfoStatus.Text == PlaybackStatus.Text && PlaybackInfoStatus.Text.Length > 0
+                && PlaybackInfoQueue.Text == QueueStatus.Text && PlaybackInfoQueue.Text.Length > 0);
+            PlaybackInfoButton.Flyout.Hide(); await Task.Delay(30);
             foreach (int width in new[] { 1360, 980, 820 })
             {
                 await CloseNowPlayingAsync();
                 AppWindow.Resize(new global::Windows.Graphics.SizeInt32(width, 680));
                 verify("player_controls_same_row_main_" + width, await WaitForPlayerFramesAsync() && ControlsFit() && PlayerBar.Visibility == Visibility.Visible);
+                var center = PlayPauseButton.TransformToVisual(Root).TransformPoint(new(PlayPauseButton.ActualWidth / 2, 0)).X;
+                verify("player_main_centered_compact_footer_" + width, Math.Abs(center - Root.ActualWidth / 2) <= 1
+                    && PlayerBar.ActualHeight <= 106 && NowCoverButton.ActualHeight >= 48 && PlaybackInfoButton.IsLoaded);
+                var time = PlaybackTime.TransformToVisual(TransportPanel).TransformPoint(new());
+                var progress = SeekSlider.TransformToVisual(TransportPanel).TransformPoint(new());
+                var duration = PlaybackDuration.TransformToVisual(TransportPanel).TransformPoint(new());
+                verify("player_progress_time_labels_flank_slider_" + width, time.X + PlaybackTime.ActualWidth <= progress.X
+                    && progress.X + SeekSlider.ActualWidth <= duration.X
+                    && Math.Abs(time.Y + PlaybackTime.ActualHeight / 2 - duration.Y - PlaybackDuration.ActualHeight / 2) <= 1);
+                var sidebarRight = NewNasPlaylist.TransformToVisual(SidebarScroll).TransformPoint(new(NewNasPlaylist.ActualWidth, 0)).X;
+                verify("sidebar_scroll_gutter_keeps_add_button_clear_" + width, SidebarScroll.ActualWidth - sidebarRight >= 19
+                    && SidebarScroll.HorizontalScrollBarVisibility == ScrollBarVisibility.Disabled);
                 await OpenNowPlayingAsync();
                 verify("player_controls_same_row_lyrics_" + width, await WaitForPlayerFramesAsync() && ControlsFit() && PlayerBar.Visibility == Visibility.Collapsed
                     && ReferenceEquals(FullTransportHost.Content, TransportPanel));

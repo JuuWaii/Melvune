@@ -86,7 +86,7 @@ public sealed partial class MainWindow
                 AppWindow.Resize(new global::Windows.Graphics.SizeInt32(820, 560)); await Task.Delay(120); Root.UpdateLayout();
                 var origin = TrackList.TransformToVisual(LibraryPanel).TransformPoint(new global::Windows.Foundation.Point());
                 verify("all_music_compact_header_keeps_song_list_visible", TrackList.ActualHeight >= 79 && origin.Y + TrackList.ActualHeight <= LibraryPanel.ActualHeight + 1
-                    && LibraryHeaderScroll.ActualHeight <= LibraryHeaderScroll.MaxHeight + 1 && LibraryHeaderScroll.ScrollableHeight > 0
+                    && LibraryHeaderScroll.ActualHeight is > 0 && LibraryHeaderScroll.ActualHeight <= LibraryHeaderScroll.MaxHeight + 1
                     && BrowseSourceFilter.ActualWidth > 100 && LocalGroupFilter.ActualWidth > 100 && LocalLibraryFilter.ActualWidth > 100);
             }
             finally { AppWindow.Resize(size); await Task.Delay(100); Root.UpdateLayout(); }

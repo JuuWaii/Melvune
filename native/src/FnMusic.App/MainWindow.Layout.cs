@@ -14,14 +14,18 @@ public sealed partial class MainWindow
         bool compact = width < 1100;
         fullPageView?.Adapt(Root.ActualHeight);
         SidebarColumn.Width = new GridLength(compact ? 176 : 220);
-        NowPlayingColumn.Width = compact ? new GridLength(1, GridUnitType.Star) : new GridLength(270);
-        Grid.SetColumnSpan(NowPlayingDetails, compact ? 2 : 1);
-        Grid.SetRow(TransportPanel, compact ? 1 : 0);
-        Grid.SetColumn(TransportPanel, compact ? 0 : 1);
-        Grid.SetColumnSpan(TransportPanel, compact ? 2 : 1);
-        while (PlayerLayout.RowDefinitions.Count < 4) PlayerLayout.RowDefinitions.Add(new() { Height = GridLength.Auto });
-        Grid.SetRow(PlaybackStatus, compact ? 2 : 1);
-        Grid.SetRow(QueueStatus, compact ? 3 : 2);
+        bool lyrics = LyricsPanel.Visibility == Visibility.Visible;
+        bool tight = width < 760;
+        VolumeSlider.Width = tight ? 64 : 88;
+        TransportButtons.Spacing = tight ? 0 : 8;
+        double side = Math.Clamp((width - 48) * .22, tight ? 172 : 196, 270);
+        NowPlayingColumn.Width = PlayerRightColumn.Width = new GridLength(side);
+        TransportLeftColumn.Width = lyrics ? new GridLength(0) : new GridLength(side);
+        TransportRightColumn.Width = lyrics ? GridLength.Auto : new GridLength(side);
+        Grid.SetColumnSpan(NowPlayingDetails, 1);
+        Grid.SetRow(TransportPanel, 0); Grid.SetColumn(TransportPanel, 0); Grid.SetColumnSpan(TransportPanel, 3);
+        Grid.SetColumn(PlayerProgress, lyrics ? 0 : 1);
+        Grid.SetColumnSpan(PlayerProgress, lyrics ? 3 : 1);
         // Lyrics always own the page; short/narrow displays prioritize readable text.
         bool textOnly = width < 900 || Root.ActualHeight < 560;
         FullArtworkPanel.Visibility = textOnly ? Visibility.Collapsed : Visibility.Visible;

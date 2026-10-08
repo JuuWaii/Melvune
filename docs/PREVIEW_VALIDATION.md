@@ -1,10 +1,12 @@
-# 0.2.0-preview.11 本机验证指南
+# 0.2.0-preview.12 本机验证指南
 
 这是 Windows x64 原生测试版。保留整个目录，双击 Start-FnMusic.cmd 或 FnMusic.App.exe 启动。包含 .NET、Windows App SDK 与固定版本的 FFmpeg 解码动态库，无需另装 FFmpeg；不要只复制 exe。
 
-源码工作区可用 `./scripts/check-preview.ps1 -Path ./dist/FnMusic-0.2.0-preview.11-win-x64-verified` 核对包内全部文件哈希、额外文件、程序版本和补丁构建材料；检查旧包需传入对应 -ExpectedVersion，例如旧 preview.10 使用 `-ExpectedVersion 0.2.0-preview.10`。这项检查证明目录完整性，不替代实际运行和分发许可审查。
+源码工作区可用 `./scripts/check-preview.ps1 -Path ./dist/FnMusic-0.2.0-preview.12-win-x64-verified` 核对包内全部文件哈希、额外文件、程序版本和补丁构建材料；检查旧包需传入对应 -ExpectedVersion，例如旧 preview.11 使用 `-ExpectedVersion 0.2.0-preview.11`。这项检查证明目录完整性，不替代实际运行和分发许可审查。
 
 ## 本次重点
+
+- 底部播放器压缩为歌曲信息、居中播放控件、右侧设备/音量/队列与进度两端时间，不再让状态说明占据额外行；状态与队列来源说明可点击歌曲信息旁的提示图标查看，播放错误仍有提示。侧栏为滚动条保留独立边距；歌词页继续共用同一组播放控件。
 
 - 本地音乐扫描结果按音乐库存为歌曲索引，重启先加载已有曲目并支持直接播放，再后台检查新增、删除和变化；文件大小、修改时间未变时复用元数据。缓存不复制音频，文件在磁盘或网络盘上仍需可访问。后台更新保留播放来源、队列和选中项，失败/取消保留旧索引；损坏或不匹配目录的索引回退到扫描。首次建立索引仍需完成一次扫描。
 

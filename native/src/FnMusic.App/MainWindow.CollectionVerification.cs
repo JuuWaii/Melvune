@@ -227,7 +227,8 @@ public sealed partial class MainWindow
             ApplySystemTheme();
             await OpenNowPlayingAsync();
             UpdateAdaptiveLayout(800);
-            Verify("compact_player_rows", Microsoft.UI.Xaml.Controls.Grid.GetRow(TransportPanel) == 1 && Microsoft.UI.Xaml.Controls.Grid.GetColumnSpan(TransportPanel) == 2);
+            Verify("compact_player_shared_transport", ReferenceEquals(FullTransportHost.Content, TransportPanel)
+                && PlayerOptionsPanel.Children.Contains(QueueButton) && TransportPanel.Children.Contains(PlayerProgress));
             Verify("compact_lyrics_readable_column", Microsoft.UI.Xaml.Controls.Grid.GetColumn(FullLyricsText) == 0
                 && Microsoft.UI.Xaml.Controls.Grid.GetColumnSpan(FullLyricsText) == 2 && FullArtworkPanel.Visibility == Visibility.Collapsed);
             UpdateCollectionView();
