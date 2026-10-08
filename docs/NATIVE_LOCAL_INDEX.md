@@ -25,3 +25,5 @@ Debug/Release 构建均为零警告零错误。核心专项验证缓存跨实例
 报告位于 `.review-audit/local-index-delivery-app/local-cache-seed.json`（2 项，seed_complete）与 `local-cache-window-verification.json`（10 项，complete）；异常为空。这是隔离原生运行验证，未模拟鼠标，也不等于所有真实大目录启动性能、听音或网络断连场景完成。
 
 实际 preview.11 已恢复 273 首本地索引并完成缓存歌曲静音播放观察，包内七个播放模块和运行前后 552 文件校验通过，现有六个配置/会话文件保持；具体范围见 [交付记录](PREVIEW11_ACCEPTANCE.md)。旧 preview.10 固定包不覆盖。
+
+2026-10-08 规模补充：100 个子目录的 10000 份有效 WAV/FLAC/MP3/Opus/M4A 音频，正式标签初扫 85.70 秒、持久索引恢复约 50 毫秒、未变刷新 366 毫秒且零标签读取。半途取消、超限、单文件变化、实际万首虚拟列表滚动/末行播放/搜索等20条件通过，见 [规模记录](NATIVE_LOCAL_SCALE.md)。同进程索引恢复不等于整体冷启动，五段音频的副本不等于真实万首 NAS 歌曲。
