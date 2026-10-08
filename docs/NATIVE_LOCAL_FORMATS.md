@@ -1,5 +1,7 @@
 # 本地格式验收
 
+当前补充（2026-10-08）：11 种受支持扩展名的23个实际编码样本、162条件通过，包含APE、ALAC、96 kHz/24位/六声道；修复WAV/APE缺失标签，并兼容旧索引后台升级，见 [扩展矩阵](NATIVE_LOCAL_FORMAT_MATRIX.md)。下面表格保留2026-09-30首轮结果；APE当前结果以扩展矩阵为准，未把有限样本视作任意编码/听音验收。
+
 2026-09-30。Debug 参数 `--verify-local-formats` 用本机现有 FFmpeg 工具生成 12 秒音频，经过正式 LocalMusicSource、Windows 元数据读取和 NativeMusicPlayer，静音验证播放推进、跳转到 7 秒后继续推进、停止释放。生成器不包含在 Release；不读取用户音乐或登录信息。
 
 报告写到运行目录 `local-format-verification.json`，包含格式、完成阶段、异常类型、标签/时长结果及清理结果，不含本地路径。运行前构建 Debug，将现有 FFmpeg 工具放入 PATH，然后从输出目录运行 `FnMusic.App.exe --verify-local-formats`。每种格式设置 45 秒取消期限；生成文件只在随机命名的自有目录中创建，结束时逐文件清理。

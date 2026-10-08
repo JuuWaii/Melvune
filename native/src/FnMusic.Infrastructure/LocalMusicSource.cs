@@ -10,13 +10,18 @@ public sealed record LocalMusicMetadata(string Title, string Artist, double Dura
     public string Album { get; init; } = "";
 }
 public sealed record LocalMusicIndexEntry(string RelativePath, LocalMusicMetadata Metadata, long Size, long Modified);
-public sealed record LocalMusicIndex(LocalMusicSettings Settings, IReadOnlyList<LocalMusicIndexEntry> Entries);
+public sealed record LocalMusicIndex(LocalMusicSettings Settings, IReadOnlyList<LocalMusicIndexEntry> Entries)
+{
+    // Missing in older indexes: restore their rows immediately, then re-read tags in the background.
+    public int MetadataRevision { get; init; }
+}
 
 /// <summary>只播放扫描快照里的文件；曲目 ID 不接受路径或 URI。</summary>
 public sealed class LocalMusicSource : IMusicPlaybackSource
 {
+    private const int CurrentMetadataRevision = 1;
     private sealed record Snapshot(Dictionary<string, string> Files, IReadOnlyList<MusicTrack> Tracks,
-        Dictionary<string, (long Size, long Modified, LocalMusicMetadata Metadata)> Metadata);
+        Dictionary<string, (long Size, long Modified, LocalMusicMetadata Metadata)> Metadata, int MetadataRevision);
     private Snapshot snapshot;
     private Dictionary<string, string> files => Volatile.Read(ref snapshot).Files;
     private Dictionary<string, (long Size, long Modified, LocalMusicMetadata Metadata)> metadataCache => Volatile.Read(ref snapshot).Metadata;
@@ -29,7 +34,7 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
 
     private LocalMusicSource(LocalMusicSettings settings, Dictionary<string, string> files, List<MusicTrack> tracks)
     {
-        Settings = settings; snapshot = new(files, tracks.AsReadOnly(), []);
+        Settings = settings; snapshot = new(files, tracks.AsReadOnly(), [], CurrentMetadataRevision);
         Source = new(settings.SourceId, "本地音乐", "local", MusicSourceCapabilities.Browse | MusicSourceCapabilities.Search |
             MusicSourceCapabilities.Playback | MusicSourceCapabilities.Artwork | MusicSourceCapabilities.Lyrics);
     }
@@ -51,14 +56,14 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
             return new LocalMusicIndexEntry(Path.GetRelativePath(Settings.Directory, current.Files[track.Id]),
                 new(track.Title, track.Artist, track.DurationSeconds) { Album = track.Album },
                 stamp.Metadata is null ? -1 : stamp.Size, stamp.Metadata is null ? -1 : stamp.Modified);
-        }).ToArray());
+        }).ToArray()) { MetadataRevision = current.MetadataRevision };
     }
 
     // Restore without enumerating or statting the music directory. File access is checked when played.
     public static LocalMusicSource FromIndex(LocalMusicIndex index)
     {
         if (index?.Settings is not { } settings || settings.SourceId == Guid.Empty || !Path.IsPathFullyQualified(settings.Directory)
-            || index.Entries is null || index.Entries.Count > 10000) throw new InvalidDataException();
+            || index.Entries is null || index.Entries.Count > 10000 || index.MetadataRevision < 0) throw new InvalidDataException();
         string root = LocalLibraryStore.NormalizePath(settings.Directory);
         var files = new Dictionary<string, string>(); var tracks = new List<MusicTrack>();
         var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -84,6 +89,7 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
             if (entry.Size >= 0) result.metadataCache.Add(id, (entry.Size, entry.Modified, metadata));
         }
         tracks.Sort((a, b) => { int title = StringComparer.OrdinalIgnoreCase.Compare(a.Title, b.Title); return title != 0 ? title : StringComparer.Ordinal.Compare(a.Id, b.Id); });
+        result.snapshot = result.snapshot with { MetadataRevision = index.MetadataRevision };
         return result;
     }
 
@@ -98,9 +104,10 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
         var files = new Dictionary<string, string>();
         var tracks = new List<MusicTrack>();
         var cache = new Dictionary<string, (long Size, long Modified, LocalMusicMetadata Metadata)>();
-        bool reuse = previous is not null && previous.Source.Id == settings.SourceId && string.Equals(
+        var previousSnapshot = previous is null ? null : Volatile.Read(ref previous.snapshot);
+        bool reuse = previousSnapshot?.MetadataRevision == CurrentMetadataRevision && previous is not null && previous.Source.Id == settings.SourceId && string.Equals(
             LocalLibraryStore.NormalizePath(previous.Settings.Directory), LocalLibraryStore.NormalizePath(root), StringComparison.OrdinalIgnoreCase);
-        var previousMetadata = previous?.metadataCache;
+        var previousMetadata = previousSnapshot?.Metadata;
         progress?.Report(0);
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
         foreach (string file in Directory.EnumerateFiles(root, "*", options))

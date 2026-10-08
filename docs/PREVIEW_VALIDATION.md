@@ -1,10 +1,12 @@
-# 0.2.0-preview.12 本机验证指南
+# 0.2.0-preview.13 本机验证指南
 
 这是 Windows x64 原生测试版。保留整个目录，双击 Start-FnMusic.cmd 或 FnMusic.App.exe 启动。包含 .NET、Windows App SDK 与固定版本的 FFmpeg 解码动态库，无需另装 FFmpeg；不要只复制 exe。
 
-源码工作区可用 `./scripts/check-preview.ps1 -Path ./dist/FnMusic-0.2.0-preview.12-win-x64-verified` 核对包内全部文件哈希、额外文件、程序版本和补丁构建材料；检查旧包需传入对应 -ExpectedVersion，例如旧 preview.11 使用 `-ExpectedVersion 0.2.0-preview.11`。这项检查证明目录完整性，不替代实际运行和分发许可审查。
+源码工作区可用 `./scripts/check-preview.ps1 -Path ./dist/FnMusic-0.2.0-preview.13-win-x64-verified` 核对包内全部文件哈希、额外文件、程序版本和补丁构建材料；检查旧包需传入对应 -ExpectedVersion，例如旧 preview.12 使用 `-ExpectedVersion 0.2.0-preview.12`。这项检查证明目录完整性，不替代实际运行和分发许可审查。
 
 ## 本次重点
+
+- 补齐 Windows 属性接口漏掉的本地标题/歌手/专辑，保留已读到的字段和时长。已验证 WAV RIFF 标签、APE 标签及 AIFF ID3；23 个编码样本的播放、五次前后定位、索引恢复和停止释放通过。旧歌曲索引仍立即显示和可播放，后台重新读取一次元数据后恢复增量检查；可取消，取消不写入半成品。此矩阵不是采样级定位或实际听音证明。
 
 - 底部播放器压缩为歌曲信息、居中播放控件、右侧设备/音量/队列与进度两端时间，不再让状态说明占据额外行；状态与队列来源说明可点击歌曲信息旁的提示图标查看，播放错误仍有提示。侧栏为滚动条保留独立边距；歌词页继续共用同一组播放控件。
 

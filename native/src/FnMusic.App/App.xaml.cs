@@ -9,6 +9,8 @@ public partial class App : Application
     protected override void OnLaunched(LaunchActivatedEventArgs args)
     {
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-local-format-matrix"))
+        { RunLocalFormatMatrixVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-embedded-lyrics"))
         { RunNativeEmbeddedLyricsVerification(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-native-library-lifecycle"))
@@ -49,6 +51,8 @@ public partial class App : Application
         window.Activate();
     }
 #if DEBUG
+    private async void RunLocalFormatMatrixVerification()
+    { await Services.LocalFormatMatrixVerification.RunAsync(); Exit(); }
     private async void RunNativeEmbeddedLyricsVerification()
     { await Services.NasEmbeddedLyricsVerification.RunAsync(); Exit(); }
     private async void RunLibraryLifecycleVerification()

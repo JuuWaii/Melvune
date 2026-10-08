@@ -33,6 +33,33 @@ internal static class LocalIndexVerification
             }
             finally { Directory.Move(music + "-offline", music); }
             reads = 0; var unchanged = await LocalMusicSource.ScanAsync(settings, default, Read, previous: restored); Require(reads == 0);
+            var legacyIndex = initial.CreateIndex() with { MetadataRevision = 0 };
+            var legacyCacheFile = Path.Combine(state, "local-index", settings.SourceId.ToString("N") + ".json");
+            // The actual old JSON has no revision property. Loading it must not touch the music files.
+            await File.WriteAllTextAsync(legacyCacheFile, JsonSerializer.Serialize(new { Version = 1,
+                Index = new { legacyIndex.Settings, legacyIndex.Entries } }));
+            var legacy = await store.LoadAsync(settings) ?? throw new Exception("Legacy index lost");
+            Require(reads == 0 && legacy.Tracks.Count == 2 && legacy.CreateIndex().MetadataRevision == 0);
+            await using (var playable = await legacy.OpenAsync(legacy.Tracks[0].Reference, default)) Require(playable.Length == 5);
+            byte[] oldBytes = await File.ReadAllBytesAsync(legacyCacheFile);
+            using (var upgradeCanceled = new CancellationTokenSource())
+            {
+                try
+                {
+                    await LocalMusicSource.ScanAsync(settings, upgradeCanceled.Token, (_, ct) =>
+                    { upgradeCanceled.Cancel(); ct.ThrowIfCancellationRequested(); return Task.FromResult(new LocalMusicMetadata("", "", 0)); }, previous: legacy);
+                    throw new Exception("Canceled metadata upgrade returned");
+                }
+                catch (OperationCanceledException) { }
+                byte[] afterUpgradeCanceled = await File.ReadAllBytesAsync(legacyCacheFile);
+                Require(oldBytes.SequenceEqual(afterUpgradeCanceled) && legacy.Tracks.Count == 2);
+            }
+            var upgraded = await LocalMusicSource.ScanAsync(settings, default, Read, previous: legacy);
+            Require(reads == 2 && upgraded.CreateIndex().MetadataRevision > 0
+                && upgraded.Tracks.Select(track => track.Reference).SequenceEqual(legacy.Tracks.Select(track => track.Reference)));
+            await store.SaveAsync(upgraded); reads = 0;
+            var persistedUpgrade = await store.LoadAsync(settings);
+            await LocalMusicSource.ScanAsync(settings, default, Read, previous: persistedUpgrade); Require(reads == 0);
             string originalId = unchanged.Tracks.Single(track => track.Title == "first").Id;
             await File.WriteAllTextAsync(first, "first changed"); File.Delete(second); await File.WriteAllTextAsync(added, "added");
             var refreshed = await LocalMusicSource.ScanAsync(settings, default, Read, previous: unchanged);
@@ -71,6 +98,7 @@ internal static class LocalIndexVerification
             }
             foreach (var bad in new[]
             {
+                index with { MetadataRevision = -1 },
                 index with { Entries = [index.Entries[0], index.Entries[0]] },
                 index with { Entries = [index.Entries[0] with { Modified = long.MaxValue }] },
                 index with { Entries = Enumerable.Repeat(index.Entries[0], 10001).ToArray() }

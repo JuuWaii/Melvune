@@ -31,8 +31,10 @@ public sealed partial class MainWindow
                 var saved = await localLibraryStore.LoadAsync();
                 var library = new LocalLibrary(Guid.NewGuid(), root, "启动缓存验收", "索引");
                 ApplyLocalCatalog(await localLibraryStore.SaveAsync(saved with { Libraries = [library] }));
-                var source = await ScanLocalAsync(library.Settings, deadline.Token); ReplaceLocalSource(source); await SaveLocalIndexAsync(source);
+                var source = await ScanLocalAsync(library.Settings, deadline.Token); ReplaceLocalSource(source);
+                await SaveLocalIndexAsync(LocalMusicSource.FromIndex(source.CreateIndex() with { MetadataRevision = 0 }));
                 var cached = await ReadLocalIndexAsync(library.Settings, deadline.Token);
+                Verify("legacy_metadata_revision_keeps_cached_rows_available", cached?.CreateIndex().MetadataRevision == 0 && cached.Tracks.Count == 2);
                 Verify("initial_scan_persisted_two_playable_references", cached?.Tracks.Count == 2 && cached.Tracks.Select(track => track.Reference).SequenceEqual(source.Tracks.Select(track => track.Reference)));
                 using var stream = await cached!.OpenAsync(cached.Tracks[0].Reference, deadline.Token);
                 Verify("initial_cache_opens_actual_wave_stream", stream.Length > 10000);

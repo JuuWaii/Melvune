@@ -21,9 +21,11 @@ public static class LocalMusicMetadataReader
             catch (Exception) { /* Unsupported shell metadata still permits decoder probing. */ }
         }
         ct.ThrowIfCancellationRequested();
-        if (result.DurationSeconds > 0) return result;
+        if (result.DurationSeconds > 0 && !string.IsNullOrWhiteSpace(result.Title)
+            && !string.IsNullOrWhiteSpace(result.Artist) && !string.IsNullOrWhiteSpace(result.Album)) return result;
 
-        // Some supported audio formats have no Windows property handler (e.g. AIFF).
+        // Windows may provide duration but omit valid tags (e.g. RIFF INFO in WAV).
+        // Fill only missing fields; keep shell tags and duration when already available.
         // Reuse stream-only decoder configuration; never let embedded URLs open files/network.
         SeekablePlayback? probe = null;
         using var fallbackTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
@@ -35,7 +37,26 @@ public static class LocalMusicMetadataReader
             using var cancel = fallbackTimeout.Token.Register(() => _ = probe.Stop());
             var source = await probe.Opening.WaitAsync(fallbackTimeout.Token);
             fallbackTimeout.Token.ThrowIfCancellationRequested();
-            result = result with { DurationSeconds = source.Duration.TotalSeconds };
+            string Tag(string key)
+            {
+                foreach (var tag in source.MetadataTags.Take(128))
+                {
+                    if (!string.Equals(tag.Key, key, StringComparison.OrdinalIgnoreCase)) continue;
+                    foreach (string value in tag.Value.Take(8))
+                    {
+                        if (string.IsNullOrWhiteSpace(value)) continue;
+                        return value[..Math.Min(value.Length, 1024)].Trim();
+                    }
+                }
+                return "";
+            }
+            result = result with
+            {
+                Title = string.IsNullOrWhiteSpace(result.Title) ? Tag("title") : result.Title,
+                Artist = string.IsNullOrWhiteSpace(result.Artist) ? Tag("artist") : result.Artist,
+                Album = string.IsNullOrWhiteSpace(result.Album) ? Tag("album") : result.Album,
+                DurationSeconds = result.DurationSeconds > 0 ? result.DurationSeconds : source.Duration.TotalSeconds
+            };
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
         catch (Exception) { /* Preserve any shell tags when probing is unsupported or times out. */ }
