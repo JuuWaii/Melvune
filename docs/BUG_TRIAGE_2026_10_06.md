@@ -13,3 +13,5 @@
 2026-10-08 阶段验证：Debug/Release 零警告零错误；完整原生窗口 620/620，覆盖 1360/980/820 宽度、播放中心/高度、时间对齐、侧栏边距、主页面与歌词共用控制、黑白主题、动画和状态弹层实时内容。报告 `.review-audit/player-balanced-verified-app/collection-window-verification.json` 的 stage=complete、error 为空。此为程序内隔离检查，不冒充鼠标验收。
 
 实际 Release 鼠标操作确认状态详情有完整内容、273 首缓存歌曲直接播放（观察进度至 43 秒）、封面进入/返回歌词页、右侧队列滑出及 Escape 关闭；停止播放、恢复静音后正常关闭，八个现有配置/会话文件哈希保持。记录 `.review-audit/player-balanced-runtime.json`。隐私检查 8/8，源码扫描 243 文件通过。当前没有登录飞牛或修改服务端设置；更多 DPI、系统通知及真实格式矩阵继续按原清单验收。
+
+独立 preview.12 固定包、哈希与包内解码运行验收见 [交付记录](PREVIEW12_ACCEPTANCE.md)。
