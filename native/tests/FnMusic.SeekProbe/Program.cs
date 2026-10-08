@@ -7,6 +7,16 @@ using System.Net.Http.Headers;
 using FnMusic.App.Services;
 
 // Synthetic input only: no user files, credentials or network access.
+if (args.Contains("--verify-range-stress", StringComparer.Ordinal))
+{
+    try { await RangeStressVerification.RunAsync(); }
+    catch (Exception error)
+    {
+        Console.Error.WriteLine($"FAIL Range stress: {error.GetType().Name}. See the JSON report.");
+        Environment.ExitCode = 1;
+    }
+    return;
+}
 if (args.Contains("--verify-content", StringComparer.Ordinal))
 {
     try { await SeekContentVerification.RunAsync(args); }
@@ -222,7 +232,9 @@ static async Task VerifyBlockedOpenCancellation(string path, bool body)
 sealed class RangeHandler(string path, bool versioned = false) : HttpMessageHandler
 {
     private long bytesRead;
+    private int requests;
     public long BytesRead => Interlocked.Read(ref bytesRead);
+    public int Requests => Volatile.Read(ref requests);
     public bool Block { get; set; }
     public bool BlockBody { get; set; }
     public bool Cancelled { get; private set; }
@@ -230,6 +242,7 @@ sealed class RangeHandler(string path, bool versioned = false) : HttpMessageHand
     protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken token)
     {
         if (request.RequestUri?.Host != "seek.invalid") throw new Exception("Unexpected origin.");
+        Interlocked.Increment(ref requests);
         if (Block)
         {
             await WaitBlocked(token);
