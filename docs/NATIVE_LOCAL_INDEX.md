@@ -22,4 +22,4 @@ Debug/Release 构建均为零警告零错误。核心专项验证缓存跨实例
 
 报告位于 `.review-audit/local-index-delivery-app/local-cache-seed.json`（2 项，seed_complete）与 `local-cache-window-verification.json`（10 项，complete）；异常为空。这是隔离原生运行验证，未模拟鼠标，也不等于所有真实大目录启动性能、听音或网络断连场景完成。
 
-后续实际当前包重启与操作结果跟随本轮交付记录；旧 preview.10 固定包不覆盖。
+实际 preview.11 已恢复 273 首本地索引并完成缓存歌曲静音播放观察，包内七个播放模块和运行前后 552 文件校验通过，现有六个配置/会话文件保持；具体范围见 [交付记录](PREVIEW11_ACCEPTANCE.md)。旧 preview.10 固定包不覆盖。
