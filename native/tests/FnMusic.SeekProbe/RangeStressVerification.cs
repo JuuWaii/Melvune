@@ -11,11 +11,13 @@ internal static class RangeStressVerification
     private sealed record Cycle(string Format, int Number, long BytesRead, int Requests, double Milliseconds,
         long PrivateBytes, bool SourceReleased);
 
-    internal static async Task RunAsync()
+    internal static async Task RunAsync(bool profileOnly = false)
     {
         string root = Path.Combine(AppContext.BaseDirectory, "range-stress-fixture-" + Guid.NewGuid().ToString("N"));
         var paths = new List<string>(); var cycles = new List<Cycle>();
         var checks = new Dictionary<string, bool>(); var sizes = new Dictionary<string, long>();
+        var profiles = new Dictionary<string, object>();
+        int iterations = profileOnly ? 1 : 60;
         string stage = "prepare", error = ""; bool cleanup = true;
         using var lifetime = new CancellationTokenSource(TimeSpan.FromMinutes(15));
         void Check(string name, bool value)
@@ -47,10 +49,10 @@ internal static class RangeStressVerification
                 using (var input = File.OpenRead(path)) original = await SHA256.HashDataAsync(input, lifetime.Token);
                 using var audio = new NativeMusicPlayer(); audio.Player.IsMuted = true;
                 long warmup = 0;
-                for (int number = 1; number <= 60; number++)
+                for (int number = 1; number <= iterations; number++)
                 {
                     stage = format + "_cycle_" + number;
-                    using var handler = new RangeHandler(path, versioned: true);
+                    using var handler = new RangeHandler(path, versioned: true) { CaptureRanges = number == 1 };
                     using var client = new HttpClient(handler, false);
                     using var input = await HttpRangeStream.OpenAsync(client, new Uri("https://seek.invalid/audio"), lifetime.Token);
                     var ready = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -59,10 +61,12 @@ internal static class RangeStressVerification
                     void Failed(MediaPlayer _, MediaPlayerFailedEventArgs args) => failed.TrySetException(new IOException("Media pipeline failed"));
                     audio.Player.MediaOpened += Opened; audio.Player.MediaFailed += Failed;
                     var timer = Stopwatch.StartNew();
+                    long openBytes = 0; int openRequests = 0;
                     try
                     {
                         await audio.OpenAsync(input, lifetime.Token).WaitAsync(TimeSpan.FromSeconds(15));
                         await Await(ready.Task);
+                        openBytes = handler.BytesRead; openRequests = handler.Requests;
                         Check(format + "_cycle_" + number + "_seekable", audio.Player.PlaybackSession.CanSeek);
                         foreach (int target in new[] { 500, 20, 300, 100 })
                         {
@@ -84,6 +88,7 @@ internal static class RangeStressVerification
                         && handler.BytesRead > 0 && handler.BytesRead < sizes[format] * 8 + 20L * 1024 * 1024);
                     cycles.Add(new(format, number, handler.BytesRead, handler.Requests, timer.Elapsed.TotalMilliseconds,
                         memory, audio.Player.Source is null));
+                    if (number == 1) profiles[format] = new { openBytes, openRequests, rangeCounts = handler.RangeCounts };
                     if (number % 10 == 0) Console.WriteLine($"INFO {format} Range cycle {number}: {memory / 1024} KiB private, {handler.BytesRead} bytes, {handler.Requests} requests");
 
                     async Task Await(Task operation)
@@ -97,12 +102,12 @@ internal static class RangeStressVerification
                             await Task.Delay(25, timeout.Token);
                     }
                 }
-                Check(format + "_post_warmup_growth_under_96_mib", Memory() - warmup <= 96L * 1024 * 1024);
+                if (!profileOnly) Check(format + "_post_warmup_growth_under_96_mib", Memory() - warmup <= 96L * 1024 * 1024);
                 byte[] after;
                 using (var input = File.OpenRead(path)) after = await SHA256.HashDataAsync(input, lifetime.Token);
                 Check(format + "_generated_audio_hash_unchanged", original.SequenceEqual(after));
             }
-            Check("both_encodings_complete_sixty_range_cycles", cycles.Count == 120);
+            Check(profileOnly ? "both_encodings_profiled" : "both_encodings_complete_sixty_range_cycles", cycles.Count == iterations * 2);
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; throw; }
@@ -117,9 +122,9 @@ internal static class RangeStressVerification
                 if (Directory.Exists(root)) Directory.Delete(root);
             }
             catch (Exception) { cleanup = false; }
-            await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "range-stress-verification.json"),
+            await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, profileOnly ? "range-read-profile.json" : "range-stress-verification.json"),
                 JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, cleanup, checks, sizes,
-                    cycles, decoderSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "FFmpegInteropX.dll")))) }));
+                    cycles, profiles, profileOnly, decoderSha256 = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "FFmpegInteropX.dll")))) }));
         }
     }
 }

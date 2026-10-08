@@ -17,7 +17,6 @@ internal static class PlaybackVerification
         string errorModule = "";
         int errorCode = 0;
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(90));
-        using var connection = new ConnectionViewModel();
         using var audio = new NativeMusicPlayer();
         var player = audio.Player;
         player.IsMuted = true;
@@ -33,6 +32,7 @@ internal static class PlaybackVerification
         }
         try
         {
+            using var connection = CreateConnection();
             Stream stream;
             if (synthetic)
             {
@@ -107,6 +107,18 @@ internal static class PlaybackVerification
             await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "playback-verification.json"),
                 JsonSerializer.Serialize(new { synthetic, complete = stage == "complete", stage, checks, error, errorCode, errorModule }));
         }
+    }
+    private static ConnectionViewModel CreateConnection()
+    {
+        var arguments = Environment.GetCommandLineArgs();
+        int index = Array.IndexOf(arguments, "--verification-data-dir");
+        if (index < 0) return new ConnectionViewModel();
+        if (index + 1 >= arguments.Length) throw new ArgumentException();
+        string directory = Path.GetFullPath(arguments[index + 1]);
+        string parent = Path.TrimEndingDirectorySeparator(Path.GetFullPath(AppContext.BaseDirectory));
+        if (!Path.IsPathFullyQualified(arguments[index + 1]) || Path.GetDirectoryName(directory) != parent
+            || !Path.GetFileName(directory).StartsWith("verification-session-", StringComparison.Ordinal)) throw new ArgumentException();
+        return new ConnectionViewModel(directory);
     }
     internal static MemoryStream CreateWave()
     {

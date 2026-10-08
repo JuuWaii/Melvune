@@ -13,7 +13,7 @@
     <SelfContained>true</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <DefaultLanguage>zh-CN</DefaultLanguage>
-    <Version>0.2.0-preview.13</Version>
+    <Version>0.2.0-preview.14</Version>
     <AssemblyVersion>0.2.0.0</AssemblyVersion>
   </PropertyGroup>
   <ItemGroup>

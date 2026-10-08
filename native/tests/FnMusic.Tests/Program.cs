@@ -18,6 +18,13 @@ var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
 await Test("persisted local index restores offline and playable references and incrementally reconciles changed added deleted files with bounded invalid document handling", LocalIndexVerification.RunAsync);
 await Test("ten thousand offline cached rows and empty snapshots persist with atomic concurrent snapshot publication", LocalIndexVerification.CapacityAsync);
 if (args.Contains("--verify-local-index")) { Console.WriteLine($"Local index checks: {passed} passed."); return; }
+async Task VerifyRangeCacheAsync()
+{
+    await Test("strong Range cache retains hot blocks and evicts the least recently used within its fixed bound", RangeCacheVerification.StrongCacheAsync);
+    await Test("canceled and changed-version Range blocks preserve validated cache and destination", RangeCacheVerification.FailurePreservesCacheAsync);
+    await Test("weak or unavailable validators retain the previous single-block policy", RangeCacheVerification.UnversionedCacheAsync);
+}
+if (args.Contains("--verify-range-cache")) { await VerifyRangeCacheAsync(); Console.WriteLine($"Targeted checks: {passed} passed."); return; }
 if (args.Length == 2 && args[0] == "--verify-embedded-producer")
 { await Test("independent FFmpeg tags and unchanged valid audio files", () => EmbeddedLyricsVerification.ProducerAsync(args[1])); return; }
 async Task VerifyEmbeddedLyricsAsync()
@@ -1315,6 +1322,7 @@ await Test("range stream rejects a file changing size between requests", async (
     using var stream = await HttpRangeStream.OpenAsync(new HttpClient(handler), endpoint.MusicUri, default);
     await Fails(MusicFailure.InvalidResponse, async () => { _ = await stream.ReadAsync(new byte[10]); });
 });
+await VerifyRangeCacheAsync();
 await Test("range stream rejects changed, weak or missing pinned versions without publishing bytes", RangeRepresentationVerification.ChangedVersionAsync);
 await Test("range stream binds strong representation versions across cache blocks", RangeRepresentationVerification.StrongVersionAsync);
 await Test("range stream preserves weak or absent validator compatibility without conditional requests", RangeRepresentationVerification.UnavailableVersionAsync);

@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [string]$ExpectedVersion = '0.2.0-preview.13'
+    [string]$ExpectedVersion = '0.2.0-preview.14'
 )
 $ErrorActionPreference = 'Stop'
 $previewRoot = (Get-Item -LiteralPath $Path).FullName

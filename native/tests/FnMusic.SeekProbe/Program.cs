@@ -7,9 +7,9 @@ using System.Net.Http.Headers;
 using FnMusic.App.Services;
 
 // Synthetic input only: no user files, credentials or network access.
-if (args.Contains("--verify-range-stress", StringComparer.Ordinal))
+if (args.Contains("--verify-range-stress", StringComparer.Ordinal) || args.Contains("--profile-range-reads", StringComparer.Ordinal))
 {
-    try { await RangeStressVerification.RunAsync(); }
+    try { await RangeStressVerification.RunAsync(args.Contains("--profile-range-reads", StringComparer.Ordinal)); }
     catch (Exception error)
     {
         Console.Error.WriteLine($"FAIL Range stress: {error.GetType().Name}. See the JSON report.");
@@ -233,6 +233,9 @@ sealed class RangeHandler(string path, bool versioned = false) : HttpMessageHand
 {
     private long bytesRead;
     private int requests;
+    private readonly Dictionary<long, int> rangeCounts = [];
+    public bool CaptureRanges { get; init; }
+    public IReadOnlyDictionary<long, int> RangeCounts { get { lock (rangeCounts) return new Dictionary<long, int>(rangeCounts); } }
     public long BytesRead => Interlocked.Read(ref bytesRead);
     public int Requests => Volatile.Read(ref requests);
     public bool Block { get; set; }
@@ -259,6 +262,7 @@ sealed class RangeHandler(string path, bool versioned = false) : HttpMessageHand
         var bytes = new byte[checked((int)(to - from + 1))];
         await file.ReadExactlyAsync(bytes, token);
         Interlocked.Add(ref bytesRead, bytes.Length);
+        if (CaptureRanges) lock (rangeCounts) rangeCounts[from] = rangeCounts.GetValueOrDefault(from) + 1;
         var response = new HttpResponseMessage(HttpStatusCode.PartialContent)
         { Content = BlockBody ? new StreamContent(new BlockedBody(WaitBlocked)) : new ByteArrayContent(bytes) };
         response.Content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");

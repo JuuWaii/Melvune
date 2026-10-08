@@ -4,7 +4,7 @@ using FnMusic.Core;
 
 namespace FnMusic.Infrastructure;
 
-/// <summary>以受控 Range 请求提供可定位流；只缓存一个 256 KiB 块，不将歌曲写入磁盘。</summary>
+/// <summary>受控 Range 流；强版本最多缓存八个 256 KiB 块，其他来源只缓存一块，不写入磁盘。</summary>
 public sealed class HttpRangeStream : Stream
 {
     private const int BlockSize = 256 * 1024;
@@ -14,8 +14,9 @@ public sealed class HttpRangeStream : Stream
     private readonly EntityTagHeaderValue? versionTag;
     private readonly SemaphoreSlim gate = new(1);
     private readonly CancellationTokenSource lifetime = new();
-    private byte[] block = [];
-    private long blockOffset = -1, position;
+    private sealed record CachedBlock(long Offset, byte[] Bytes);
+    private readonly LinkedList<CachedBlock> blocks = new();
+    private long position;
     private volatile bool disposed;
     public string ContentType { get; }
 
@@ -68,7 +69,9 @@ public sealed class HttpRangeStream : Stream
             ObjectDisposedException.ThrowIf(disposed, this);
             if (buffer.IsEmpty || position >= length) return 0;
             long start = position / BlockSize * BlockSize;
-            if (blockOffset != start)
+            var cached = blocks.First;
+            while (cached is not null && cached.Value.Offset != start) cached = cached.Next;
+            if (cached is null)
             {
                 long end = Math.Min(length - 1, start + BlockSize - 1);
                 using var request = new HttpRequestMessage(HttpMethod.Get, source);
@@ -84,18 +87,22 @@ public sealed class HttpRangeStream : Stream
                 await input.ReadExactlyAsync(next, timeout.Token).ConfigureAwait(false);
                 ObjectDisposedException.ThrowIf(disposed, this);
                 timeout.Token.ThrowIfCancellationRequested();
-                block = next;
-                blockOffset = start;
+                // Only validated, complete, uncanceled data may evict a prior block.
+                // Strong ETags pin all retained blocks to the opened representation.
+                cached = blocks.AddFirst(new CachedBlock(start, next));
+                if (blocks.Count > (versionTag is null ? 1 : 8)) blocks.RemoveLast();
             }
             ObjectDisposedException.ThrowIf(disposed, this);
             timeout.Token.ThrowIfCancellationRequested();
-            int offset = checked((int)(position - blockOffset));
+            if (cached != blocks.First) { blocks.Remove(cached); blocks.AddFirst(cached); }
+            byte[] block = cached.Value.Bytes;
+            int offset = checked((int)(position - cached.Value.Offset));
             int count = Math.Min(buffer.Length, block.Length - offset);
             block.AsMemory(offset, count).CopyTo(buffer);
             position += count;
             return count;
         }
-        finally { gate.Release(); }
+        finally { if (disposed) blocks.Clear(); gate.Release(); }
     }
     public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken ct) => ReadAsync(buffer.AsMemory(offset, count), ct).AsTask();
     public override int Read(byte[] buffer, int offset, int count) => ReadAsync(buffer.AsMemory(offset, count)).AsTask().GetAwaiter().GetResult();
@@ -112,7 +119,7 @@ public sealed class HttpRangeStream : Stream
             if (next < 0) throw new IOException("Invalid seek");
             return position = next;
         }
-        finally { gate.Release(); }
+        finally { if (disposed) blocks.Clear(); gate.Release(); }
     }
     public override bool CanRead => !disposed;
     public override bool CanSeek => !disposed;
@@ -124,7 +131,12 @@ public sealed class HttpRangeStream : Stream
     public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     protected override void Dispose(bool disposing)
     {
-        if (disposing && !disposed) { disposed = true; lifetime.Cancel(); client.Dispose(); }
+        if (disposing && !disposed)
+        {
+            disposed = true; lifetime.Cancel(); client.Dispose();
+            // Never wait behind native IO during stop. The holder clears on release.
+            if (gate.Wait(0)) { try { blocks.Clear(); } finally { gate.Release(); } }
+        }
         base.Dispose(disposing);
     }
 }
