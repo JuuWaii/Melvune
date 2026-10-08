@@ -1,10 +1,14 @@
-# 0.2.0-preview.13 本机验证指南
+# 0.2.0-preview.14 本机验证指南
 
 这是 Windows x64 原生测试版。保留整个目录，双击 Start-FnMusic.cmd 或 FnMusic.App.exe 启动。包含 .NET、Windows App SDK 与固定版本的 FFmpeg 解码动态库，无需另装 FFmpeg；不要只复制 exe。
 
-源码工作区可用 `./scripts/check-preview.ps1 -Path ./dist/FnMusic-0.2.0-preview.13-win-x64-verified` 核对包内全部文件哈希、额外文件、程序版本和补丁构建材料；检查旧包需传入对应 -ExpectedVersion，例如旧 preview.12 使用 `-ExpectedVersion 0.2.0-preview.12`。这项检查证明目录完整性，不替代实际运行和分发许可审查。
+源码工作区可用 `./scripts/check-preview.ps1 -Path ./dist/FnMusic-0.2.0-preview.14-win-x64-verified-final` 核对包内全部文件哈希、额外文件、程序版本和补丁构建材料；检查旧包需传入对应 -ExpectedVersion，例如旧 preview.13 使用 `-ExpectedVersion 0.2.0-preview.13`。这项检查证明目录完整性，不替代实际运行和分发许可审查。
 
 ## 本次重点
+
+- 强ETag音频流最多保留2MiB近期已验证范围块，减少OGG头尾/定位区间重复下载。当前受控序列响应减少47.9%，内容20项与120轮压力回归通过，准确定位策略保持；弱/无标签继续单块。MP3大范围读取、真实慢网和长期稳定性仍需继续验证。
+
+- 本机10000份有效五格式音频正式标签与索引、实际虚拟列表/末行播放/搜索共20条件通过，索引恢复约50毫秒、未变化刷新366毫秒且零标签重读。这是有效副本规模检查，不等于万首不同NAS歌曲或完整应用冷启动测量。
 
 - 补齐 Windows 属性接口漏掉的本地标题/歌手/专辑，保留已读到的字段和时长。已验证 WAV RIFF 标签、APE 标签及 AIFF ID3；23 个编码样本的播放、五次前后定位、索引恢复和停止释放通过。旧歌曲索引仍立即显示和可播放，后台重新读取一次元数据后恢复增量检查；可取消，取消不写入半成品。此矩阵不是采样级定位或实际听音证明。
 
