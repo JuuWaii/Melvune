@@ -38,7 +38,7 @@ public sealed partial class MainWindow
         {
             confirmation.IsChecked = false;
             var task = (picker.SelectedItem as BackgroundTaskRow)?.Task;
-            details.Text = task is null ? "当前未返回后台任务；这不代表之前的扫描已成功完成。" :
+            details.Text = task is null ? picker.Items.Count > 0 ? "请明确选择要查看或操作的后台任务。" : "当前未返回后台任务；这不代表之前的扫描已成功完成。" :
                 $"{task.Name}\n类型：{TaskType(task.Type)}\n状态：{TaskState(task)}\n总数 {task.Total} · 成功 {task.SuccessCount} · 失败 {task.FailCount} · 已取消 {task.CanceledCount}";
             UpdateButtons();
         }
