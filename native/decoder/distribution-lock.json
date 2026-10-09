@@ -1,0 +1,75 @@
+{
+  "bridgeCommit": "841fc8e79346a235906f1dbd45be53034b2e2f52",
+  "components": [
+    {
+      "name": "PkgConfigFake",
+      "commit": "d254be13c9e9fee3b4a0756c07e48cab6a3cc961",
+      "url": "https://codeload.github.com/ffmpeginteropx/PkgConfigFake/tar.gz/d254be13c9e9fee3b4a0756c07e48cab6a3cc961",
+      "file": "PkgConfigFake.tar.gz",
+      "sha256": "BDB3796B3EC269ACA899E566FEC3F2E55C7EB2FBF4DCE3AECDBA5CA1ABBED920"
+    },
+    {
+      "name": "bzip2",
+      "commit": "8d1ad89f6cc129685bb9ea43e38cc25c97b9d2b4",
+      "url": "https://codeload.github.com/ffmpeginteropx/bzip2/tar.gz/8d1ad89f6cc129685bb9ea43e38cc25c97b9d2b4",
+      "file": "bzip2.tar.gz",
+      "sha256": "46ABA736D6F5DCA4722F36921FC22938AB6B7286B7E180F4C812CC32737F559B"
+    },
+    {
+      "name": "dav1d",
+      "commit": "99172b11470776177939c3d2bc366fe8d904eab7",
+      "url": "https://codeload.github.com/videolan/dav1d/tar.gz/99172b11470776177939c3d2bc366fe8d904eab7",
+      "file": "dav1d.tar.gz",
+      "sha256": "411211625F44301C03858C395061AC87AF6B3A0F02BDD3D599B4C87B123CCB27"
+    },
+    {
+      "name": "ffmpeg",
+      "commit": "38b88335f99e76ed89ff3c93f877fdefce736c13",
+      "url": "https://codeload.github.com/FFmpeg/FFmpeg/tar.gz/38b88335f99e76ed89ff3c93f877fdefce736c13",
+      "file": "ffmpeg.tar.gz",
+      "sha256": "2AE7E42343CFFFB811D15CFE98B6D005F082595FCDF034D30A4FF90CFED9F9C6"
+    },
+    {
+      "name": "gas-preprocessor",
+      "commit": "9309c67acb535ca6248f092e96131d8eb07eefc1",
+      "url": "https://codeload.github.com/FFmpeg/gas-preprocessor/tar.gz/9309c67acb535ca6248f092e96131d8eb07eefc1",
+      "file": "gas-preprocessor.tar.gz",
+      "sha256": "4800C17DD529815EA73AEE9658C3682F69BF45518D24408B5A58D678FDC94B94"
+    },
+    {
+      "name": "libiconv",
+      "commit": "d601c3e8e69db72980edd4794e90177f0a74f86d",
+      "url": "https://codeload.github.com/ffmpeginteropx/libiconv/tar.gz/d601c3e8e69db72980edd4794e90177f0a74f86d",
+      "file": "libiconv.tar.gz",
+      "sha256": "265343701A7E1F27114BA7A1A3DB7A14E6B5A6461354836B778A2EADD10354FE"
+    },
+    {
+      "name": "liblzma",
+      "commit": "76a4518a3b74da3a9e424d4d925c1738a7eefe46",
+      "url": "https://codeload.github.com/ffmpeginteropx/liblzma/tar.gz/76a4518a3b74da3a9e424d4d925c1738a7eefe46",
+      "file": "liblzma.tar.gz",
+      "sha256": "2BBA4B91FBF3C7DC26916D5E30583BC8F0DF685B5640026D99EA50A9559F7F85"
+    },
+    {
+      "name": "libxml2",
+      "commit": "b885bd9c38318ccc969a79416a71cc8430d8bf19",
+      "url": "https://codeload.github.com/ffmpeginteropx/libxml2/tar.gz/b885bd9c38318ccc969a79416a71cc8430d8bf19",
+      "file": "libxml2.tar.gz",
+      "sha256": "FD6A483810BA06B4368B81BC7B9DB7EA3F8E773D7E17B889A17900E645040E6A"
+    },
+    {
+      "name": "openssl",
+      "commit": "ad4910fad22d57c6d685b0ca83bdb7b2bf69d8fd",
+      "url": "https://codeload.github.com/openssl/openssl/tar.gz/ad4910fad22d57c6d685b0ca83bdb7b2bf69d8fd",
+      "file": "openssl.tar.gz",
+      "sha256": "7EB89698F3182B56C1DD14084D98C9C2A7CBBF09D89FD7C06E9CFC92A596D272"
+    },
+    {
+      "name": "zlib",
+      "commit": "8b861857759df1d1eafff995682b95e57657ed05",
+      "url": "https://codeload.github.com/ffmpeginteropx/zlib/tar.gz/8b861857759df1d1eafff995682b95e57657ed05",
+      "file": "zlib.tar.gz",
+      "sha256": "BD2CCB59F32B60C2CCB74155842601F06B08A50F459C65684EF183EE30D8A164"
+    }
+  ]
+}

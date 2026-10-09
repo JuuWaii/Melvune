@@ -22,6 +22,7 @@ public sealed partial class MainWindow
                 && Root.FindName("RemoteFavoritesTab") is null && Root.FindName("RemoteAlbumsTab") is null
                 && Root.FindName("RemoteArtistsTab") is null && AllMusicNavigation is not null && RemoteFavoritesNavigation is not null);
             music.Player.IsMuted = true;
+            await VerifyStartupRecoveryAsync(Verify);
             if (!Environment.GetCommandLineArgs().Contains("--preview-collections")) throw new InvalidOperationException();
             SettingsPanel.Visibility = Visibility.Collapsed; LibraryPanel.Visibility = Visibility.Visible;
             await VerifyRemoteCommandsWindowAsync(Verify);

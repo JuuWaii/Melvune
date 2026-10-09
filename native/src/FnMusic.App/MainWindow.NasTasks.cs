@@ -7,6 +7,11 @@ namespace FnMusic.App;
 public sealed partial class MainWindow
 {
     private sealed record BackgroundTaskRow(NasBackgroundTask Task, string Name);
+    private sealed record BackgroundTaskIdentity(Guid Source, string Id, string Type, long CreatedAt, string? LibraryId)
+    {
+        public static BackgroundTaskIdentity From(NasBackgroundTask task) =>
+            new(task.SourceInstanceId, task.Id, task.Type, task.CreatedAt, task.LibraryId);
+    }
     private static (StackPanel Panel, Action UpdateButtons) CreateNasTasksPanel(NasApiClient api,
         CancellationToken ct, Func<bool> isAdmin, Func<Func<Task>, bool, Task> run)
     {
@@ -19,6 +24,8 @@ public sealed partial class MainWindow
         var retry = new Button { Content = "重试所选任务" };
         var delete = new Button { Content = "删除任务记录" };
         var message = new TextBlock { TextWrapping = TextWrapping.Wrap };
+        BackgroundTaskIdentity? selectedIdentity = null;
+        bool rendering = false;
         void UpdateButtons()
         {
             var task = (picker.SelectedItem as BackgroundTaskRow)?.Task;
@@ -35,18 +42,34 @@ public sealed partial class MainWindow
                 $"{task.Name}\n类型：{TaskType(task.Type)}\n状态：{TaskState(task)}\n总数 {task.Total} · 成功 {task.SuccessCount} · 失败 {task.FailCount} · 已取消 {task.CanceledCount}";
             UpdateButtons();
         }
-        void Render(IReadOnlyList<NasBackgroundTask> tasks, string? selectedId)
+        void Render(IReadOnlyList<NasBackgroundTask> tasks)
         {
             var rows = tasks.Select(task => new BackgroundTaskRow(task, $"{TaskType(task.Type)} · {TaskState(task)} · {task.Name}")).ToArray();
-            picker.ItemsSource = rows;
-            picker.SelectedItem = rows.FirstOrDefault(row => row.Task.Id == selectedId) ?? rows.FirstOrDefault();
+            rendering = true;
+            try
+            {
+                picker.ItemsSource = rows;
+                picker.SelectedItem = rows.FirstOrDefault(row => BackgroundTaskIdentity.From(row.Task) == selectedIdentity);
+            }
+            finally { rendering = false; }
             Select();
+            if (picker.SelectedItem is null && selectedIdentity is not null)
+                details.Text = "所选任务已不存在或身份已变化，请刷新恢复原任务或明确重新选择；这不代表之前的扫描已成功完成。";
+        }
+        void Invalidate()
+        {
+            Render([]);
+            details.Text = "后台任务读取或操作失败，已清除可操作状态。请刷新重试；这不代表之前的扫描已成功完成。";
+            message.Text = "";
         }
         async Task Refresh()
         {
-            string? id = (picker.SelectedItem as BackgroundTaskRow)?.Task.Id;
-            var tasks = await api.ListBackgroundTasksAsync(ct); ct.ThrowIfCancellationRequested();
-            Render(tasks, id); message.Text = "已读取服务器当前任务状态。";
+            try
+            {
+                var tasks = await api.ListBackgroundTasksAsync(ct); ct.ThrowIfCancellationRequested();
+                Render(tasks); message.Text = "已读取服务器当前任务状态。";
+            }
+            catch { Invalidate(); throw; }
         }
         async Task Change(NasTaskAction action)
         {
@@ -55,12 +78,21 @@ public sealed partial class MainWindow
             await run(async () =>
             {
                 message.Text = "";
-                var tasks = await api.ChangeBackgroundTaskAsync(row.Task, action, ct); ct.ThrowIfCancellationRequested();
-                Render(tasks, row.Task.Id);
+                try
+                {
+                    var tasks = await api.ChangeBackgroundTaskAsync(row.Task, action, ct); ct.ThrowIfCancellationRequested();
+                    Render(tasks);
+                }
+                catch { Invalidate(); throw; }
                 message.Text = action == NasTaskAction.Delete ? "任务记录已删除，音乐文件不受影响。" : "请求已提交。请刷新查看最终状态；请求成功不代表任务完成。";
             }, true);
         }
-        picker.SelectionChanged += (_, _) => Select();
+        picker.SelectionChanged += (_, _) =>
+        {
+            if (rendering) return;
+            selectedIdentity = picker.SelectedItem is BackgroundTaskRow row ? BackgroundTaskIdentity.From(row.Task) : null;
+            Select();
+        };
         confirmation.Click += (_, _) => UpdateButtons();
         refresh.Click += async (_, _) => await run(Refresh, false);
         cancel.Click += async (_, _) => await Change(NasTaskAction.Cancel);

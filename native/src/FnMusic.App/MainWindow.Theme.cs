@@ -10,14 +10,7 @@ public sealed partial class MainWindow
     private bool updatingThemeChoice = true;
 
     private static string ThemeSettingsDirectory()
-    {
-#if DEBUG
-        // Synthetic UI verification must never replace the user's saved preference.
-        if (Environment.GetCommandLineArgs().Contains("--preview-synthetic"))
-            return Path.Combine(AppContext.BaseDirectory, "synthetic-settings");
-#endif
-        return Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FnMusic.Native");
-    }
+        => Services.AppDataDirectory.Resolve();
 
     private void InitializeThemeChoice()
     {

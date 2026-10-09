@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [string]$ExpectedVersion = '0.2.0-preview.14'
+    [string]$ExpectedVersion = '0.2.0-rc.1'
 )
 $ErrorActionPreference = 'Stop'
 $previewRoot = (Get-Item -LiteralPath $Path).FullName
@@ -30,11 +30,17 @@ $files = @($contents | Where-Object { -not $_.PSIsContainer -and $_.FullName -ne
 if ($files | Where-Object { [IO.Path]::GetRelativePath($previewRoot, $_.FullName) -match '^(local-index|nas-metadata)[\\/]' }) { throw 'Personal music index found in preview' }
 if ($files.Count -ne $manifest.Count -or @($files | Where-Object { -not $known.Contains($_.FullName) }).Count -gt 0) { throw 'Manifest does not describe every package file' }
 if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|appearance)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Development or personal artifact found' }
-foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.dll', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf',
+$requiredFiles = @('FnMusic.App.exe', 'FnMusic.App.dll', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf',
     'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Start-FnMusic.cmd',
-    'LICENSE', 'THIRD_PARTY_NOTICES.md', 'PREVIEW_VALIDATION.md', 'NATIVE_DECODER_DEPENDENCIES.md', 'native-decoder-build.json',
+    'LICENSE', 'THIRD_PARTY_NOTICES.md', 'NATIVE_DECODER_DEPENDENCIES.md', 'native-decoder-build.json',
     'licenses/FFmpegInteropX-Apache-2.0.txt', 'licenses/FFmpegInteropX-build/mp3-preroll.patch',
-    'licenses/FFmpegInteropX-build/toolchain-lock.json', 'licenses/FFmpegInteropX-build/build-native-decoder.py')) {
+    'licenses/FFmpegInteropX-build/toolchain-lock.json', 'licenses/FFmpegInteropX-build/build-native-decoder.py')
+if ($ExpectedVersion -eq '0.2.0-rc.1') {
+    $requiredFiles += @('USER_GUIDE.md', 'RC1_USER_VALIDATION.md', '0.2.0-rc.1.md', 'BUILDING_SOURCES.md', 'release.json',
+        'licenses/corresponding-source/decoder-corresponding-source.zip', 'licenses/corresponding-source/decoder-distribution.json',
+        'licenses/corresponding-source/runtime-license-index.json', 'licenses/packages.lock.json')
+} else { $requiredFiles += 'PREVIEW_VALIDATION.md' }
+foreach ($required in $requiredFiles) {
     if (-not $known.Contains([IO.Path]::GetFullPath((Join-Path $previewRoot $required)))) { throw "Required file missing: $required" }
 }
 $version = (Get-Item -LiteralPath (Join-Path $previewRoot 'FnMusic.App.exe')).VersionInfo.ProductVersion
@@ -49,5 +55,14 @@ foreach ($binding in @(
     @('licenses/FFmpegInteropX-build/build-native-decoder.py', $decoder.scriptSha256))) {
     if ($binding[1] -notmatch '^[0-9A-Fa-f]{64}$' -or
         (Get-FileHash -LiteralPath (Join-Path $previewRoot $binding[0]) -Algorithm SHA256).Hash -ne $binding[1]) { throw 'Decoder material does not match provenance' }
+}
+if ($ExpectedVersion -eq '0.2.0-rc.1') {
+    $distribution = Get-Content -LiteralPath (Join-Path $previewRoot 'licenses/corresponding-source/decoder-distribution.json') -Raw | ConvertFrom-Json
+    if ((Get-FileHash -LiteralPath (Join-Path $previewRoot 'licenses/corresponding-source/decoder-corresponding-source.zip') -Algorithm SHA256).Hash -ne $distribution.sourceArchiveSha256) { throw 'Corresponding source archive mismatch' }
+    foreach ($binary in $distribution.binarySha256.PSObject.Properties) {
+        if ((Get-FileHash -LiteralPath (Join-Path $previewRoot $binary.Name) -Algorithm SHA256).Hash -ne $binary.Value) { throw 'FFmpeg binary provenance mismatch' }
+    }
+    $release = Get-Content -LiteralPath (Join-Path $previewRoot 'release.json') -Raw | ConvertFrom-Json
+    if ($release.version -ne $ExpectedVersion -or $release.sourceCommit -notmatch '^[a-f0-9]{40}$' -or $release.architecture -ne 'win-x64') { throw 'Release identity mismatch' }
 }
 [pscustomobject]@{ Version = $version; VerifiedFiles = $files.Count; TotalFiles = $files.Count + 1; DecoderSha256 = $decoder.decoderSha256 }

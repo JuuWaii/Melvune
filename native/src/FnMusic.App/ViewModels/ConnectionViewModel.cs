@@ -28,7 +28,7 @@ public sealed class ConnectionViewModel : INotifyPropertyChanged, IDisposable
     public string Account { get => account; private set { account = value; Changed(); } }
     public bool IsReady => !busy;
     public bool IsBusy => busy;
-    public ConnectionViewModel() : this(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "FnMusic.Native")) { }
+    public ConnectionViewModel() : this(Services.AppDataDirectory.Resolve()) { }
     internal ConnectionViewModel(string data)
     {
         settingsStore = new ConnectionSettingsStore(data);

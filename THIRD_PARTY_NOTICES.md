@@ -13,7 +13,7 @@
 - .NET 与 System.Security.Cryptography.ProtectedData：由 .NET Foundation、Microsoft 及贡献者提供；保留对应包的许可证及第三方声明。
   项目：https://github.com/dotnet/runtime
 - Microsoft.Windows.SDK.BuildTools：Windows SDK 构建工具，受其分发包附带的微软许可条款约束，不将其统一宣称为 MIT 组件。
-- 原生依赖的精确版本记录在 `native/` 项目及锁文件中。正式发布前必须汇总自包含运行时及传递依赖的许可文件，并检查最终安装包；本轮未发布安装包。
+- 原生依赖的精确版本记录在 `native/` 项目及锁文件中。rc.1 便携包的 licenses/corresponding-source/runtime-licenses 保留自包含运行时及传递依赖的许可证和 NOTICE，索引记录各包材料。本版未发布安装包。
 
 ### Electron
 - 主页: https://github.com/electron/electron
@@ -89,7 +89,7 @@ SOFTWARE.
 
 ## FFmpeg / FFmpegInteropX（原生播放预览）
 
-preview.3 随附 FFmpegInteropX 2.1.0 桥接库和 FFmpeg 8.1.2 动态库，来自锁定的 NuGet 依赖。桥接库声明 Apache-2.0；FFmpeg 组件及附属依赖另有 LGPL、Zlib、MIT 等许可，不适用上面的 MIT 条款。预览目录内 `licenses/` 包含桥接库许可证和 FFmpeg 包提供的全部许可证。版本及源码标识见 `NATIVE_DECODER_DEPENDENCIES.md`（仓库中位于 docs）。开发回归仍可使用外部 FFmpeg 命令行程序，但不将该程序打入预览包。对外发布前仍需补齐对应源码和构建材料；参见 [FFmpeg 官方许可说明](https://ffmpeg.org/legal.html)。
+preview.3 随附 FFmpegInteropX 2.1.0 桥接库和 FFmpeg 8.1.2 动态库，来自锁定的 NuGet 依赖。桥接库声明 Apache-2.0；FFmpeg 组件及附属依赖另有 LGPL、Zlib、MIT 等许可，不适用上面的 MIT 条款。预览目录内 `licenses/` 包含桥接库许可证和 FFmpeg 包提供的全部许可证。版本及源码标识见 `NATIVE_DECODER_DEPENDENCIES.md`（仓库中位于 docs）。开发回归仍可使用外部 FFmpeg 命令行程序，但不将该程序打入预览包。rc.1 的 licenses/corresponding-source/decoder-corresponding-source.zip 提供完整固定源码和实际构建配置，BUILDING_SOURCES.md 说明构建与动态库替换；参见 [FFmpeg 官方许可说明](https://ffmpeg.org/legal.html)。
 
 说明（2026-09-13）：Electron 与 electron-builder 已退出活动依赖，以下相关条目作为历史归属保留。
 

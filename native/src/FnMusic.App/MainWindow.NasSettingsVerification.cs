@@ -17,7 +17,9 @@ public sealed partial class MainWindow
         public string ServerName = "服务器夹具", Mode = "none";
         public string[] AccessIds = [];
         public int Writes;
-        public bool TaskExists = true, TaskDone, TaskCancelling;
+        public bool TaskExists = true, TaskDone, TaskCancelling, SecondTask;
+        public long TaskCreatedAt = 1, TaskSuccess = 3;
+        public string TaskType = "fileScan", TaskLibrary = "initial";
         public bool ReconnectMatch = true;
         public string? FailedRead;
         public Task? PausedRead;
@@ -64,7 +66,13 @@ public sealed partial class MainWindow
             else if (path.EndsWith("settings/user")) data = new { defaultSharedLibraryAccess = new { mode = Mode, sharedLibraries = AccessIds.Select(id => new { guid = id }) } };
             else if (path.EndsWith("shared-library/detail")) data = Library(Uri.UnescapeDataString(request.RequestUri.Query[6..]));
             else if (path.EndsWith("shared-library/list")) data = new { list = Libraries.Keys.Select(Library).ToArray() };
-            else if (path.EndsWith("task/list")) data = new { list = TaskExists ? new[] { new { id = "task-1", type = "fileScan", name = "扫描夹具", total = 10, successCount = 3, failCount = 1, canceledCount = 0, done = TaskDone, cancelling = TaskCancelling, canceled = false, retryable = true, createdAt = 1 } } : [] };
+            else if (path.EndsWith("task/list"))
+            {
+                var list = new List<object>();
+                if (TaskExists) list.Add(new { id = "task-1", type = TaskType, name = "扫描夹具", total = 10, successCount = TaskSuccess, failCount = 1, canceledCount = 0, done = TaskDone, cancelling = TaskCancelling, canceled = false, retryable = true, createdAt = TaskCreatedAt, ext = new { libraryGUID = TaskLibrary } });
+                if (SecondTask) list.Add(new { id = "task-2", type = "fileScan", name = "另一个任务", total = 10, successCount = 2, failCount = 0, canceledCount = 0, done = false, cancelling = false, canceled = false, retryable = true, createdAt = 2, ext = new { libraryGUID = "initial" } });
+                data = new { list };
+            }
             else data = new { list = new[] { new { path = "/music/new" } } };
             return new(HttpStatusCode.OK) { Content = new StringContent(JsonSerializer.Serialize(new { code = 0, data }), Encoding.UTF8, "application/json") };
         }
@@ -167,6 +175,35 @@ public sealed partial class MainWindow
                 tabs.SelectedIndex = 3; await Task.Delay(150);
                 await Click("刷新后台任务");
                 var taskDetails = tasks.Children.OfType<TextBlock>().First();
+                var taskPicker = tasks.Children.OfType<ComboBox>().Single();
+                bool NoTaskActions() => taskPicker.SelectedItem is null && new[] { "取消所选任务", "重试所选任务", "删除任务记录" }
+                    .All(label => !buttons.Single(button => button.Content.ToString() == label).IsEnabled);
+                verify("nas_tasks_initial_requires_explicit_selection", NoTaskActions());
+                taskPicker.SelectedIndex = 0;
+                handler.SecondTask = true; handler.TaskSuccess = 4; await Click("刷新后台任务");
+                verify("nas_tasks_progress_preserves_identity", (taskPicker.SelectedItem as BackgroundTaskRow)?.Task.SuccessCount == 4);
+                handler.TaskExists = false; await Click("刷新后台任务");
+                verify("nas_tasks_disappearance_does_not_select_other", NoTaskActions() && taskPicker.Items.Count == 1);
+                handler.TaskExists = true; await Click("刷新后台任务");
+                verify("nas_tasks_reappearance_restores_identity", (taskPicker.SelectedItem as BackgroundTaskRow)?.Task.Id == "task-1");
+                handler.TaskCreatedAt = 9; await Click("刷新后台任务");
+                verify("nas_tasks_reused_id_created_at_rejected", NoTaskActions());
+                handler.TaskCreatedAt = 1; handler.TaskType = "lyricDownload"; await Click("刷新后台任务");
+                verify("nas_tasks_reused_id_type_rejected", NoTaskActions());
+                handler.TaskType = "fileScan"; handler.TaskLibrary = "created"; await Click("刷新后台任务");
+                verify("nas_tasks_reused_id_library_rejected", NoTaskActions());
+                handler.TaskLibrary = "initial"; await Click("刷新后台任务");
+                verify("nas_tasks_original_identity_recovers", (taskPicker.SelectedItem as BackgroundTaskRow)?.Task.Id == "task-1");
+                handler.FailedRead = "task/list"; await Click("刷新后台任务");
+                verify("nas_tasks_failed_read_clears_snapshot", NoTaskActions() && taskPicker.Items.Count == 0);
+                handler.FailedRead = null; await Click("刷新后台任务");
+                verify("nas_tasks_failed_read_restores_identity", (taskPicker.SelectedItem as BackgroundTaskRow)?.Task.Id == "task-1");
+                handler.TaskExists = false; await Click("刷新后台任务");
+                taskPicker.SelectedIndex = 0;
+                verify("nas_tasks_explicit_other_selection", (taskPicker.SelectedItem as BackgroundTaskRow)?.Task.Id == "task-2"
+                    && BackgroundTaskIdentity.From(((BackgroundTaskRow)taskPicker.SelectedItem).Task) != BackgroundTaskIdentity.From(new NasBackgroundTask(Guid.NewGuid(), "task-2", "fileScan", "", 10, 2, 0, 0, false, false, false, true, 2) { LibraryId = "initial" }));
+                handler.TaskExists = true; await Click("刷新后台任务");
+                taskPicker.SelectedIndex = 0; handler.SecondTask = false; await Click("刷新后台任务");
                 verify("nas_tasks_running_state", taskDetails.Text.Contains("进行中") && !buttons.Single(button => button.Content.ToString() == "删除任务记录").IsEnabled);
                 ((IToggleProvider)new CheckBoxAutomationPeer(tasks.Children.OfType<CheckBox>().Single()).GetPattern(PatternInterface.Toggle)).Toggle();
                 await Click("取消所选任务");
@@ -179,6 +216,9 @@ public sealed partial class MainWindow
                 ((IToggleProvider)new CheckBoxAutomationPeer(tasks.Children.OfType<CheckBox>().Single()).GetPattern(PatternInterface.Toggle)).Toggle();
                 await Click("删除任务记录");
                 verify("nas_tasks_delete_record", !handler.TaskExists && taskDetails.Text.Contains("不代表之前的扫描已成功完成"));
+                // A failed operation also invalidates the settings editor's snapshots.
+                // Restore those explicitly before continuing with library mutations.
+                await Click("刷新飞牛设置");
                 tabs.SelectedIndex = 4; await Task.Delay(150);
                 var reconnectPath = reconnect.Children.OfType<TextBox>().Single();
                 var reconnectButton = buttons.Single(button => button.Content.ToString() == "重新关联素材库");
@@ -225,7 +265,7 @@ public sealed partial class MainWindow
         };
         try
         {
-            await ShowNasSettingsAsync(api); await done.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            await ShowNasSettingsAsync(api); await done.Task.WaitAsync(TimeSpan.FromSeconds(30));
             settingsPageOpened = null;
             var release = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
             handler.PausedRead = release.Task;
