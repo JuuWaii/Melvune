@@ -1,6 +1,6 @@
 # 飞牛音乐 Windows 原生客户端
 
-本轮候选版为 **0.2.0-rc.1**，目标推荐目录 `dist/FnMusic-0.2.0-rc.1-win-x64/`。保留整个目录并双击 `Start-FnMusic.cmd`；最终包证据与推荐 ZIP 以 [候选版交付记录](docs/RC1_ACCEPTANCE.md) 为准。此前 [preview.14](docs/PREVIEW14_ACCEPTANCE.md) 目录保持不变。包含统一界面、两类歌单、本地启动索引/后台扫描、封面与内嵌歌词，以及范围读取可靠性和缓存优化。
+当前推荐候选版为 **0.2.0-rc.1**，推荐目录 `dist/FnMusic-0.2.0-rc.1-win-x64/`。保留整个目录并双击 `Start-FnMusic.cmd`；唯一推荐 ZIP 为 `dist/FnMusic-0.2.0-rc.1-win-x64.zip`，完整哈希、本轮实际启动/播放及依赖核验见 [候选版交付记录](docs/RC1_ACCEPTANCE.md)。此前 [preview.14](docs/PREVIEW14_ACCEPTANCE.md) 目录保持不变。包含统一界面、两类歌单、本地启动索引/后台扫描、封面与内嵌歌词，以及范围读取可靠性和缓存优化。
 
 **当前进度统一查看 [发布开发清单](docs/RELEASE_CHECKLIST.md)**：目标为 0.2.0-rc.1 Windows x64 便携候选版，按批次开发、统一检查、交付一个推荐包。第三方源、桌面歌词、对外接口和全面扩展矩阵推迟；rc.1 随包提供对应源码、许可与构建材料，候选版不是正式安装发行版。旧 [开发清单](docs/NATIVE_BACKLOG.md) 和 [路线图](docs/PRODUCT_ROADMAP.md) 保留历史及后续需求。
 
