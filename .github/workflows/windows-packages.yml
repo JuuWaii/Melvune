@@ -1,0 +1,62 @@
+name: Windows packages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-2022
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Privacy review
+        shell: pwsh
+        run: |
+          node scripts/check-privacy.js
+          if ($LASTEXITCODE -ne 0) { throw 'Privacy check failed' }
+          python scripts/audit-release-privacy.py --output .review-audit/github-privacy-candidates.json
+          if ($LASTEXITCODE -ne 0) { throw 'History audit failed' }
+      - name: Prepare pinned SDK
+        shell: pwsh
+        run: ./scripts/native.ps1 bootstrap
+      - name: Core checks
+        shell: pwsh
+        run: |
+          ./scripts/native.ps1 test
+          if ($LASTEXITCODE -ne 0) { throw 'Core checks failed' }
+          node --test tests/*.test.cjs
+          if ($LASTEXITCODE -ne 0) { throw 'Node checks failed' }
+      - name: Build verified payload and installers
+        shell: pwsh
+        run: |
+          ./scripts/package-preview.ps1 -Name FnMusic-0.2.0-rc.1-win-x64
+          ./scripts/package-windows.ps1 -Name FnMusic-0.2.0-rc.1-win-x64-windows
+      - name: Verify installer contents without installing
+        shell: pwsh
+        run: |
+          ./.tools/wix/wix.exe msi decompile dist/FnMusic-0.2.0-rc.1-win-x64-windows/FnMusic-0.2.0-rc.1-win-x64-setup.msi -o .review-audit/msi.wxs -x .review-audit/msi
+          if ($LASTEXITCODE -ne 0) { throw 'MSI extraction failed' }
+          ./.tools/wix/wix.exe burn extract dist/FnMusic-0.2.0-rc.1-win-x64-windows/FnMusic-0.2.0-rc.1-win-x64-setup.exe -o .review-audit/burn -oba .review-audit/burn-ba
+          if ($LASTEXITCODE -ne 0) { throw 'EXE extraction failed' }
+          python scripts/verify-windows-packages.py --packages dist/FnMusic-0.2.0-rc.1-win-x64-windows --payload dist/FnMusic-0.2.0-rc.1-win-x64 --msi-source .review-audit/msi.wxs --msi-extracted .review-audit/msi --burn-extracted .review-audit/burn --burn-ba .review-audit/burn-ba --report .review-audit/windows-verification.json
+          if ($LASTEXITCODE -ne 0) { throw 'Package content verification failed' }
+      - name: Upload distributable packages
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: FnMusic-0.2.0-rc.1-win-x64
+          path: |
+            dist/FnMusic-0.2.0-rc.1-win-x64.zip
+            dist/FnMusic-0.2.0-rc.1-win-x64.SHA256SUMS.txt
+            dist/FnMusic-0.2.0-rc.1-win-x64-windows/*
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 14

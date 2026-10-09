@@ -1,0 +1,80 @@
+"""Verify package payloads after WiX extraction; never installs a product."""
+import argparse
+import hashlib
+import json
+import pathlib
+import struct
+import xml.etree.ElementTree as ET
+import zipfile
+
+parser = argparse.ArgumentParser()
+parser.add_argument('--packages', type=pathlib.Path, required=True)
+parser.add_argument('--payload', type=pathlib.Path, required=True)
+parser.add_argument('--msi-source', type=pathlib.Path, required=True)
+parser.add_argument('--msi-extracted', type=pathlib.Path, required=True)
+parser.add_argument('--burn-extracted', type=pathlib.Path, required=True)
+parser.add_argument('--burn-ba', type=pathlib.Path, required=True)
+parser.add_argument('--report', type=pathlib.Path, required=True)
+args = parser.parse_args()
+root = pathlib.Path(__file__).resolve().parent.parent
+def digest(file):
+    with file.open('rb') as stream: return hashlib.file_digest(stream, 'sha256').hexdigest().upper()
+expected = {p.relative_to(args.payload).as_posix(): digest(p) for p in args.payload.rglob('*') if p.is_file()}
+with (args.packages / 'FnMusic-0.2.0-rc.1-win-x64-portable.exe').open('rb') as stream:
+    stream.seek(-57, 2)
+    assert stream.read(17) == b'FNMUSIC-PAYLOAD-1', 'Portable trailer magic mismatch'
+    payload_hash = stream.read(32).hex().upper()
+    payload_length = struct.unpack('<q', stream.read(8))[0]
+    assert payload_length == pathlib.Path(str(args.payload) + '.zip').stat().st_size
+    stream.seek(-57 - payload_length, 2)
+    computed = hashlib.sha256()
+    for _ in range((payload_length + 1048575) // 1048576):
+        data = stream.read(min(1048576, payload_length))
+        computed.update(data); payload_length -= len(data)
+    assert computed.hexdigest().upper() == payload_hash == digest(pathlib.Path(str(args.payload) + '.zip'))
+with zipfile.ZipFile(args.packages / 'FnMusic-0.2.0-rc.1-win-x64-portable.exe') as archive:
+    assert archive.testzip() is None, 'Portable ZIP CRC failed'
+    actual = {}
+    for entry in archive.infolist():
+        if entry.is_dir(): continue
+        relative = entry.filename.split('/', 1)[1]
+        assert relative not in actual, 'Duplicate portable ZIP entry'
+        with archive.open(entry) as stream: actual[relative] = hashlib.file_digest(stream, 'sha256').hexdigest().upper()
+    assert actual == expected, 'Portable ZIP differs from verified app directory'
+for name in ['WIX_NOTICE.md', 'WIX_LICENSE.txt']:
+    expected['licenses/installer/' + name] = digest(root / 'packaging' / name)
+ns = {'w': 'http://wixtoolset.org/schemas/v4/wxs'}
+source = ET.parse(args.msi_source).getroot()
+package = source.find('w:Package', ns)
+assert package is not None and package.get('Scope') == 'perUser'
+assert package.get('Version') == '0.1.999'
+assert not source.findall('.//w:CustomAction', ns), 'Unexpected installer custom action'
+assert not source.findall('.//w:ServiceInstall', ns), 'Unexpected installed service'
+assert all(e.get('Root') == 'HKCU' for e in source.findall('.//w:RegistryValue', ns)), 'Machine-wide registry write'
+assert source.find('.//w:StandardDirectory[@Id="LocalAppDataFolder"]', ns) is not None
+assert 'WINDOWSBUILDNUMBER >= 19041' in source.find('.//w:Launch', ns).get('Condition', '')
+file_rows = {e.get('Id'): e for e in source.findall('.//w:File', ns)}
+assert len(file_rows) == len(expected), 'MSI file count mismatch'
+for relative, checksum in expected.items():
+    file_id = 'F' + hashlib.sha256(relative.encode()).hexdigest()[:24]
+    assert file_id in file_rows, 'Missing MSI file: ' + relative
+    assert digest(args.msi_extracted / 'File' / file_id) == checksum, 'MSI payload differs: ' + relative
+msi = args.packages / 'FnMusic-0.2.0-rc.1-win-x64-setup.msi'
+embedded = [p for p in args.burn_extracted.rglob('*') if p.is_file()]
+assert any(digest(p) == digest(msi) for p in embedded), 'EXE does not contain the standalone MSI'
+burn_ns = {'b': 'http://wixtoolset.org/schemas/v4/2008/Burn'}
+burn = ET.parse(args.burn_ba / 'manifest.xml').getroot()
+assert burn.find('b:Registration', burn_ns).get('PerMachine') == 'no'
+assert burn.find('.//b:MsiPackage', burn_ns).get('PerMachine') == 'no'
+assert burn.find('.//b:MsiProperty[@Id="INSTALLFOLDER"]', burn_ns).get('Value') == '[InstallFolder]'
+for line in (args.packages / 'SHA256SUMS.txt').read_text().splitlines():
+    checksum, name = line.split('  ', 1)
+    assert pathlib.PurePath(name).name == name, 'Invalid checksum filename'
+    assert digest(args.packages / name) == checksum, 'Distribution checksum mismatch'
+record = dict(portableFiles=len(actual), msiFiles=len(expected), msiScope=package.get('Scope'),
+              customActions=0, embeddedMsiMatches=True, payloadZipSha256=payload_hash,
+              portableSha256=digest(args.packages / 'FnMusic-0.2.0-rc.1-win-x64-portable.exe'),
+              msiSha256=digest(msi), setupExeSha256=digest(args.packages / 'FnMusic-0.2.0-rc.1-win-x64-setup.exe'))
+args.report.parent.mkdir(parents=True, exist_ok=True)
+args.report.write_text(json.dumps(record, indent=2) + '\n')
+print(json.dumps(record))

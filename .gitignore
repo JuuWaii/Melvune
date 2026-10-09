@@ -8,6 +8,8 @@ out/
 .tools/
 native/**/bin/
 native/**/obj/
+packaging/**/bin/
+packaging/**/obj/
 native/.vs/
 
 # 用户个人配置（含内网地址等个人信息，严禁提交到版本库）

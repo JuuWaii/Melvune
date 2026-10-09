@@ -63,7 +63,7 @@ function trackedFilesFromIndex() {
 
 /** 退化方案：扫描已知源码目录 */
 function fallbackFiles() {
-  const dirs = ['src', 'scripts', 'tests', 'docs', 'build', 'native', '.github'];
+  const dirs = ['src', 'scripts', 'tests', 'docs', 'build', 'native', 'packaging', '.github'];
   const files = [];
   for (const d of dirs) {
     const base = path.join(ROOT, d);
@@ -134,14 +134,14 @@ function reviewedDecoderVersion(file, match, content) {
 }
 
 function checkFile(file) {
-  if (FORBIDDEN_FILES.includes(file) || /^(?:\.chrome-debug|\.review-audit|\.tools)\//.test(file)) {
+  if (FORBIDDEN_FILES.includes(file) || /^(?:\.chrome-debug|\.review-audit|\.tools)\//.test(file) || /\.(pfx|p12|pem|key)$/i.test(file)) {
     violations++;
     report.push('✗ 禁止文件出现在版本库: ' + file);
     return;
   }
   // 点文件（.npmrc/.gitignore 等）也纳入内容扫描
   const isDotfile = /^\.[a-z0-9_-]+$/i.test(path.basename(file));
-  if (!isDotfile && !/\.(js|cjs|json|md|yml|yaml|html|css|txt|example|cs|csproj|xaml|resw|props|targets|config|manifest|sln|slnx|ps1|py|patch)$/i.test(file)) return;
+  if (!isDotfile && !/\.(js|cjs|json|md|yml|yaml|html|css|txt|example|cs|csproj|xaml|resw|props|targets|config|manifest|sln|slnx|ps1|py|patch|wxs|wxi)$/i.test(file)) return;
   let content;
   try {
     content = fs.readFileSync(path.join(ROOT, file), 'utf8');

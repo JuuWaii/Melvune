@@ -46,6 +46,31 @@ test('untracked native build outputs are excluded from source scan', () => {
   assert.equal(result.status, 0);
 });
 
+test('portable launcher and installer authoring secrets are detected and redacted', () => {
+  const value = 'q'.repeat(24);
+  for (const name of ['packaging/portable/Program.cs', 'packaging/Setup.wxs']) {
+    const result = scan({ [name]: 'token = "' + value + '"' });
+    assert.equal(result.status, 1);
+    assert.ok(result.stdout.includes(name));
+    assert.ok(!result.stdout.includes(value));
+  }
+});
+
+test('portable build outputs stay excluded while source remains checked', () => {
+  const value = 'q'.repeat(24);
+  const result = scan({
+    'packaging/portable/obj/Generated.cs': 'token = "' + value + '"',
+    'packaging/portable/Program.cs': 'class Launcher {}'
+  });
+  assert.equal(result.status, 0);
+});
+
+test('signing private key containers are forbidden even without text secrets', () => {
+  const result = scan({ 'packaging/signing.pfx': Buffer.from([0, 1, 2, 3]) });
+  assert.equal(result.status, 1);
+  assert.ok(result.stdout.includes('packaging/signing.pfx'));
+});
+
 test('fixed DLL metadata permits the version but still detects later addresses', () => {
   const version = [2, 1, 0, 1].join('.');
   const address = [203, 0, 113, 9].join('.');
