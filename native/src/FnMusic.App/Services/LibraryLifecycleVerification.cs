@@ -49,7 +49,7 @@ internal static partial class LibraryLifecycleVerification
         var allowedTracks = new HashSet<TrackReference>();
         IReadOnlyList<NasSharedLibrary>? before = null;
         var existingTaskIds = new HashSet<(string, long)>();
-        using var connection = new ConnectionViewModel(); using var observer = new ConnectionViewModel();
+        using var connection = PlaybackVerification.CreateConnection(); using var observer = PlaybackVerification.CreateConnection();
         using var timeout = new CancellationTokenSource(TimeSpan.FromMinutes(8));
         using var scanLifetime = CancellationTokenSource.CreateLinkedTokenSource(timeout.Token);
         Task<(object? Result, Exception? Error)>? reconnectObservation = null;
@@ -215,7 +215,7 @@ internal static partial class LibraryLifecycleVerification
     private static async Task<(object? Result, Exception? Error)> ObserveScanAsync(NasApiClient api, string libraryId,
         HashSet<(string, long)> baseline, int files, string stage, List<object> observations, CancellationToken ct)
     {
-        try { return (await WaitForScanAsync(api, libraryId, baseline, files, stage, observations, ct), null); }
+        try { return (await WaitForScanAsync(api, libraryId, baseline, files, stage, observations, ct).ConfigureAwait(false), null); }
         catch (Exception error) { return (null, error); }
     }
 
@@ -226,15 +226,22 @@ internal static partial class LibraryLifecycleVerification
         bounded.CancelAfter(TimeSpan.FromMinutes(2));
         var elapsed = System.Diagnostics.Stopwatch.StartNew();
         string? previousState = null;
+        int polls = 0;
         while (true)
         {
-            var all = await api.ListBackgroundTasksAsync(bounded.Token);
+            long requestedAt = elapsed.ElapsedMilliseconds;
+            // Reference hashing and XAML callbacks must not delay this observer's
+            // continuation. Request latency is recorded separately from poll delay.
+            var all = await api.ListBackgroundTasksAsync(bounded.Token).ConfigureAwait(false);
+            long returnedAt = elapsed.ElapsedMilliseconds;
+            polls++;
             var associated = all.Where(task => task.LibraryId == libraryId && task.Type == "fileScan").ToArray();
             var states = associated.Select(task => new { task.Id, task.CreatedAt, IsBaseline = baseline.Contains((task.Id, task.CreatedAt)),
                 task.Total, task.SuccessCount, task.FailCount, task.CanceledCount, task.Done, task.Cancelling, task.Canceled }).ToArray();
             string state = JsonSerializer.Serialize(new { TotalTasks = all.Count, Associated = states });
             if (state != previousState && observations.Count < 150)
-                observations.Add(new { Stage = stage, ElapsedMilliseconds = elapsed.ElapsedMilliseconds, TotalTasks = all.Count, Associated = states });
+                observations.Add(new { Stage = stage, ElapsedMilliseconds = returnedAt, Poll = polls,
+                    RequestMilliseconds = returnedAt - requestedAt, TotalTasks = all.Count, Associated = states });
             previousState = state;
             var tasks = associated.Where(task => !baseline.Contains((task.Id, task.CreatedAt))).ToArray();
             Require(tasks.Length <= 1);
@@ -243,8 +250,9 @@ internal static partial class LibraryLifecycleVerification
                 Require(!task.Cancelling && !task.Canceled && task.FailCount == 0 && task.CanceledCount == 0 && task.Total == files && task.SuccessCount == files);
                 return new { task.Type, task.Total, task.SuccessCount, task.FailCount, task.CanceledCount, task.Done };
             }
-            // Short three-file scans may complete between two-second samples.
-            await Task.Delay(elapsed.Elapsed < TimeSpan.FromSeconds(10) ? TimeSpan.FromMilliseconds(250) : TimeSpan.FromSeconds(2), bounded.Token);
+            // Bound the initial observation burst; do not turn a vanished task
+            // into success or keep high-frequency requests running indefinitely.
+            await Task.Delay(elapsed.Elapsed < TimeSpan.FromSeconds(10) ? TimeSpan.FromMilliseconds(100) : TimeSpan.FromSeconds(2), bounded.Token).ConfigureAwait(false);
         }
     }
 }

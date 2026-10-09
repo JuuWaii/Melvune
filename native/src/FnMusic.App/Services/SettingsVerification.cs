@@ -12,10 +12,10 @@ internal static class SettingsVerification
         IReadOnlyList<string>? authorizedDirectories = null;
         IReadOnlyList<string>? libraryPaths = null;
         IReadOnlyList<string>? sampleTrackPaths = null;
-        using var connection = new ConnectionViewModel();
         using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         try
         {
+            using var connection = PlaybackVerification.CreateConnection();
             await connection.InitializeAsync();
             var api = connection.AuthenticatedClient ?? throw new InvalidOperationException(); checks[stage] = true;
             stage = "account_role"; bool admin = await api.IsAdministratorAsync(timeout.Token); checks[stage] = true;
