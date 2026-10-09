@@ -108,7 +108,7 @@ internal static class PlaybackVerification
                 JsonSerializer.Serialize(new { synthetic, complete = stage == "complete", stage, checks, error, errorCode, errorModule }));
         }
     }
-    private static ConnectionViewModel CreateConnection()
+    internal static ConnectionViewModel CreateConnection()
     {
         var arguments = Environment.GetCommandLineArgs();
         int index = Array.IndexOf(arguments, "--verification-data-dir");

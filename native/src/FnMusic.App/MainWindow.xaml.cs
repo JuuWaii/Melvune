@@ -32,6 +32,8 @@ public sealed partial class MainWindow : Window
     {
         Root.Loaded -= Root_Loaded;
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-nas-search-window") && IsSyntheticPreview)
+        { await VerifyNasSearchWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-local-scale-window") && IsSyntheticPreview)
         { await VerifyLocalScaleWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-local-cache-window") && IsSyntheticPreview)
