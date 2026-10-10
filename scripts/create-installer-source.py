@@ -10,7 +10,9 @@ parser.add_argument('payload', type=pathlib.Path)
 parser.add_argument('output', type=pathlib.Path)
 args = parser.parse_args()
 ns = 'http://wixtoolset.org/schemas/v4/wxs'
+ui_ns = 'http://wixtoolset.org/schemas/v4/wxs/ui'
 ET.register_namespace('', ns)
+ET.register_namespace('ui', ui_ns)
 def node(parent, name, **attrs):
     return ET.SubElement(parent, '{' + ns + '}' + name, attrs)
 def ident(prefix, relative):
@@ -19,9 +21,19 @@ def component_guid(key):
     return str(uuid.uuid5(uuid.UUID('fd052535-9ef6-4949-9fd2-5f4162d8f9a8'), key)).upper()
 root = ET.Element('{' + ns + '}Wix')
 package = node(root, 'Package', Name='FnMusic 0.2.0-rc.1', Manufacturer='FnMusic contributors',
-               Version='0.1.999', UpgradeCode='67547B43-CFA0-4C8C-8BF6-973F6567D305',
-               ProductCode='DD474E6E-6605-4CDD-AC57-CDBB5C202001', Scope='perUser', InstallerVersion='500')
+               Version='0.1.1000', UpgradeCode='67547B43-CFA0-4C8C-8BF6-973F6567D305',
+               ProductCode='4139BD23-9416-4B92-B520-135FBCD7DDEE', Scope='perUser', InstallerVersion='500')
+node(package, 'Icon', Id='FnMusicAppIcon', SourceFile=str((pathlib.Path(__file__).resolve().parent.parent / 'assets/branding/fnmusic.ico').resolve()))
+node(package, 'Property', Id='ARPPRODUCTICON', Value='FnMusicAppIcon')
 node(package, 'MajorUpgrade', DowngradeErrorMessage='A newer FnMusic version is already installed.')
+ET.SubElement(package, '{' + ui_ns + '}WixUI', {'Id': 'WixUI_InstallDir', 'InstallDirectory': 'INSTALLFOLDER'})
+license_text = (pathlib.Path(__file__).resolve().parent.parent / 'LICENSE').read_text(encoding='utf-8-sig')
+license_rtf = args.output.parent / 'license.rtf'
+license_rtf.parent.mkdir(parents=True, exist_ok=True)
+escaped = license_text.replace('\\', '\\\\').replace('{', '\\{').replace('}', '\\}').replace('\r', '').replace('\n', '\\par\n')
+escaped = ''.join(c if ord(c) < 128 else '\\u' + str(ord(c) if ord(c) < 32768 else ord(c) - 65536) + '?' for c in escaped)
+license_rtf.write_text('{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 Segoe UI;}}\\f0\\fs18\n' + escaped + '}', encoding='ascii')
+node(package, 'WixVariable', Id='WixUILicenseRtf', Value=str(license_rtf.resolve()))
 node(package, 'MediaTemplate', EmbedCab='yes', CompressionLevel='high')
 build_property = node(package, 'Property', Id='WINDOWSBUILDNUMBER', Secure='yes')
 node(build_property, 'RegistrySearch', Id='ActualWindowsBuild', Root='HKLM', Key='SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion', Name='CurrentBuildNumber', Type='raw', Bitness='always64')
@@ -50,7 +62,7 @@ for file, relative in files:
     node(feature, 'ComponentRef', Id=component_id)
 menu = node(package, 'StandardDirectory', Id='ProgramMenuFolder')
 component = node(menu, 'Component', Id='StartMenuShortcut', Guid=component_guid('shortcut'), Bitness='always64')
-node(component, 'Shortcut', Id='FnMusicShortcut', Name='FnMusic', Target='[INSTALLFOLDER]FnMusic.App.exe', WorkingDirectory='INSTALLFOLDER')
+node(component, 'Shortcut', Id='FnMusicShortcut', Name='FnMusic', Target='[INSTALLFOLDER]FnMusic.App.exe', WorkingDirectory='INSTALLFOLDER', Icon='FnMusicAppIcon', IconIndex='0')
 node(component, 'RegistryValue', Root='HKCU', Key='Software\\FnMusic\\Installer', Name='StartMenu', Type='integer', Value='1', KeyPath='yes')
 node(feature, 'ComponentRef', Id='StartMenuShortcut')
 # Explicitly remove empty app directories, never the separate user configuration.

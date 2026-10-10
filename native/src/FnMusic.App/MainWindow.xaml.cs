@@ -9,6 +9,7 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "FnMusic.ico"));
         ExtendsContentIntoTitleBar = true;
         AppWindow.TitleBar.PreferredHeightOption = global::Microsoft.UI.Windowing.TitleBarHeightOption.Tall;
         SetTitleBar(AppTitleBar);

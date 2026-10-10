@@ -12,11 +12,14 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <SelfContained>true</SelfContained>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>../../../assets/branding/fnmusic.ico</ApplicationIcon>
     <DefaultLanguage>zh-CN</DefaultLanguage>
     <Version>0.2.0-rc.1</Version>
     <AssemblyVersion>0.2.0.0</AssemblyVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Content Include="../../../assets/branding/fnmusic.ico" Link="Assets/FnMusic.ico" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+    <Content Include="../../../assets/branding/fnmusic.png" Link="Assets/FnMusic.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <PackageReference Include="FFmpegInteropX" Version="2.1.0.81200" />
     <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.260804001" />
     <PackageReference Include="Microsoft.Windows.SDK.BuildTools" Version="10.0.26100.9169" />

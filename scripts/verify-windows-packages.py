@@ -47,8 +47,15 @@ ns = {'w': 'http://wixtoolset.org/schemas/v4/wxs'}
 source = ET.parse(args.msi_source).getroot()
 package = source.find('w:Package', ns)
 assert package is not None and package.get('Scope') == 'perUser'
-assert package.get('Version') == '0.1.999'
-assert not source.findall('.//w:CustomAction', ns), 'Unexpected installer custom action'
+assert package.get('Version') == '0.1.1000'
+assert source.find('.//w:Property[@Id="ARPPRODUCTICON"]', ns).get('Value') == 'FnMusicAppIcon'
+assert source.find('.//w:Shortcut[@Id="FnMusicShortcut"]', ns).get('Icon') == 'FnMusicAppIcon'
+ui_actions = {'WixUIValidatePath_X64', 'WixUIPrintEula_X64'}
+actions = source.findall('.//w:CustomAction', ns)
+assert all(e.get('Id') in ui_actions for e in actions), 'Unexpected installer custom action'
+assert not source.findall('.//w:InstallExecuteSequence/w:Custom', ns), 'Unexpected execute-sequence custom action'
+assert source.find('.//w:Dialog[@Id="InstallDirDlg"]', ns) is not None, 'MSI directory selection is missing'
+assert source.find('.//w:Control[@Type="PathEdit"]', ns) is not None, 'MSI path editor is missing'
 assert not source.findall('.//w:ServiceInstall', ns), 'Unexpected installed service'
 assert all(e.get('Root') == 'HKCU' for e in source.findall('.//w:RegistryValue', ns)), 'Machine-wide registry write'
 assert source.find('.//w:StandardDirectory[@Id="LocalAppDataFolder"]', ns) is not None
@@ -67,12 +74,21 @@ burn = ET.parse(args.burn_ba / 'manifest.xml').getroot()
 assert burn.find('b:Registration', burn_ns).get('PerMachine') == 'no'
 assert burn.find('.//b:MsiPackage', burn_ns).get('PerMachine') == 'no'
 assert burn.find('.//b:MsiProperty[@Id="INSTALLFOLDER"]', burn_ns).get('Value') == '[InstallFolder]'
+install_folder = burn.find('b:Variable[@Id="InstallFolder"]', burn_ns)
+assert install_folder is not None and install_folder.get('Type') == 'formatted', 'Default install path must be formatted'
+assert install_folder.get('Value') == '[LocalAppDataFolder]Programs\\FnMusic'
+assert burn.find('b:Variable[@Id="WixStdBASuppressOptionsUI"]', burn_ns) is None, 'EXE directory options are suppressed'
+theme = ET.parse(args.burn_ba / 'thm.xml').getroot()
+theme_ns = {'t': 'http://wixtoolset.org/schemas/v4/thmutil'}
+assert theme.find('.//t:Editbox[@Name="InstallFolder"]', theme_ns) is not None
+assert theme.find('.//t:BrowseDirectoryAction[@VariableName="InstallFolder"]', theme_ns) is not None
 for line in (args.packages / 'SHA256SUMS.txt').read_text().splitlines():
     checksum, name = line.split('  ', 1)
     assert pathlib.PurePath(name).name == name, 'Invalid checksum filename'
     assert digest(args.packages / name) == checksum, 'Distribution checksum mismatch'
 record = dict(portableFiles=len(actual), msiFiles=len(expected), msiScope=package.get('Scope'),
-              customActions=0, embeddedMsiMatches=True, payloadZipSha256=payload_hash,
+              uiCustomActions=len(actions), executeCustomActions=0, directorySelection=True,
+              embeddedMsiMatches=True, payloadZipSha256=payload_hash,
               portableSha256=digest(args.packages / 'FnMusic-0.2.0-rc.1-win-x64-portable.exe'),
               msiSha256=digest(msi), setupExeSha256=digest(args.packages / 'FnMusic-0.2.0-rc.1-win-x64-setup.exe'))
 args.report.parent.mkdir(parents=True, exist_ok=True)

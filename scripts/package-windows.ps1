@@ -29,6 +29,8 @@ $wixVersion = & $wix --version
 if ($LASTEXITCODE -ne 0 -or $wixVersion -notmatch '^4\.0\.6(?:\+|$)') { throw 'WiX 4.0.6 is required.' }
 & $wix extension add -g WixToolset.Bal.wixext/4.0.6
 if ($LASTEXITCODE -ne 0) { throw 'WiX extension preparation failed.' }
+& $wix extension add -g WixToolset.UI.wixext/4.0.6
+if ($LASTEXITCODE -ne 0) { throw 'WiX UI extension preparation failed.' }
 $work = Join-Path $root ".tools/installers/$Name"
 New-Item -ItemType Directory -Force -Path $work,$output | Out-Null
 $project = Join-Path $root 'packaging/portable/FnMusic.Portable.csproj'
@@ -55,14 +57,14 @@ $source = Join-Path $work 'package.wxs'
 & python (Join-Path $PSScriptRoot 'create-installer-source.py') $payloadPath $source
 if ($LASTEXITCODE -ne 0) { throw 'Installer authoring failed.' }
 $msi = Join-Path $output 'FnMusic-0.2.0-rc.1-win-x64-setup.msi'
-& $wix build $source -arch x64 -o $msi -pdbtype none
+& $wix build $source -arch x64 -ext WixToolset.UI.wixext/4.0.6 -culture zh-CN -o $msi -pdbtype none
 if ($LASTEXITCODE -ne 0) { throw 'MSI build failed.' }
 $setup = Join-Path $output 'FnMusic-0.2.0-rc.1-win-x64-setup.exe'
-& $wix build (Join-Path $root 'packaging/bundle.wxs') -arch x64 -ext WixToolset.Bal.wixext/4.0.6 -d "MsiPath=$msi" -o $setup -pdbtype none
+& $wix build (Join-Path $root 'packaging/bundle.wxs') -arch x64 -ext WixToolset.Bal.wixext/4.0.6 -d "MsiPath=$msi" -d "BrandingDir=$(Join-Path $root 'assets/branding')" -o $setup -pdbtype none
 if ($LASTEXITCODE -ne 0) { throw 'EXE installer build failed.' }
 $release = Get-Content -LiteralPath (Join-Path $payloadPath 'release.json') -Raw | ConvertFrom-Json
 Copy-Item -LiteralPath (Join-Path $root 'packaging/WIX_NOTICE.md'),(Join-Path $root 'packaging/WIX_LICENSE.txt') -Destination $output
-@{ version='0.2.0-rc.1'; msiVersion='0.1.999'; payloadSource=$release.sourceCommit; packagingSource=(& git -c "safe.directory=$($root.Replace('\','/'))" rev-parse HEAD); payloadZipSha256=$zipHash; wixVersion='4.0.6'; signed=$false } |
+@{ version='0.2.0-rc.1'; msiVersion='0.1.1000'; payloadSource=$release.sourceCommit; packagingSource=(& git -c "safe.directory=$($root.Replace('\','/'))" rev-parse HEAD); payloadZipSha256=$zipHash; wixVersion='4.0.6'; signed=$false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'release.json') -Encoding UTF8
 Get-ChildItem -LiteralPath $output -File | Sort-Object Name | ForEach-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash + '  ' + $_.Name } |
     Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ASCII
