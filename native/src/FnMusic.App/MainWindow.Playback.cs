@@ -73,7 +73,7 @@ public sealed partial class MainWindow
                 if (closed || endedSource is null || !ReferenceEquals(music.Player.Source, endedSource)) return;
                 var next = queue.Next(automatic: true);
                 if (next is not null) await PlayTrackAsync(next);
-                else { PlaybackStatus.Text = "队列播放结束"; mediaReady = false; music.Stop(); }
+                else { PlaybackStatus.Text = "队列播放结束"; mediaReady = false; StopLinkedPlayback(); }
             });
         };
         music.Player.MediaFailed += (sender, args) =>
@@ -85,13 +85,14 @@ public sealed partial class MainWindow
                 if (closed || failedSource is null || !ReferenceEquals(music.Player.Source, failedSource)) return;
                 mediaReady = false;
                 PlaybackStatus.Text = $"FFmpeg 播放链路无法读取此音频（{code:X8}）。可尝试其他曲目。";
-                music.Stop();
+                StopLinkedPlayback();
             });
         };
         progressTimer = DispatcherQueue.CreateTimer();
         progressTimer.Interval = TimeSpan.FromMilliseconds(500);
         progressTimer.Tick += (_, _) => UpdateProgress();
         progressTimer.Start();
+        music.Player.PlaybackSession.PlaybackStateChanged += (_, _) => DispatcherQueue.TryEnqueue(() => { if (!closed) PublishPlaybackSnapshot(); });
     }
     private async Task ShowLibraryAsync()
     {
@@ -284,11 +285,12 @@ public sealed partial class MainWindow
     private async Task PlayTrackAsync(MusicTrack track)
     {
         if (closed) return;
-        CancelWork(); music.Stop(); mediaReady = false;
+        CancelWork(); StopLinkedPlayback(); mediaReady = false;
         ClearDecoderLyrics();
         UpdateQueueStatus();
         if (!IsSyntheticPreview && !ViewModel.PlaybackRouter.CanPlay(track.Reference))
         { ClearPresentation(); NowPlaying.Text = ""; PlaybackStatus.Text = "歌曲来源未连接或不支持播放。"; return; }
+        BeginLinkedPlayback(track);
         var embedded = new TaskCompletionSource<Lyrics>(TaskCreationOptions.RunContinuationsAsynchronously);
         decoderLyrics = embedded; decoderLyricsReference = track.Reference;
         _ = LoadLyricsAsync(track);
@@ -314,7 +316,7 @@ public sealed partial class MainWindow
         }
         catch (FileNotFoundException) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "音频文件或 FFmpeg 不可用，请检查文件位置与解码器安装。"; }
         catch (Exception) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "音频加载失败，请检查网络、登录状态或选择其他曲目。"; }
-        finally { embedded.TrySetResult(Lyrics.Empty); }
+        finally { embedded.TrySetResult(Lyrics.Empty); if (!ct.IsCancellationRequested && !closed) { snapshotLoading = false; if (music.Player.Source is null) StopLinkedPlayback(); else PublishPlaybackSnapshot(); } }
     }
     private void Pause_Click(object sender, RoutedEventArgs e) { music.Player.Pause(); if (mediaReady) PlaybackStatus.Text = "已暂停"; }
     private async void PlayPause_Click(object sender, RoutedEventArgs e)
@@ -337,7 +339,7 @@ public sealed partial class MainWindow
     private async void ManageQueue_Click(object sender, RoutedEventArgs e)
     { if (queuePage is not null) await CloseQueuePageAsync(); else ShowQueuePage(); }
     private void Resume_Click(object sender, RoutedEventArgs e) { if (mediaReady) { music.Player.Play(); PlaybackStatus.Text = "正在播放"; } }
-    private void Stop_Click(object sender, RoutedEventArgs e) { ClearDecoderLyrics(); ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false; PlaybackStatus.Text = "已停止"; NowPlaying.Text = ""; }
+    private void Stop_Click(object sender, RoutedEventArgs e) { ClearDecoderLyrics(); ClearPresentation(); CancelWork(); StopLinkedPlayback(); mediaReady = false; PlaybackStatus.Text = "已停止"; NowPlaying.Text = ""; }
     private void Mute_Click(object sender, RoutedEventArgs e)
     { music.Player.IsMuted = MuteToggle.IsChecked == true; UpdateVolumeControl(); }
     private void Volume_Changed(object sender, RangeBaseValueChangedEventArgs e)
@@ -382,6 +384,7 @@ public sealed partial class MainWindow
     private void UpdateProgress()
     {
         if (closed) return;
+        PublishPlaybackSnapshot();
         bool playing = mediaReady && music.Player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing;
         string playGlyph = playing ? "\uE769" : "\uE768";
         if (PlayPauseIcon.Glyph != playGlyph)
@@ -457,7 +460,7 @@ public sealed partial class MainWindow
             || !ViewModel.PlaybackRouter.CanPlay(track.Reference)).ToArray()) queue.Remove(track.Reference);
         if (!preserveLocalQueue)
         {
-            ClearDecoderLyrics(); ClearPresentation(); CancelWork(); music.Stop(); mediaReady = false;
+            ClearDecoderLyrics(); ClearPresentation(); CancelWork(); StopLinkedPlayback(); mediaReady = false;
             NowPlaying.Text = "";
             PlaybackStatus.Text = queue.Count > 0 ? "旧飞牛播放已停止，本地条目保留在队列中。" : localView ? "本地音乐可直接播放。" : "登录后刷新曲库。";
         }
@@ -481,5 +484,5 @@ public sealed partial class MainWindow
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
     }
     private void ClosePlayback()
-    { closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { CloseLinkedServices(); StopLinkedPlayback(); closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

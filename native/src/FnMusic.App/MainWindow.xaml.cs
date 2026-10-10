@@ -19,10 +19,11 @@ public sealed partial class MainWindow : Window
         ConfigureSongList(TrackList);
         QueueModeButton.Flyout.Opening += PlayerMenu_Opening;
         OutputDeviceButton.Flyout.Opening += PlayerOutput_Opening;
-        Title = "飞牛音乐 · 0.2.0-rc.1";
+        Title = "飞牛音乐 · 0.2.0-rc.2";
         AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1360, 900));
         InitializePlayback();
         InitializePresentation();
+        InitializeDesktopIntegration();
         PlayerBar.SizeChanged += (_, _) => { UpdateQueuePaneLayout(); UpdateLibraryHeaderLayout(); };
         ViewModel.SessionChanging += ResetLibrary;
         ViewModel.PropertyChanged += ConnectionCapabilitiesChanged;
@@ -33,6 +34,8 @@ public sealed partial class MainWindow : Window
     {
         Root.Loaded -= Root_Loaded;
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-desktop-integration") && IsSyntheticPreview)
+        { await VerifyDesktopIntegrationAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-nas-settings-permissions-window") && IsSyntheticPreview)
         { await VerifyNasSettingsPermissionsWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-nas-search-window") && IsSyntheticPreview)

@@ -1,6 +1,6 @@
 param(
-    [string]$Payload = 'dist/FnMusic-0.2.0-rc.1-win-x64',
-    [string]$Name = ('FnMusic-0.2.0-rc.1-win-x64-windows-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    [string]$Payload = 'dist/FnMusic-0.2.0-rc.2-win-x64',
+    [string]$Name = ('FnMusic-0.2.0-rc.2-win-x64-windows-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -9,7 +9,7 @@ $payloadPath = if ([IO.Path]::IsPathRooted($Payload)) { [IO.Path]::GetFullPath($
 $archivePath = $payloadPath + '.zip'
 $output = Join-Path $root "dist/$Name"
 if (Test-Path -LiteralPath $output) { throw 'Output already exists; choose a new name.' }
-& (Join-Path $PSScriptRoot 'check-preview.ps1') -Path $payloadPath -ExpectedVersion '0.2.0-rc.1'
+& (Join-Path $PSScriptRoot 'check-preview.ps1') -Path $payloadPath -ExpectedVersion '0.2.0-rc.2'
 if (-not $?) { throw 'Payload verification failed.' }
 if (-not (Test-Path -LiteralPath $archivePath)) { throw 'Matching portable ZIP is required.' }
 $zipHash = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash
@@ -38,7 +38,7 @@ $project = Join-Path $root 'packaging/portable/FnMusic.Portable.csproj'
 if ($LASTEXITCODE -ne 0) { throw 'Portable launcher restore failed.' }
 & $sdk publish $project -c Release --no-restore --nologo -o (Join-Path $work 'launcher')
 if ($LASTEXITCODE -ne 0) { throw 'Portable launcher build failed.' }
-$portable = Join-Path $output 'FnMusic-0.2.0-rc.1-win-x64-portable.exe'
+$portable = Join-Path $output 'FnMusic-0.2.0-rc.2-win-x64-portable.exe'
 $target = [IO.File]::Create($portable)
 try {
     foreach ($file in @((Join-Path $work 'launcher/FnMusic.Portable.exe'), $archivePath)) {
@@ -56,15 +56,15 @@ try {
 $source = Join-Path $work 'package.wxs'
 & python (Join-Path $PSScriptRoot 'create-installer-source.py') $payloadPath $source
 if ($LASTEXITCODE -ne 0) { throw 'Installer authoring failed.' }
-$msi = Join-Path $output 'FnMusic-0.2.0-rc.1-win-x64-setup.msi'
+$msi = Join-Path $output 'FnMusic-0.2.0-rc.2-win-x64-setup.msi'
 & $wix build $source -arch x64 -ext WixToolset.UI.wixext/4.0.6 -culture zh-CN -o $msi -pdbtype none
 if ($LASTEXITCODE -ne 0) { throw 'MSI build failed.' }
-$setup = Join-Path $output 'FnMusic-0.2.0-rc.1-win-x64-setup.exe'
+$setup = Join-Path $output 'FnMusic-0.2.0-rc.2-win-x64-setup.exe'
 & $wix build (Join-Path $root 'packaging/bundle.wxs') -arch x64 -ext WixToolset.Bal.wixext/4.0.6 -d "MsiPath=$msi" -d "BrandingDir=$(Join-Path $root 'assets/branding')" -o $setup -pdbtype none
 if ($LASTEXITCODE -ne 0) { throw 'EXE installer build failed.' }
 $release = Get-Content -LiteralPath (Join-Path $payloadPath 'release.json') -Raw | ConvertFrom-Json
 Copy-Item -LiteralPath (Join-Path $root 'packaging/WIX_NOTICE.md'),(Join-Path $root 'packaging/WIX_LICENSE.txt') -Destination $output
-@{ version='0.2.0-rc.1'; msiVersion='0.1.1001'; payloadSource=$release.sourceCommit; packagingSource=(& git -c "safe.directory=$($root.Replace('\','/'))" rev-parse HEAD); payloadZipSha256=$zipHash; wixVersion='4.0.6'; signed=$false } |
+@{ version='0.2.0-rc.2'; msiVersion='0.1.1002'; payloadSource=$release.sourceCommit; packagingSource=(& git -c "safe.directory=$($root.Replace('\','/'))" rev-parse HEAD); payloadZipSha256=$zipHash; wixVersion='4.0.6'; signed=$false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'release.json') -Encoding UTF8
 Get-ChildItem -LiteralPath $output -File | Sort-Object Name | ForEach-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash + '  ' + $_.Name } |
     Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ASCII

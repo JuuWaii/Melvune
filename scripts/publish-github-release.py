@@ -99,7 +99,7 @@ def main():
     if source_sha != tag_sha:
         raise ValueError('Expected source does not match the repository tag')
     paths, checksums = verified_assets(args.artifacts, args.tag, source_sha)
-    notes = pathlib.Path('docs/releases/0.2.0-rc.1.md').read_text(encoding='utf-8')
+    notes = pathlib.Path('docs/releases/' + args.tag.removeprefix('v') + '.md').read_text(encoding='utf-8')
     build_run_id = args.build_run_id or os.environ['GITHUB_RUN_ID']
     if not build_run_id.isdecimal():
         raise ValueError('Invalid build workflow ID')

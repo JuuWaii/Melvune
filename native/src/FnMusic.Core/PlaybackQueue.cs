@@ -14,6 +14,8 @@ public sealed class PlaybackQueue(Random? random = null)
     public int Count => tracks.Length;
     public IReadOnlyList<MusicTrack> Tracks => Array.AsReadOnly(tracks);
     public MusicTrack? Current => Index >= 0 && Index < tracks.Length ? tracks[Index] : null;
+    public bool CanPrevious => Current is not null && (history.Count > 0 || Index > 0 || Mode is QueueMode.RepeatAll or QueueMode.RepeatOne);
+    public bool CanNext => Current is not null && (requestedNext.Count > 0 || Index + 1 < Count || Mode != QueueMode.Sequential);
 
     public bool Replace(IEnumerable<MusicTrack> source, TrackReference selectedReference)
     {

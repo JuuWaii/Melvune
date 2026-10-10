@@ -43,27 +43,27 @@ jobs:
       - name: Build verified payload and installers
         shell: pwsh
         run: |
-          ./scripts/package-preview.ps1 -Name FnMusic-0.2.0-rc.1-win-x64
-          ./scripts/package-windows.ps1 -Name FnMusic-0.2.0-rc.1-win-x64-windows
+          ./scripts/package-preview.ps1 -Name FnMusic-0.2.0-rc.2-win-x64
+          ./scripts/package-windows.ps1 -Name FnMusic-0.2.0-rc.2-win-x64-windows
       - name: Verify installer contents without installing
         shell: pwsh
         run: |
-          ./.tools/wix/wix.exe msi decompile dist/FnMusic-0.2.0-rc.1-win-x64-windows/FnMusic-0.2.0-rc.1-win-x64-setup.msi -o .review-audit/msi.wxs -x .review-audit/msi
+          ./.tools/wix/wix.exe msi decompile dist/FnMusic-0.2.0-rc.2-win-x64-windows/FnMusic-0.2.0-rc.2-win-x64-setup.msi -o .review-audit/msi.wxs -x .review-audit/msi
           if ($LASTEXITCODE -ne 0) { throw 'MSI extraction failed' }
-          ./.tools/wix/wix.exe burn extract dist/FnMusic-0.2.0-rc.1-win-x64-windows/FnMusic-0.2.0-rc.1-win-x64-setup.exe -o .review-audit/burn -oba .review-audit/burn-ba
+          ./.tools/wix/wix.exe burn extract dist/FnMusic-0.2.0-rc.2-win-x64-windows/FnMusic-0.2.0-rc.2-win-x64-setup.exe -o .review-audit/burn -oba .review-audit/burn-ba
           if ($LASTEXITCODE -ne 0) { throw 'EXE extraction failed' }
-          python scripts/verify-windows-packages.py --packages dist/FnMusic-0.2.0-rc.1-win-x64-windows --payload dist/FnMusic-0.2.0-rc.1-win-x64 --msi-source .review-audit/msi.wxs --msi-extracted .review-audit/msi --burn-extracted .review-audit/burn --burn-ba .review-audit/burn-ba --report .review-audit/windows-verification.json
+          python scripts/verify-windows-packages.py --packages dist/FnMusic-0.2.0-rc.2-win-x64-windows --payload dist/FnMusic-0.2.0-rc.2-win-x64 --msi-source .review-audit/msi.wxs --msi-extracted .review-audit/msi --burn-extracted .review-audit/burn --burn-ba .review-audit/burn-ba --report .review-audit/windows-verification.json
           if ($LASTEXITCODE -ne 0) { throw 'Package content verification failed' }
-          python scripts/verify-icon-resources.py --icon assets/branding/fnmusic.ico dist/FnMusic-0.2.0-rc.1-win-x64/FnMusic.App.exe dist/FnMusic-0.2.0-rc.1-win-x64-windows/FnMusic-0.2.0-rc.1-win-x64-portable.exe dist/FnMusic-0.2.0-rc.1-win-x64-windows/FnMusic-0.2.0-rc.1-win-x64-setup.exe
+          python scripts/verify-icon-resources.py --icon assets/branding/fnmusic.ico dist/FnMusic-0.2.0-rc.2-win-x64/FnMusic.App.exe dist/FnMusic-0.2.0-rc.2-win-x64-windows/FnMusic-0.2.0-rc.2-win-x64-portable.exe dist/FnMusic-0.2.0-rc.2-win-x64-windows/FnMusic-0.2.0-rc.2-win-x64-setup.exe
           if ($LASTEXITCODE -ne 0) { throw 'Application icon verification failed' }
       - name: Upload distributable packages
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: FnMusic-0.2.0-rc.1-win-x64
+          name: FnMusic-0.2.0-rc.2-win-x64
           path: |
-            dist/FnMusic-0.2.0-rc.1-win-x64.zip
-            dist/FnMusic-0.2.0-rc.1-win-x64.SHA256SUMS.txt
-            dist/FnMusic-0.2.0-rc.1-win-x64-windows/*
+            dist/FnMusic-0.2.0-rc.2-win-x64.zip
+            dist/FnMusic-0.2.0-rc.2-win-x64.SHA256SUMS.txt
+            dist/FnMusic-0.2.0-rc.2-win-x64-windows/*
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
@@ -82,7 +82,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
-          name: FnMusic-0.2.0-rc.1-win-x64
+          name: FnMusic-0.2.0-rc.2-win-x64
           path: dist
       - name: Verify assets and publish prerelease
         env:

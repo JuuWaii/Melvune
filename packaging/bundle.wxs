@@ -1,5 +1,5 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
-  <Bundle Name="FnMusic 0.2.0-rc.1" Manufacturer="FnMusic contributors" Version="0.1.1001.0" UpgradeCode="725BF993-538D-44B0-B1B4-227B1230B13F" IconSourceFile="$(var.BrandingDir)\fnmusic.ico">
+  <Bundle Name="FnMusic 0.2.0-rc.2" Manufacturer="FnMusic contributors" Version="0.1.1002.0" UpgradeCode="725BF993-538D-44B0-B1B4-227B1230B13F" IconSourceFile="$(var.BrandingDir)\fnmusic.ico">
     <Variable Name="InstallFolder" Type="formatted" Value="[LocalAppDataFolder]Programs\FnMusic" Persisted="yes" bal:Overridable="yes" />
     <BootstrapperApplication>
       <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense" LicenseUrl="https://github.com/JuuWaii/fnmusic_pc/blob/master/LICENSE" LogoFile="$(var.BrandingDir)\fnmusic.png" />

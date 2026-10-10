@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [string]$ExpectedVersion = '0.2.0-rc.1'
+    [string]$ExpectedVersion = '0.2.0-rc.2'
 )
 $ErrorActionPreference = 'Stop'
 $previewRoot = (Get-Item -LiteralPath $Path).FullName
@@ -27,19 +27,22 @@ $contents = @(Get-ChildItem -LiteralPath $previewRoot -Recurse -Force)
 if (($contents | Where-Object { ($_.Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0 }) -or
     ((Get-Item -LiteralPath $previewRoot).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0) { throw 'Package contains a link' }
 $files = @($contents | Where-Object { -not $_.PSIsContainer -and $_.FullName -ne $manifestPath })
-if ($files | Where-Object { [IO.Path]::GetRelativePath($previewRoot, $_.FullName) -match '^(local-index|nas-metadata)[\\/]' }) { throw 'Personal music index found in preview' }
+if ($files | Where-Object { [IO.Path]::GetRelativePath($previewRoot, $_.FullName) -match '^(local-index|nas-metadata|playback-information)[\\/]' }) { throw 'Personal music index found in preview' }
 if ($files.Count -ne $manifest.Count -or @($files | Where-Object { -not $known.Contains($_.FullName) }).Count -gt 0) { throw 'Manifest does not describe every package file' }
-if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|appearance)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Development or personal artifact found' }
+if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|appearance|desktop-integration)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Development or personal artifact found' }
 $requiredFiles = @('FnMusic.App.exe', 'FnMusic.App.dll', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf',
     'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Start-FnMusic.cmd',
     'LICENSE', 'THIRD_PARTY_NOTICES.md', 'NATIVE_DECODER_DEPENDENCIES.md', 'native-decoder-build.json',
     'licenses/FFmpegInteropX-Apache-2.0.txt', 'licenses/FFmpegInteropX-build/mp3-preroll.patch',
     'licenses/FFmpegInteropX-build/toolchain-lock.json', 'licenses/FFmpegInteropX-build/build-native-decoder.py')
-if ($ExpectedVersion -eq '0.2.0-rc.1') {
-    $requiredFiles += @('USER_GUIDE.md', 'RC1_USER_VALIDATION.md', '0.2.0-rc.1.md', 'BUILDING_SOURCES.md', 'release.json',
+if ($ExpectedVersion -in @('0.2.0-rc.1','0.2.0-rc.2')) {
+    $requiredFiles += @('USER_GUIDE.md', (('RC' + $(if ($ExpectedVersion -eq '0.2.0-rc.2') { '2' } else { '1' }) + '_USER_VALIDATION.md')), ($ExpectedVersion + '.md'), 'BUILDING_SOURCES.md', 'release.json',
         'licenses/corresponding-source/decoder-corresponding-source.zip', 'licenses/corresponding-source/decoder-distribution.json',
         'licenses/corresponding-source/runtime-license-index.json', 'licenses/packages.lock.json')
 } else { $requiredFiles += 'PREVIEW_VALIDATION.md' }
+if ($ExpectedVersion -eq '0.2.0-rc.2') {
+    $requiredFiles += @('DESKTOP_INTEGRATION.md', 'PLAYBACK_INFORMATION_PROTOCOL.md', 'examples/InfoClient/FnMusic.InfoClient.exe', 'examples/InfoClient/README.md')
+}
 foreach ($required in $requiredFiles) {
     if (-not $known.Contains([IO.Path]::GetFullPath((Join-Path $previewRoot $required)))) { throw "Required file missing: $required" }
 }
@@ -56,7 +59,7 @@ foreach ($binding in @(
     if ($binding[1] -notmatch '^[0-9A-Fa-f]{64}$' -or
         (Get-FileHash -LiteralPath (Join-Path $previewRoot $binding[0]) -Algorithm SHA256).Hash -ne $binding[1]) { throw 'Decoder material does not match provenance' }
 }
-if ($ExpectedVersion -eq '0.2.0-rc.1') {
+if ($ExpectedVersion -in @('0.2.0-rc.1','0.2.0-rc.2')) {
     $distribution = Get-Content -LiteralPath (Join-Path $previewRoot 'licenses/corresponding-source/decoder-distribution.json') -Raw | ConvertFrom-Json
     if ((Get-FileHash -LiteralPath (Join-Path $previewRoot 'licenses/corresponding-source/decoder-corresponding-source.zip') -Algorithm SHA256).Hash -ne $distribution.sourceArchiveSha256) { throw 'Corresponding source archive mismatch' }
     foreach ($binary in $distribution.binarySha256.PSObject.Properties) {

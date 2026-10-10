@@ -10,7 +10,7 @@
     <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <Version>0.2.0-rc.1</Version>
+    <Version>0.2.0-rc.2</Version>
     <DebugType>none</DebugType>
     <DebugSymbols>false</DebugSymbols>
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>

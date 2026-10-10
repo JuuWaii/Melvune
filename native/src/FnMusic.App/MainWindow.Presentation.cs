@@ -296,7 +296,9 @@ public sealed partial class MainWindow
         ClearPresentation(); NowCover.DataContext = FullNowCover.DataContext = track; NowAlbum.Text = track.Album;
         FullNowTitle.Text = track.Title; FullNowArtist.Text = string.Join(" · ", new[] { track.Artist, track.Album }.Where(value => !string.IsNullOrWhiteSpace(value)));
         if (!TrackSupports(track, MusicSourceCapabilities.Lyrics))
-        { lyricsNeedsRetry = true; LyricsStatus.Text = "当前歌曲来源未连接或不支持歌词。"; return; }
+        { lyricsNeedsRetry = true; snapshotLyricsKind = PlaybackLyricsKind.Unavailable; playbackSnapshots.SetLyrics(trackGeneration, snapshotLyricsKind, Lyrics.Empty); PublishPlaybackSnapshot(); LyricsStatus.Text = "当前歌曲来源未连接或不支持歌词。"; return; }
+        var generation = trackGeneration; snapshotLyricsKind = PlaybackLyricsKind.Loading;
+        playbackSnapshots.SetLyrics(generation, snapshotLyricsKind, Lyrics.Empty); PublishPlaybackSnapshot();
         var ct = lyricsWork.Token; LyricsStatus.Text = "正在加载歌词…";
         var source = localSources.GetValueOrDefault(track.SourceInstanceId);
         var api = ViewModel.AuthenticatedClient;
@@ -322,18 +324,22 @@ public sealed partial class MainWindow
 #if DEBUG
             if (lyricsBeforeCommit is { } beforeCommit) await beforeCommit();
 #endif
-            if (ct.IsCancellationRequested || closed) return;
-            if (!SourceIsCurrent()) { lyricsNeedsRetry = true; LyricsStatus.Text = "歌曲来源已变化或不支持歌词，打开歌词可重试。"; return; }
+            if (ct.IsCancellationRequested || closed || generation != trackGeneration) return;
+            if (!SourceIsCurrent()) { lyricsNeedsRetry = true; snapshotLyricsKind = PlaybackLyricsKind.Unavailable; playbackSnapshots.SetLyrics(generation, snapshotLyricsKind, Lyrics.Empty); PublishPlaybackSnapshot(); LyricsStatus.Text = "歌曲来源已变化或不支持歌词，打开歌词可重试。"; return; }
             currentLyrics = result; LyricsList.ItemsSource = result.Lines;
+            snapshotLyricsKind = result.Lines.Count == 0 ? PlaybackLyricsKind.Empty : result.IsTimed ? PlaybackLyricsKind.Timed : PlaybackLyricsKind.Plain;
+            playbackSnapshots.SetLyrics(generation, snapshotLyricsKind, result); PublishPlaybackSnapshot();
             LyricsStatus.Text = result.Lines.Count == 0 ? "暂无可用歌词。本地音乐可使用内嵌歌词或同名 .lrc 文件。" : result.IsTimed ? "随播放高亮 · 点击歌词跳转" : "纯文本歌词（无时间轴）";
             UpdateLyricsPosition();
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
         catch (Exception)
         {
-            if (!closed && !ct.IsCancellationRequested)
+            if (!closed && !ct.IsCancellationRequested && generation == trackGeneration)
             {
                 lyricsNeedsRetry = true;
+                snapshotLyricsKind = PlaybackLyricsKind.Unavailable;
+                playbackSnapshots.SetLyrics(generation, snapshotLyricsKind, Lyrics.Empty); PublishPlaybackSnapshot();
                 LyricsStatus.Text = SourceIsCurrent() ? "歌词加载失败，打开歌词可重试。" : "歌曲来源已变化或不支持歌词，打开歌词可重试。";
             }
         }

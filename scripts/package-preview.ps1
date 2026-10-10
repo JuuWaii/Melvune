@@ -1,4 +1,4 @@
-param([string]$Name = ('FnMusic-0.2.0-rc.1-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss')))
+param([string]$Name = ('FnMusic-0.2.0-rc.2-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss')))
 $ErrorActionPreference = 'Stop'
 if ($Name -notmatch '^[a-zA-Z0-9._-]+$' -or $Name -in @('.', '..')) { throw 'Invalid package name' }
 $repo = Split-Path $PSScriptRoot -Parent
@@ -15,10 +15,16 @@ if ($LASTEXITCODE -ne 0) { throw 'Restore failed' }
 Ensure-FnMusicNativeDecoder $repo
 & $sdk publish (Join-Path $repo 'native/src/FnMusic.App/FnMusic.App.csproj') -c Release --no-restore --nologo -p:DebugSymbols=false -p:DebugType=None -o $destination
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
+$consumerProject = Join-Path $repo 'native/examples/FnMusic.InfoClient/FnMusic.InfoClient.csproj'
+& $sdk restore $consumerProject -r win-x64 -p:SelfContained=true --configfile (Join-Path $repo 'native/NuGet.Config') --locked-mode --nologo
+if ($LASTEXITCODE -ne 0) { throw 'Independent consumer restore failed' }
+& $sdk publish $consumerProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugSymbols=false -p:DebugType=None --no-restore --nologo -o (Join-Path $destination 'examples/InfoClient')
+if ($LASTEXITCODE -ne 0) { throw 'Independent consumer publish failed' }
+Copy-Item -LiteralPath (Join-Path $repo 'native/examples/FnMusic.InfoClient/README.md') -Destination (Join-Path $destination 'examples/InfoClient')
 foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Assets/FnMusic.ico', 'Assets/FnMusic.png')) {
     if (-not (Test-Path -LiteralPath (Join-Path $destination $required))) { throw "Missing preview file: $required" }
 }
-Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'THIRD_PARTY_NOTICES.md'), (Join-Path $repo 'docs/USER_GUIDE.md'), (Join-Path $repo 'docs/RC1_USER_VALIDATION.md'), (Join-Path $repo 'docs/releases/0.2.0-rc.1.md'), (Join-Path $repo 'docs/BUILDING_SOURCES.md') -Destination $destination
+Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'THIRD_PARTY_NOTICES.md'), (Join-Path $repo 'docs/USER_GUIDE.md'), (Join-Path $repo 'docs/RC2_USER_VALIDATION.md'), (Join-Path $repo 'docs/releases/0.2.0-rc.2.md'), (Join-Path $repo 'docs/BUILDING_SOURCES.md'), (Join-Path $repo 'docs/PLAYBACK_INFORMATION_PROTOCOL.md'), (Join-Path $repo 'docs/DESKTOP_INTEGRATION.md') -Destination $destination
 $decoderLicenses = Join-Path $destination 'licenses'
 New-Item -ItemType Directory -Path $decoderLicenses | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'licenses/FFmpegInteropX-Apache-2.0.txt') -Destination $decoderLicenses
@@ -35,7 +41,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Corresponding source preparation failed' }
 Copy-Item -LiteralPath (Join-Path $repo 'native/src/FnMusic.App/packages.lock.json') -Destination (Join-Path $decoderLicenses 'packages.lock.json')
 $revision = & git -c ('safe.directory=' + $repo.Replace('\', '/')) -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source revision unavailable' }
-@{ version = '0.2.0-rc.1'; sourceCommit = $revision.Trim(); architecture = 'win-x64' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'release.json') -Encoding utf8
+@{ version = '0.2.0-rc.2'; sourceCommit = $revision.Trim(); architecture = 'win-x64' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'release.json') -Encoding utf8
 @'
 @echo off
 cd /d "%~dp0"
@@ -48,7 +54,7 @@ $manifest = $files | Sort-Object FullName | ForEach-Object {
     [ordered]@{ path = [IO.Path]::GetRelativePath($destination, $_.FullName); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
 }
 ConvertTo-Json -InputObject @($manifest) -Depth 3 | Set-Content -LiteralPath (Join-Path $destination 'SHA256.json') -Encoding utf8
-& (Join-Path $PSScriptRoot 'check-preview.ps1') -Path $destination -ExpectedVersion '0.2.0-rc.1'
+& (Join-Path $PSScriptRoot 'check-preview.ps1') -Path $destination -ExpectedVersion '0.2.0-rc.2'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::CreateFromDirectory($destination, $archivePath, [IO.Compression.CompressionLevel]::Optimal, $true)
 $archiveDigest = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash

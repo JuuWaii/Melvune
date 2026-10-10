@@ -1,0 +1,150 @@
+using System.Text.Json;
+using FnMusic.App.Services;
+using FnMusic.Infrastructure;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
+
+namespace FnMusic.App;
+
+public sealed partial class MainWindow
+{
+    private SystemMediaBridge? systemMedia;
+    private DesktopLyricsWindow? desktopLyrics;
+    private PlaybackInformationServer? informationServer;
+    private readonly SemaphoreSlim integrationGate = new(1);
+    private bool updatingIntegration = true;
+    private bool closingIntegration;
+    private sealed record DesktopIntegrationSettings(bool LyricsEnabled = false, bool InformationEnabled = false,
+        DesktopLyricsOptions? Lyrics = null);
+    private DesktopIntegrationSettings integrationSettings = new();
+    private string IntegrationSettingsFile => Path.Combine(AppDataDirectory.Resolve(), "desktop-integration.json");
+
+    private void InitializeDesktopIntegration()
+    {
+        try
+        {
+            if (File.Exists(IntegrationSettingsFile))
+            {
+                if (new FileInfo(IntegrationSettingsFile).Length > 8192) throw new InvalidDataException();
+                integrationSettings = JsonSerializer.Deserialize<DesktopIntegrationSettings>(File.ReadAllText(IntegrationSettingsFile)) ?? new();
+            }
+        }
+        catch (Exception) { integrationSettings = new(); IntegrationStatus.Text = "桌面联动设置无法读取，已使用默认值。"; }
+        try { systemMedia = new(music.Player, WinRT.Interop.WindowNative.GetWindowHandle(this), DispatcherQueue, playbackSnapshots, ExecutePlaybackCommandAsync); }
+        catch (Exception) { IntegrationStatus.Text = "Windows 媒体控制暂不可用，应用内播放仍可使用。"; }
+        DesktopLyricsEnabled.IsOn = integrationSettings.LyricsEnabled;
+        InformationEnabled.IsOn = integrationSettings.InformationEnabled;
+        SyncDesktopOptions(); updatingIntegration = false;
+        AppWindow.Closing += PrepareDesktopClose;
+        Root.ActualThemeChanged += (_, _) => ApplyDesktopTheme();
+        _ = ApplyDesktopIntegrationAsync();
+    }
+    private void SyncDesktopOptions()
+    {
+        var options = integrationSettings.Lyrics ?? new();
+        DesktopLyricsTopmost.IsOn = options.Topmost; DesktopLyricsLocked.IsOn = options.Locked;
+        DesktopLyricsFont.Value = Math.Clamp(options.FontSize, 16, 64);
+        DesktopLyricsTheme.SelectedIndex = options.Theme switch { "light" => 1, "dark" => 2, _ => 0 };
+    }
+    private void SaveDesktopIntegration()
+    {
+        try
+        {
+            Directory.CreateDirectory(AppDataDirectory.Resolve());
+            string pending = IntegrationSettingsFile + "." + playbackSnapshots.InstanceId.ToString("N") + ".tmp";
+            try { File.WriteAllText(pending, JsonSerializer.Serialize(integrationSettings)); File.Move(pending, IntegrationSettingsFile, true); }
+            finally { if (File.Exists(pending)) File.Delete(pending); }
+        }
+        catch (Exception) { IntegrationStatus.Text = "桌面联动偏好未能保存，当前会话仍可使用。"; }
+    }
+    private void ApplyDesktopTheme()
+    {
+        var options = integrationSettings.Lyrics ?? new();
+        desktopLyrics?.ApplyOptions(options with { Theme = options.Theme == "system" ? Root.ActualTheme == ElementTheme.Dark ? "dark" : "light" : options.Theme });
+    }
+    private async Task ApplyDesktopIntegrationAsync()
+    {
+        await integrationGate.WaitAsync();
+        try
+        {
+            if (closed || closingIntegration) return;
+            if (integrationSettings.LyricsEnabled)
+            {
+                if (desktopLyrics is null)
+                {
+                    desktopLyrics = new(playbackSnapshots, integrationSettings.Lyrics ?? new());
+                    desktopLyrics.OptionsChanged += options =>
+                    {
+                        if (closed || updatingIntegration) return;
+                        // Preserve the user's system-theme preference while saving window geometry.
+                        options = options with { Theme = (integrationSettings.Lyrics ?? new()).Theme };
+                        integrationSettings = integrationSettings with { Lyrics = options };
+                        updatingIntegration = true; SyncDesktopOptions(); updatingIntegration = false; SaveDesktopIntegration();
+                    };
+                    desktopLyrics.Hidden += () =>
+                    {
+                        if (closed || !integrationSettings.LyricsEnabled) return;
+                        integrationSettings = integrationSettings with { LyricsEnabled = false };
+                        updatingIntegration = true; DesktopLyricsEnabled.IsOn = false; updatingIntegration = false; SaveDesktopIntegration();
+                    };
+                }
+                ApplyDesktopTheme(); if (!desktopLyrics.IsLyricsVisible) desktopLyrics.ShowLyrics();
+            }
+            else desktopLyrics?.HideLyrics();
+            if (integrationSettings.InformationEnabled && informationServer is null)
+            {
+                var server = new PlaybackInformationServer(playbackSnapshots, AppDataDirectory.Resolve());
+                try { await server.StartAsync(); if (closed || closingIntegration) { await server.DisposeAsync(); return; } informationServer = server; }
+                catch (Exception) { await server.DisposeAsync(); throw; }
+            }
+            else if (!integrationSettings.InformationEnabled && informationServer is not null)
+            {
+                var server = informationServer; informationServer = null; await server.DisposeAsync();
+            }
+        }
+        catch (Exception) { IntegrationStatus.Text = "桌面联动启停失败，请重新开启后重试。"; }
+        finally { integrationGate.Release(); }
+    }
+    private async void DesktopIntegration_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (updatingIntegration || closed) return;
+        integrationSettings = integrationSettings with { LyricsEnabled = DesktopLyricsEnabled.IsOn, InformationEnabled = InformationEnabled.IsOn };
+        SaveDesktopIntegration(); await ApplyDesktopIntegrationAsync();
+    }
+    private void DesktopOptions_Changed(object sender, RoutedEventArgs e) => UpdateDesktopOptions();
+    private void DesktopFont_Changed(object sender, Microsoft.UI.Xaml.Controls.Primitives.RangeBaseValueChangedEventArgs e) => UpdateDesktopOptions();
+    private void DesktopTheme_Changed(object sender, SelectionChangedEventArgs e) => UpdateDesktopOptions();
+    private void UpdateDesktopOptions()
+    {
+        if (updatingIntegration || closed) return;
+        var options = (integrationSettings.Lyrics ?? new()) with { Topmost = DesktopLyricsTopmost.IsOn, Locked = DesktopLyricsLocked.IsOn,
+            FontSize = DesktopLyricsFont.Value, Theme = DesktopLyricsTheme.SelectedIndex switch { 1 => "light", 2 => "dark", _ => "system" } };
+        integrationSettings = integrationSettings with { Lyrics = options }; SaveDesktopIntegration(); ApplyDesktopTheme();
+    }
+    private void RecoverDesktopLyrics_Click(object sender, RoutedEventArgs e)
+    {
+        updatingIntegration = true; DesktopLyricsLocked.IsOn = false; updatingIntegration = false;
+        integrationSettings = integrationSettings with { Lyrics = (integrationSettings.Lyrics ?? new()) with { Locked = false } };
+        ApplyDesktopTheme(); desktopLyrics?.RecoverPosition(); SaveDesktopIntegration();
+    }
+    private void CloseLinkedServices()
+    {
+        closingIntegration = true;
+        systemMedia?.Dispose(); systemMedia = null;
+        desktopLyrics?.Dispose(); desktopLyrics = null;
+        // Disposal cancels I/O immediately; completion stays off the UI thread.
+        if (informationServer is { } server) { informationServer = null; _ = server.DisposeAsync(); }
+    }
+    private async void PrepareDesktopClose(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
+    {
+        if (closingIntegration) return;
+        args.Cancel = true; closingIntegration = true;
+        await integrationGate.WaitAsync();
+        try
+        {
+            if (informationServer is { } server) { informationServer = null; await server.DisposeAsync(); }
+        }
+        catch (Exception) { /* Exit must still release windows and audio. */ }
+        finally { integrationGate.Release(); Close(); }
+    }
+}

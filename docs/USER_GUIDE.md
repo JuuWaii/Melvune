@@ -31,3 +31,7 @@ EXE 安装包通过 **Options → Browse** 选择目录，MSI 提供中文目录
 MP3 远距离首次定位可能读取较多数据；准确模式保持启用。尚未承诺全部编码、DPI/触摸、设备热插拔或长期压力组合。第三方源、桌面歌词、媒体键/托盘、对外接口和自动更新后续添加。
 
 集中验证见 `RC1_USER_VALIDATION.md`。反馈提供步骤、预期/实际、版本、格式和错误提示，隐去密码、令牌和私人路径。软件使用 FFmpeg（LGPL 2.1 或更高版本），完整对应源码见 `licenses/corresponding-source/decoder-corresponding-source.zip`；构建与替换方式见 `BUILDING_SOURCES.md`，其他许可见 `licenses/`。
+
+## rc.2 桌面联动
+
+设置 → 播放可开启桌面歌词和本机只读信息接口（默认关闭）。Windows 媒体信息复用当前播放链路。完整用法见 DESKTOP_INTEGRATION.md，独立消费者和接口见 PLAYBACK_INFORMATION_PROTOCOL.md，用户验证见 RC2_USER_VALIDATION.md。

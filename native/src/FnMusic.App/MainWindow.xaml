@@ -134,6 +134,19 @@
       <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Button x:Name="SettingsModeButton" Content="播放模式" Click="SettingsMode_Click"/><TextBlock x:Name="SettingsModeSummary" Grid.Column="1" VerticalAlignment="Center"/></Grid>
       <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Button x:Name="SettingsOutputButton" Content="音频输出设备" Click="SettingsOutput_Click"/><TextBlock Grid.Column="1" Text="{Binding SelectedItem.Name, ElementName=OutputDevices}" VerticalAlignment="Center" TextWrapping="Wrap"/></Grid>
      </StackPanel></Border>
+     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24"><StackPanel Spacing="12">
+      <TextBlock Text="桌面播放联动" FontWeight="SemiBold"/>
+      <TextBlock Text="Windows 媒体控制随播放启用。以下两个可选功能默认关闭。" TextWrapping="Wrap"/>
+      <ToggleSwitch x:Name="DesktopLyricsEnabled" Header="显示桌面歌词" Toggled="DesktopIntegration_Toggled"/>
+      <ToggleSwitch x:Name="DesktopLyricsTopmost" Header="歌词置顶" Toggled="DesktopOptions_Changed"/>
+      <ToggleSwitch x:Name="DesktopLyricsLocked" Header="锁定歌词窗口（可在此解锁）" Toggled="DesktopOptions_Changed"/>
+      <Slider x:Name="DesktopLyricsFont" Header="歌词字号" Minimum="16" Maximum="64" Value="28" ValueChanged="DesktopFont_Changed"/>
+      <ComboBox x:Name="DesktopLyricsTheme" Header="歌词颜色模式" SelectionChanged="DesktopTheme_Changed"><ComboBoxItem Content="跟随主窗口"/><ComboBoxItem Content="浅色"/><ComboBoxItem Content="深色"/></ComboBox>
+      <Button Content="解锁并找回歌词窗口" Click="RecoverDesktopLyrics_Click" HorizontalAlignment="Left"/>
+      <ToggleSwitch x:Name="InformationEnabled" Header="本机只读音乐与歌词接口" Toggled="DesktopIntegration_Toggled"/>
+      <TextBlock Text="开启后，同一 Windows 用户的程序可按协议读取歌曲和歌词。关闭会移除本实例发现记录；第三方软件需自行接入。" TextWrapping="Wrap"/>
+      <TextBlock x:Name="IntegrationStatus" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+     </StackPanel></Border>
     </StackPanel>
     <StackPanel x:Name="SettingsLibrariesSection" Visibility="Collapsed" Spacing="16">
      <TextBlock Text="音乐库与素材库" FontSize="20" FontWeight="SemiBold"/>

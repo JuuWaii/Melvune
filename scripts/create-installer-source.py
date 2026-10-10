@@ -20,9 +20,9 @@ def ident(prefix, relative):
 def component_guid(key):
     return str(uuid.uuid5(uuid.UUID('fd052535-9ef6-4949-9fd2-5f4162d8f9a8'), key)).upper()
 root = ET.Element('{' + ns + '}Wix')
-package = node(root, 'Package', Name='FnMusic 0.2.0-rc.1', Manufacturer='FnMusic contributors',
-               Version='0.1.1001', UpgradeCode='67547B43-CFA0-4C8C-8BF6-973F6567D305',
-               ProductCode='C9E7465E-B67C-4AC6-A130-15FD2EBE6F21', Scope='perUser', InstallerVersion='500')
+package = node(root, 'Package', Name='FnMusic 0.2.0-rc.2', Manufacturer='FnMusic contributors',
+               Version='0.1.1002', UpgradeCode='67547B43-CFA0-4C8C-8BF6-973F6567D305',
+               ProductCode='C6554FAC-7067-4A64-A889-10A2F5F3DDBA', Scope='perUser', InstallerVersion='500')
 node(package, 'Icon', Id='FnMusicAppIcon', SourceFile=str((pathlib.Path(__file__).resolve().parent.parent / 'assets/branding/fnmusic.ico').resolve()))
 node(package, 'Property', Id='ARPPRODUCTICON', Value='FnMusicAppIcon')
 # Registry keypaths are used for per-user components, so maintenance must restore

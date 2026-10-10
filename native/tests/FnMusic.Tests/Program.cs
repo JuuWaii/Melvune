@@ -15,6 +15,7 @@ async Task Fails(MusicFailure failure, Func<Task> run)
     catch (MusicApiException ex) { Check(ex.Failure == failure); }
 }
 var endpoint = ServerEndpoint.Parse("https://nas.example.invalid/music/");
+await Test("public playback snapshot identity bounds and lyric expansion limits", PlaybackSnapshotVerification.RunAsync);
 await Test("persisted local index restores offline and playable references and incrementally reconciles changed added deleted files with bounded invalid document handling", LocalIndexVerification.RunAsync);
 await Test("ten thousand offline cached rows and empty snapshots persist with atomic concurrent snapshot publication", LocalIndexVerification.CapacityAsync);
 if (args.Contains("--verify-local-index")) { Console.WriteLine($"Local index checks: {passed} passed."); return; }

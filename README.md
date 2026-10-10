@@ -6,7 +6,9 @@
 
 一个使用 C#、WinUI 3 和 FFmpeg 构建的非官方桌面音乐播放器，支持飞牛音乐与本地音乐。黑白界面，统一音乐库、歌单、播放队列和应用内歌词。
 
-**当前版本：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
+**本地候选版：0.2.0-rc.2；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
+
+rc.2 新增 Windows 媒体控制、桌面歌词和可选本机只读信息接口，尚未上传 GitHub。入口和验证边界见 [rc.2 验收记录](docs/RC2_ACCEPTANCE.md)、[桌面联动指南](docs/DESKTOP_INTEGRATION.md) 与 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)。
 
 本项目与飞牛官方无关联或背书。当前为候选版，发行文件尚未进行代码签名。
 
