@@ -1,6 +1,6 @@
 # 飞牛音乐 Windows 原生客户端
 
-当前推荐候选版为 **0.2.0-rc.1**，推荐目录 `dist/FnMusic-0.2.0-rc.1-win-x64/`。保留整个目录并双击 `Start-FnMusic.cmd`；唯一推荐 ZIP 为 `dist/FnMusic-0.2.0-rc.1-win-x64.zip`，完整哈希、本轮实际启动/播放及依赖核验见 [候选版交付记录](docs/RC1_ACCEPTANCE.md)。此前 [preview.14](docs/PREVIEW14_ACCEPTANCE.md) 目录保持不变。包含统一界面、两类歌单、本地启动索引/后台扫描、封面与内嵌歌词，以及范围读取可靠性和缓存优化。
+当前推荐候选版为 **0.2.0-rc.1**，推荐目录 `dist/FnMusic-0.2.0-rc.1-win-x64-icon/`。保留整个目录并双击 `Start-FnMusic.cmd`；推荐 ZIP 为 `dist/FnMusic-0.2.0-rc.1-win-x64-icon.zip`。新版包含用户选定的 C 款黑白飞牛音符图标，哈希与封装验证见 [Windows 交付记录](docs/WINDOWS_PACKAGING.md)。原 rc.1 的实际启动/播放及依赖核验见 [候选版交付记录](docs/RC1_ACCEPTANCE.md)，原包及 [preview.14](docs/PREVIEW14_ACCEPTANCE.md) 保留。包含统一界面、两类歌单、本地启动索引/后台扫描、封面与内嵌歌词，以及范围读取可靠性和缓存优化。
 
 另提供含黑白飞牛音符图标的单文件便携 EXE、EXE 安装器和 MSI；安装器可选择目录，最新包位于 `dist/FnMusic-0.2.0-rc.1-win-x64-windows-icon-fixed/`，ZIP 为 `dist/FnMusic-0.2.0-rc.1-win-x64-icon.zip`。位置及使用方式见 [Windows 封装说明](docs/WINDOWS_PACKAGING.md)，推送准备见 [隐私审查](docs/GITHUB_PRIVACY_REVIEW.md)。安装器按当前用户安装，产物未签名，安装/卸载动态实测边界在封装说明中记录。
 
