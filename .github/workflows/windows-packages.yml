@@ -49,6 +49,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'EXE extraction failed' }
           python scripts/verify-windows-packages.py --packages dist/FnMusic-0.2.0-rc.1-win-x64-windows --payload dist/FnMusic-0.2.0-rc.1-win-x64 --msi-source .review-audit/msi.wxs --msi-extracted .review-audit/msi --burn-extracted .review-audit/burn --burn-ba .review-audit/burn-ba --report .review-audit/windows-verification.json
           if ($LASTEXITCODE -ne 0) { throw 'Package content verification failed' }
+          python scripts/verify-icon-resources.py --icon assets/branding/fnmusic.ico dist/FnMusic-0.2.0-rc.1-win-x64/FnMusic.App.exe dist/FnMusic-0.2.0-rc.1-win-x64-windows/FnMusic-0.2.0-rc.1-win-x64-portable.exe dist/FnMusic-0.2.0-rc.1-win-x64-windows/FnMusic-0.2.0-rc.1-win-x64-setup.exe
+          if ($LASTEXITCODE -ne 0) { throw 'Application icon verification failed' }
       - name: Upload distributable packages
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:

@@ -21,10 +21,15 @@ def component_guid(key):
     return str(uuid.uuid5(uuid.UUID('fd052535-9ef6-4949-9fd2-5f4162d8f9a8'), key)).upper()
 root = ET.Element('{' + ns + '}Wix')
 package = node(root, 'Package', Name='FnMusic 0.2.0-rc.1', Manufacturer='FnMusic contributors',
-               Version='0.1.1000', UpgradeCode='67547B43-CFA0-4C8C-8BF6-973F6567D305',
-               ProductCode='4139BD23-9416-4B92-B520-135FBCD7DDEE', Scope='perUser', InstallerVersion='500')
+               Version='0.1.1001', UpgradeCode='67547B43-CFA0-4C8C-8BF6-973F6567D305',
+               ProductCode='C9E7465E-B67C-4AC6-A130-15FD2EBE6F21', Scope='perUser', InstallerVersion='500')
 node(package, 'Icon', Id='FnMusicAppIcon', SourceFile=str((pathlib.Path(__file__).resolve().parent.parent / 'assets/branding/fnmusic.ico').resolve()))
 node(package, 'Property', Id='ARPPRODUCTICON', Value='FnMusicAppIcon')
+# Registry keypaths are used for per-user components, so maintenance must restore
+# the chosen directory before costing; otherwise uninstall uses the default path.
+folder_property = node(package, 'Property', Id='INSTALLFOLDER', Secure='yes')
+node(folder_property, 'RegistrySearch', Id='PreviousInstallFolder', Root='HKCU',
+     Key='Software\\FnMusic\\Installer', Name='InstallFolder', Type='raw', Bitness='always64')
 node(package, 'MajorUpgrade', DowngradeErrorMessage='A newer FnMusic version is already installed.')
 ET.SubElement(package, '{' + ui_ns + '}WixUI', {'Id': 'WixUI_InstallDir', 'InstallDirectory': 'INSTALLFOLDER'})
 license_text = (pathlib.Path(__file__).resolve().parent.parent / 'LICENSE').read_text(encoding='utf-8-sig')
@@ -64,6 +69,7 @@ menu = node(package, 'StandardDirectory', Id='ProgramMenuFolder')
 component = node(menu, 'Component', Id='StartMenuShortcut', Guid=component_guid('shortcut'), Bitness='always64')
 node(component, 'Shortcut', Id='FnMusicShortcut', Name='FnMusic', Target='[INSTALLFOLDER]FnMusic.App.exe', WorkingDirectory='INSTALLFOLDER', Icon='FnMusicAppIcon', IconIndex='0')
 node(component, 'RegistryValue', Root='HKCU', Key='Software\\FnMusic\\Installer', Name='StartMenu', Type='integer', Value='1', KeyPath='yes')
+node(component, 'RegistryValue', Root='HKCU', Key='Software\\FnMusic\\Installer', Name='InstallFolder', Type='string', Value='[INSTALLFOLDER]')
 node(feature, 'ComponentRef', Id='StartMenuShortcut')
 # Explicitly remove empty app directories, never the separate user configuration.
 for key, directory in directories.items():

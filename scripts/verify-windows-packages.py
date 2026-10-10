@@ -47,7 +47,11 @@ ns = {'w': 'http://wixtoolset.org/schemas/v4/wxs'}
 source = ET.parse(args.msi_source).getroot()
 package = source.find('w:Package', ns)
 assert package is not None and package.get('Scope') == 'perUser'
-assert package.get('Version') == '0.1.1000'
+assert package.get('Version') == '0.1.1001'
+folder_search = source.find('.//w:Property[@Id="INSTALLFOLDER"]/w:RegistrySearch', ns)
+assert folder_search is not None and folder_search.get('Root') == 'HKCU'
+assert folder_search.get('Key') == 'Software\\FnMusic\\Installer' and folder_search.get('Name') == 'InstallFolder'
+assert source.find('.//w:RegistryValue[@Name="InstallFolder"]', ns).get('Value') == '[INSTALLFOLDER]'
 assert source.find('.//w:Property[@Id="ARPPRODUCTICON"]', ns).get('Value') == 'FnMusicAppIcon'
 assert source.find('.//w:Shortcut[@Id="FnMusicShortcut"]', ns).get('Icon') == 'FnMusicAppIcon'
 ui_actions = {'WixUIValidatePath_X64', 'WixUIPrintEula_X64'}
@@ -76,6 +80,7 @@ assert burn.find('.//b:MsiPackage', burn_ns).get('PerMachine') == 'no'
 assert burn.find('.//b:MsiProperty[@Id="INSTALLFOLDER"]', burn_ns).get('Value') == '[InstallFolder]'
 install_folder = burn.find('b:Variable[@Id="InstallFolder"]', burn_ns)
 assert install_folder is not None and install_folder.get('Type') == 'formatted', 'Default install path must be formatted'
+assert install_folder.get('Persisted') == 'yes', 'Chosen install path must be persisted'
 assert install_folder.get('Value') == '[LocalAppDataFolder]Programs\\FnMusic'
 assert burn.find('b:Variable[@Id="WixStdBASuppressOptionsUI"]', burn_ns) is None, 'EXE directory options are suppressed'
 theme = ET.parse(args.burn_ba / 'thm.xml').getroot()

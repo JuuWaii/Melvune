@@ -64,7 +64,7 @@ $setup = Join-Path $output 'FnMusic-0.2.0-rc.1-win-x64-setup.exe'
 if ($LASTEXITCODE -ne 0) { throw 'EXE installer build failed.' }
 $release = Get-Content -LiteralPath (Join-Path $payloadPath 'release.json') -Raw | ConvertFrom-Json
 Copy-Item -LiteralPath (Join-Path $root 'packaging/WIX_NOTICE.md'),(Join-Path $root 'packaging/WIX_LICENSE.txt') -Destination $output
-@{ version='0.2.0-rc.1'; msiVersion='0.1.1000'; payloadSource=$release.sourceCommit; packagingSource=(& git -c "safe.directory=$($root.Replace('\','/'))" rev-parse HEAD); payloadZipSha256=$zipHash; wixVersion='4.0.6'; signed=$false } |
+@{ version='0.2.0-rc.1'; msiVersion='0.1.1001'; payloadSource=$release.sourceCommit; packagingSource=(& git -c "safe.directory=$($root.Replace('\','/'))" rev-parse HEAD); payloadZipSha256=$zipHash; wixVersion='4.0.6'; signed=$false } |
     ConvertTo-Json | Set-Content -LiteralPath (Join-Path $output 'release.json') -Encoding UTF8
 Get-ChildItem -LiteralPath $output -File | Sort-Object Name | ForEach-Object { (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash + '  ' + $_.Name } |
     Set-Content -LiteralPath (Join-Path $output 'SHA256SUMS.txt') -Encoding ASCII

@@ -4,7 +4,7 @@
 `0.2.0-rc.1`，不是稳定版；原 ZIP 和 preview.14 不覆盖。系统要求为
 Windows 10 2004 / build 19041 或更高版本、x64。
 
-最新推荐输出目录：`dist/FnMusic-0.2.0-rc.1-win-x64-windows-icon/`。
+最新推荐输出目录：`dist/FnMusic-0.2.0-rc.1-win-x64-windows-icon-fixed/`。
 旧 `windows/` 目录的 EXE 默认路径存在未展开变量问题，保留为历史，停止推荐。
 
 2026-10-10 修正：EXE 使用“Options（选项）→ Browse（浏览）”选择安装目录；
@@ -33,7 +33,7 @@ DPAPI 加密会话绑定 Windows 用户/机器，换机器后需要重新登录�
 见下文；从 EXE 安装的用户应从系统应用列表对应项卸载，避免混用 MSI 维护入口。
 
 MSI 只能使用数值版本，并且升级比较不使用第四段。图标/目录修正版的内部安装版本为
-`0.1.1000`（EXE 为 `0.1.1000.0`），高于旧 `0.1.999`，留出未来稳定 `0.2.0` 的升级顺序。
+`0.1.1001`（EXE 为 `0.1.1001.0`），高于旧 `0.1.999`，留出未来稳定 `0.2.0` 的升级顺序。
 安装产品名和播放器显示仍为 `0.2.0-rc.1`。后续版本须更新产品代码及数字版本，
 保持两个 UpgradeCode 不变，并单独验收升级。
 
@@ -47,7 +47,7 @@ WiX Toolset 4.0.6 存于项目工具目录。首次构建需要网络。
 ```powershell
 ./scripts/native.ps1 bootstrap
 ./scripts/package-preview.ps1 -Name FnMusic-0.2.0-rc.1-win-x64-icon
-./scripts/package-windows.ps1 -Payload dist/FnMusic-0.2.0-rc.1-win-x64-icon -Name FnMusic-0.2.0-rc.1-win-x64-windows-icon
+./scripts/package-windows.ps1 -Payload dist/FnMusic-0.2.0-rc.1-win-x64-icon -Name FnMusic-0.2.0-rc.1-win-x64-windows-icon-fixed
 ```
 
 如果原 ZIP 已存在并通过校验，跳过第二步。两个脚本都拒绝覆盖同名输出。
