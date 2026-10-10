@@ -98,4 +98,4 @@ FnMusic 使用 [MIT 许可](LICENSE)。FFmpeg 使用 LGPL 2.1 或更高版本，
 
 [第三方声明](THIRD_PARTY_NOTICES.md) · [源码构建与替换](docs/BUILDING_SOURCES.md) · [解码器说明](docs/NATIVE_DECODER_DEPENDENCIES.md) · [Windows 封装与验证](docs/WINDOWS_PACKAGING.md)
 
-[发布开发清单](docs/RELEASE_CHECKLIST.md) 是开发进度的统一入口；[路线图](docs/PRODUCT_ROADMAP.md) 保留后续计划。旧 Electron 客户端已归档，见 [归档说明](docs/ELECTRON_ARCHIVE.md)。
+[当前开发清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md) 是开发进度的统一入口；[rc.1 发布历史](docs/RELEASE_CHECKLIST.md) 和 [路线图](docs/PRODUCT_ROADMAP.md) 保留交付记录及后续计划。旧 Electron 客户端已归档，见 [归档说明](docs/ELECTRON_ARCHIVE.md)。
