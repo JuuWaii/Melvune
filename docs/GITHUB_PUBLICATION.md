@@ -41,7 +41,33 @@ Release 中的 SHA256SUMS、release.json 和发布正文为准。图形安装、
 发布器已改为认证后的 Release 列表查询草稿，后续按 Release ID 核验；增加
 两项回归，离线发布完整性测试现为 9/9。补充的 `publish-verified-candidate.yml`
 复用首次构建的 artifact，保持应用来源/标签不变，仅修正发布脚本，不重建包。
-执行者将在实际核实后更新最终状态，不以草稿创建替代公开成功。
+上述第一次失败记录保留；最终公开结果如下。
 
 预定入口：[Release](https://github.com/JuuWaii/fnmusic_pc/releases/tag/v0.2.0-rc.1)
 与 [Actions](https://github.com/JuuWaii/fnmusic_pc/actions/workflows/windows-packages.yml)。
+
+## 最终公开交付（2026-10-10 20:02，Asia/Shanghai）
+
+[0.2.0-rc.1 Release](https://github.com/JuuWaii/fnmusic_pc/releases/tag/v0.2.0-rc.1)
+已公开为 **Pre-release**，不是草稿。九个发行附件上传完成，每个远端大小与
+SHA-256 digest 都和已验证的构建产物一致；页面显示 11 个 Assets，另两个为
+GitHub 自动生成的源码 ZIP/tar。
+
+- 应用与封装来源：`05236e32b68b63e89dc3556ea48f92da15fb36bd`，标签未移动。
+- 构建作业：[38049853445](https://github.com/JuuWaii/fnmusic_pc/actions/runs/38049853445) 的 package 成功。
+- 发布作业：[38050468814](https://github.com/JuuWaii/fnmusic_pc/actions/runs/38050468814) 全部成功，发布脚本来自 `aa5bc75`。
+- 云端原生检查 118 项、Node 脚本 24 项通过；恢复发布时的完整性测试 9/9。
+- 包内容核验：应用 590 文件、MSI 592 文件、EXE 内嵌 MSI 一致；三个 EXE 的七档图标一致。
+- 四个公开二进制下载链接 HEAD 请求均返回 HTTP 200；公开 release.json 已读取并核对来源、版本与未签名状态。
+
+| 公开附件 | SHA-256 |
+| --- | --- |
+| FnMusic-0.2.0-rc.1-win-x64.zip | C67F4BDEADE1AF7084DD6792CFC3B4F670D7DF40437CAD06647F297DD8ACE1D1 |
+| FnMusic-0.2.0-rc.1-win-x64-portable.exe | E896CB8C95B9DE816946211A8AA1C41FAC24534AF95E6733E75EAFFE7C6B8444 |
+| FnMusic-0.2.0-rc.1-win-x64-setup.exe | 5FA27987670A4003EB112E7073183109AC07AB49EF7DB4E25B0A7D3872B69FA7 |
+| FnMusic-0.2.0-rc.1-win-x64-setup.msi | 28B1470A40FDCA19FAEF5B6EA0CFA26EBEAE8FAF6845CA1037F4DF45534F1D44 |
+
+同时公开 ZIP 校验文件、安装包 SHA256SUMS、release.json、WIX_LICENSE.txt
+和 WIX_NOTICE.md。它们由附件白名单约束；本机 dist、.tools、.review-audit、
+个人配置/索引、未审查图片及用户工作区改动均未推送到源码或作为附件上传。
+本机历史包保留，以本次 Release 的附件和校验和为公开交付基准。
