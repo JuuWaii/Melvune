@@ -29,8 +29,19 @@ Release 中的 SHA256SUMS、release.json 和发布正文为准。图形安装、
 
 ## 远端状态
 
-发布执行前记录：源码/标签尚未推送，Actions 与 Release 尚未完成。
-执行者将在实际核实后更新本节，不以本地提交、标签推送或排队替代云端成功。
+已成功推送 `master` 和注释标签 `v0.2.0-rc.1`，标签指向源码提交
+`05236e32b68b63e89dc3556ea48f92da15fb36bd`。GitHub 已显示重写后的 README；
+用户 bug/ 与 img/ 工作区保持原状。
+
+[首次发布构建](https://github.com/JuuWaii/fnmusic_pc/actions/runs/38049853445)
+的 package 作业已成功：隐私、SDK、核心/脚本检查、产物构建、包内容及图标
+校验与 artifact 上传全部通过。发布作业创建草稿后按标签读取草稿返回 404，
+因此在上传 Release 附件前中断，尚未公开。
+
+发布器已改为认证后的 Release 列表查询草稿，后续按 Release ID 核验；增加
+两项回归，离线发布完整性测试现为 9/9。补充的 `publish-verified-candidate.yml`
+复用首次构建的 artifact，保持应用来源/标签不变，仅修正发布脚本，不重建包。
+执行者将在实际核实后更新最终状态，不以草稿创建替代公开成功。
 
 预定入口：[Release](https://github.com/JuuWaii/fnmusic_pc/releases/tag/v0.2.0-rc.1)
 与 [Actions](https://github.com/JuuWaii/fnmusic_pc/actions/workflows/windows-packages.yml)。

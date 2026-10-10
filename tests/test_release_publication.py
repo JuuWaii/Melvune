@@ -4,6 +4,7 @@ import json
 import pathlib
 import tempfile
 import unittest
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('publisher', ROOT / 'scripts/publish-github-release.py')
@@ -85,6 +86,17 @@ class PublicationIntegrityTests(unittest.TestCase):
         assets[0]['digest'] = 'sha256:' + '0' * 64
         with self.assertRaisesRegex(ValueError, 'digest mismatch'):
             publisher.verify_remote(assets, paths, sums, require_all=True)
+
+    def test_draft_is_found_in_authenticated_release_listing(self):
+        draft = dict(id=123, tag_name='v0.2.0-rc.1', draft=True)
+        with mock.patch.object(publisher, 'gh', return_value=json.dumps([[dict(tag_name='v0.1.18')], [draft]])):
+            self.assertEqual(draft, publisher.find_release('owner/repo', 'v0.2.0-rc.1'))
+
+    def test_duplicate_release_tags_are_rejected(self):
+        duplicate = [dict(tag_name='v0.2.0-rc.1'), dict(tag_name='v0.2.0-rc.1')]
+        with mock.patch.object(publisher, 'gh', return_value=json.dumps([duplicate])):
+            with self.assertRaisesRegex(ValueError, 'Multiple releases'):
+                publisher.find_release('owner/repo', 'v0.2.0-rc.1')
 
 
 if __name__ == '__main__':

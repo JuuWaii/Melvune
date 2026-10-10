@@ -1,0 +1,55 @@
+name: Publish verified candidate
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful Windows build run containing the verified artifact
+        default: '38049853445'
+        required: true
+        type: string
+      tag:
+        description: Existing candidate tag matching the artifact source
+        default: 'v0.2.0-rc.1'
+        required: true
+        type: string
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/publish-verified-candidate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - name: Check publication integrity gates
+        run: python3 -m unittest discover -s tests -p test_release_publication.py
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: FnMusic-0.2.0-rc.1-win-x64
+          path: dist
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.build_run_id || '38049853445' }}
+      - name: Resume verified prerelease publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag || 'v0.2.0-rc.1' }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id || '38049853445' }}
+        run: |
+          source_commit=$(git rev-parse "$RELEASE_TAG^{commit}")
+          python3 scripts/publish-github-release.py --artifacts dist --tag "$RELEASE_TAG" --source-commit "$source_commit" --build-run-id "$BUILD_RUN_ID"

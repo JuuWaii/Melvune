@@ -22,6 +22,16 @@ def gh(*args, allow_missing=False):
     return result.stdout
 
 
+def find_release(repo, tag):
+    # Draft releases may not be returned by the tag endpoint. Authenticated
+    # release listing includes drafts and supports resuming a partial upload.
+    pages = json.loads(gh('api', 'repos/' + repo + '/releases?per_page=100', '--paginate', '--slurp'))
+    matches = [release for page in pages for release in page if release['tag_name'] == tag]
+    if len(matches) > 1:
+        raise ValueError('Multiple releases use the same tag')
+    return matches[0] if matches else None
+
+
 def verified_assets(root, tag, source_sha):
     version = tag.removeprefix('v')
     if not re.fullmatch(r'0\.2\.0-rc\.\d+', version):
@@ -80,25 +90,34 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--artifacts', type=pathlib.Path, required=True)
     parser.add_argument('--tag', required=True)
+    parser.add_argument('--source-commit')
+    parser.add_argument('--build-run-id')
     args = parser.parse_args()
     repo = os.environ['GITHUB_REPOSITORY']
-    source_sha = os.environ['GITHUB_SHA']
+    source_sha = args.source_commit or os.environ['GITHUB_SHA']
+    tag_sha = subprocess.check_output(['git', 'rev-parse', args.tag + '^{commit}'], text=True).strip()
+    if source_sha != tag_sha:
+        raise ValueError('Expected source does not match the repository tag')
     paths, checksums = verified_assets(args.artifacts, args.tag, source_sha)
     notes = pathlib.Path('docs/releases/0.2.0-rc.1.md').read_text(encoding='utf-8')
-    run_url = os.environ['GITHUB_SERVER_URL'] + '/' + repo + '/actions/runs/' + os.environ['GITHUB_RUN_ID']
+    build_run_id = args.build_run_id or os.environ['GITHUB_RUN_ID']
+    if not build_run_id.isdecimal():
+        raise ValueError('Invalid build workflow ID')
+    run_url = os.environ['GITHUB_SERVER_URL'] + '/' + repo + '/actions/runs/' + build_run_id
     notes += '\n\n## 本次构建来源\n\n源码提交：`' + source_sha + '`。\n\n[通过检查的构建记录](' + run_url + ')。\n\n'
     notes += '| 附件 | SHA-256 |\n| --- | --- |\n'
     notes += ''.join('| ' + p.name + ' | ' + checksums[p.name] + ' |\n' for p in paths if p.suffix in {'.zip', '.exe', '.msi'})
     notes_path = pathlib.Path(os.environ.get('RUNNER_TEMP', '.review-audit')) / 'fnmusic-release-notes.md'
     notes_path.parent.mkdir(parents=True, exist_ok=True)
     notes_path.write_text(notes, encoding='utf-8')
-    release = gh('api', 'repos/' + repo + '/releases/tags/' + args.tag, allow_missing=True)
+    release = find_release(repo, args.tag)
     if release is None:
         gh('release', 'create', args.tag, '--repo', repo, '--verify-tag', '--target', source_sha, '--draft',
            '--prerelease', '--latest=false', '--title', 'FnMusic ' + args.tag[1:] + ' · Windows x64',
            '--notes-file', str(notes_path))
-        release = gh('api', 'repos/' + repo + '/releases/tags/' + args.tag)
-    release = json.loads(release)
+        release = find_release(repo, args.tag)
+        if release is None:
+            raise ValueError('Created draft release could not be found')
     if not release['draft']:
         if not release['prerelease']:
             raise ValueError('Existing candidate release is marked stable')
@@ -111,10 +130,10 @@ def main():
     missing = [str(path) for path in paths if path.name not in present]
     if missing:
         gh('release', 'upload', args.tag, *missing, '--repo', repo)
-    release = json.loads(gh('api', 'repos/' + repo + '/releases/tags/' + args.tag))
+    release = json.loads(gh('api', 'repos/' + repo + '/releases/' + str(release['id'])))
     verify_remote(release['assets'], paths, checksums, require_all=True)
     gh('release', 'edit', args.tag, '--repo', repo, '--draft=false', '--prerelease', '--latest=false')
-    release = json.loads(gh('api', 'repos/' + repo + '/releases/tags/' + args.tag))
+    release = json.loads(gh('api', 'repos/' + repo + '/releases/' + str(release['id'])))
     if release['draft'] or not release['prerelease']:
         raise ValueError('Release publication state is incorrect')
     verify_remote(release['assets'], paths, checksums, require_all=True)
