@@ -1,16 +1,73 @@
-# 飞牛音乐 Windows 原生客户端
+<p align="center">
+  <img src="assets/branding/fnmusic.png" alt="FnMusic 图标" width="96" />
+</p>
 
-当前推荐候选版为 **0.2.0-rc.1**，推荐目录 `dist/FnMusic-0.2.0-rc.1-win-x64-icon/`。保留整个目录并双击 `Start-FnMusic.cmd`；推荐 ZIP 为 `dist/FnMusic-0.2.0-rc.1-win-x64-icon.zip`。新版包含用户选定的 C 款黑白飞牛音符图标，哈希与封装验证见 [Windows 交付记录](docs/WINDOWS_PACKAGING.md)。原 rc.1 的实际启动/播放及依赖核验见 [候选版交付记录](docs/RC1_ACCEPTANCE.md)，原包及 [preview.14](docs/PREVIEW14_ACCEPTANCE.md) 保留。包含统一界面、两类歌单、本地启动索引/后台扫描、封面与内嵌歌词，以及范围读取可靠性和缓存优化。
+# FnMusic · 飞牛音乐 Windows 客户端
 
-另提供含黑白飞牛音符图标的单文件便携 EXE、EXE 安装器和 MSI；安装器可选择目录，最新包位于 `dist/FnMusic-0.2.0-rc.1-win-x64-windows-icon-fixed/`，ZIP 为 `dist/FnMusic-0.2.0-rc.1-win-x64-icon.zip`。位置及使用方式见 [Windows 封装说明](docs/WINDOWS_PACKAGING.md)，推送准备见 [隐私审查](docs/GITHUB_PRIVACY_REVIEW.md)。安装器按当前用户安装，产物未签名，安装/卸载动态实测边界在封装说明中记录。
+一个使用 C#、WinUI 3 和 FFmpeg 构建的非官方桌面音乐播放器，支持飞牛音乐与本地音乐。黑白界面，统一音乐库、歌单、播放队列和应用内歌词。
 
-**当前进度统一查看 [发布开发清单](docs/RELEASE_CHECKLIST.md)**：目标为 0.2.0-rc.1 Windows x64 候选版，按批次开发、统一检查。第三方源、桌面歌词、对外接口和全面扩展矩阵推迟；rc.1 随包提供对应源码、许可与构建材料，候选版不是稳定发行版。旧 [开发清单](docs/NATIVE_BACKLOG.md) 和 [路线图](docs/PRODUCT_ROADMAP.md) 保留历史及后续需求。
+**当前版本：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
 
-使用 C#、WinUI 3/XAML 和 FFmpeg 构建的非官方 NAS 音乐客户端，目前交付 0.2.0 原生候选版。
+本项目与飞牛官方无关联或背书。当前为候选版，发行文件尚未进行代码签名。
 
-已实现原生登录与加密会话恢复、飞牛/本地完整音乐列表及来源筛选、收藏、搜索、专辑/歌手、播放/暂停/停止、进度拖动、音量与输出设备、双击切歌和四种播放模式。两类歌单与音乐库有独立管理页；播放队列从右侧覆盖打开，移除当前曲目或清空队列会停止播放。
+## 下载与安装
 
-## 构建与运行
+前往 [0.2.0-rc.1 Release](https://github.com/JuuWaii/fnmusic_pc/releases/tag/v0.2.0-rc.1) 下载。运行库与解码依赖随包提供，无需另装 .NET 或 FFmpeg。
+
+| 版本 | 下载 | 使用方式 |
+| --- | --- | --- |
+| EXE 安装包 | [setup.exe](https://github.com/JuuWaii/fnmusic_pc/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64-setup.exe) | 常规安装入口；通过 **Options → Browse** 选择目录 |
+| MSI 安装包 | [setup.msi](https://github.com/JuuWaii/fnmusic_pc/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64-setup.msi) | Windows Installer，提供中文目录选择页 |
+| 便携 EXE | [portable.exe](https://github.com/JuuWaii/fnmusic_pc/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64-portable.exe) | 放在可写目录启动，首次运行在旁边解包 |
+| 完整 ZIP | [win-x64.zip](https://github.com/JuuWaii/fnmusic_pc/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64.zip) | 解压并保留完整目录，运行 `Start-FnMusic.cmd` 或 `FnMusic.App.exe` |
+
+EXE 与 MSI 安装包选择一种即可，默认按当前用户安装到 `%LOCALAPPDATA%\Programs\FnMusic`，建立开始菜单快捷方式。自选目录会保存，供维修和卸载恢复；卸载保留独立的个人配置。
+
+便携 EXE 会创建 `FnMusic-portable` 目录，应用文件与个人数据分别保存在其中。首次解包请预留约 700 MB 空间。移动时一起复制 EXE 和该目录；换机器或 Windows 用户后，加密会话需要重新登录。更新便携 EXE 前退出播放器，保留已有 `FnMusic-portable\Data`。
+
+Release 同时提供 SHA-256 校验文件与构建来源信息。请下载 Release 附件中的完整 ZIP；GitHub 自动生成的 **Source code** 是源码，不含可直接运行的应用。
+
+## 功能
+
+- **飞牛与本地音乐**：连接飞牛音乐服务、登录与加密会话恢复，浏览音乐、收藏、搜索、专辑和歌手。
+- **音乐库管理**：多个本地库、来源/分组筛选、启动索引恢复、后台扫描与取消，离线目录保留记录。
+- **两类歌单**：跨音乐库的本地歌单，以及当前飞牛账号的专属歌单管理。
+- **播放与队列**：播放/暂停/停止、进度拖动、音量、输出设备、双击切歌和四种播放模式；队列从右侧打开。
+- **封面与歌词**：飞牛封面、支持的内嵌封面，以及飞牛歌词、同名 LRC 和支持的内嵌歌词。
+- **界面与主题**：黑白界面、浅色/深色主题和跟随系统，统一顶部导航与右键菜单。
+- **飞牛管理入口**：管理员可管理支持的素材库与设置，查看后台任务；任务消失或身份变化时保留未确认状态。
+
+## 开始使用
+
+首次启动不需要账号，可先导入本地音乐。在“音乐库与素材库”中新建本地库，选择文件夹；单目录连同子目录最多扫描 10,000 首。索引保存后，重启会先显示缓存，再检查变化。缓存不会复制音频文件。
+
+连接飞牛时，打开“设置 → 连接与账号”，填写音乐服务的最终 HTTP/HTTPS 地址（可带 `/music/`），连接后登录。会话由当前 Windows 用户的 DPAPI 加密保存，不保存明文密码。
+
+双击歌曲播放，右键可收藏、下一首或加入歌单；点击左下角封面进入应用内歌词。详细操作见 [使用指南](docs/USER_GUIDE.md)。
+
+## 配置与升级
+
+安装版和普通 ZIP 版默认配置位于 `%LOCALAPPDATA%\FnMusic.Native`；便携 EXE 使用旁边的 `FnMusic-portable\Data`。不同入口的配置不会自动互相迁移。
+
+升级前退出旧客户端并备份配置目录，避免同时运行两版写入同一配置。本地歌单使用 v2 格式，preview.5 及更早版本不能读取；回退时同时恢复备份。
+
+需要独立配置时，可直接运行应用并传入绝对目录：
+
+```powershell
+./FnMusic.App.exe "--data-directory=D:\FNMusicProfile"
+```
+
+## 已知限制与反馈
+
+MP3 远距离首次定位可能读取较多数据；素材库重关联缺少完成计数时仍显示“未确认”。飞牛歌单的网页修改需要显式刷新，不承诺实时同步或并发编辑事务。
+
+第三方音乐源、FN Connect/OAuth、桌面歌词、媒体键/托盘、对外接口和自动更新留待后续版本。全部编码、DPI、触摸、设备热插拔及长期压力组合尚未覆盖。
+
+遇到问题可提交 [Issue](https://github.com/JuuWaii/fnmusic_pc/issues)，注明版本、复现步骤、预期与实际结果。附截图或日志前，请隐去密码、令牌、服务地址和私人路径；集中验证项目见 [用户验证单](docs/RC1_USER_VALIDATION.md)。
+
+## 从源码构建
+
+需要 Windows x64、Git、Python 3.11+ 和 Node.js。脚本在项目的 `.tools` 目录准备固定版本的 .NET SDK 与原生解码工具链；首次构建需要网络。
 
 ```powershell
 ./scripts/native.ps1 bootstrap
@@ -19,27 +76,26 @@
 ./scripts/native.ps1 run
 ```
 
-本机已有匹配 SDK 时可跳过 bootstrap。原生播放器使用固定版本的 FFmpeg 动态库，构建与独立发布目录包含这些依赖；日常播放无需 PATH 中的 ffmpeg.exe。部分合成音频验证工具使用开发机已有的 FFmpeg 可执行文件生成样本。依赖和许可边界见 [解码器说明](docs/NATIVE_DECODER_DEPENDENCIES.md)。
+构建发行包：
 
-后续源码构建已接入 MP3 定位预滚补丁；首次 build 需要 Python 3.11+ 和 Git，自动在项目内准备固定的 C++ 工具链。源码及 DLL 身份校验、回归范围见 [预滚修复](docs/NATIVE_MP3_PREROLL.md)。固定 preview.6 包保持不变。
+```powershell
+./scripts/package-preview.ps1 -Name FnMusic-0.2.0-rc.1-win-x64
+./scripts/package-windows.ps1 -Name FnMusic-0.2.0-rc.1-win-x64-windows
+```
 
-[原生工程说明](native/README.md) · [阶段进度](docs/PHASE_STATUS.md) · [开发清单](docs/NATIVE_BACKLOG.md) · [FFmpeg 播放层](docs/FFMPEG_PLAYBACK.md)
-
-多音乐源、音乐库分类、两类歌单、飞牛设置同步、主题及对外音乐/歌词信息接口的最新排期见 [产品路线图](docs/PRODUCT_ROADMAP.md)。收藏基础已接入，验证边界见 [收藏状态](docs/NATIVE_FAVORITES.md)。
-
-歌曲搜索与分页已通过真实 NAS 只读验收；回车、空结果、多页和迟到请求隔离已通过合成窗口验收，见 [搜索状态](docs/NATIVE_SEARCH.md)。专辑/歌手列表、基础详情和详情歌曲播放已接入，真实列表及详情歌曲分页接口验收通过，见 [专辑与歌手状态](docs/NATIVE_COLLECTIONS.md)。多库、收藏、歌单和设置已有阶段实现，真实账户/目录及扩展验收继续跟踪；FN Connect、OAuth、桌面集成和稳定版保留后续。
-
-## Electron 归档
-
-旧客户端已从活动源码和构建入口移除，归档位置及恢复说明见 [清理记录](docs/ELECTRON_ARCHIVE.md)。原生配置位于 `%LOCALAPPDATA%/FnMusic.Native/`；旧应用用户数据未删除。
-
-辅助检查无需安装 npm 依赖：
+脚本拒绝覆盖同名输出；已有产物时使用新名称，并用 `-Payload` 指向对应应用目录。辅助检查无需安装 npm 依赖：
 
 ```powershell
 node --test tests/*.test.cjs
 node scripts/check-privacy.js
 ```
 
-本项目与飞牛官方无关联或背书。许可见 [LICENSE](LICENSE)，依赖及参考归属见 [第三方声明](THIRD_PARTY_NOTICES.md)。
+[GitHub Actions](https://github.com/JuuWaii/fnmusic_pc/actions/workflows/windows-packages.yml) 支持手动构建；推送 `v0.2.0-rc.*` 标签时，在隐私、测试、包内容与图标校验通过后发布候选版 Release。
 
-使用见 [用户指南](docs/USER_GUIDE.md)，一次反馈见 [集中验证单](docs/RC1_USER_VALIDATION.md)，公开发布正文见 [发布说明](docs/releases/0.2.0-rc.1.md)。软件使用 FFmpeg（LGPL 2.1 或更高版本），完整对应源码随候选版 ZIP 提供，见 [构建与替换说明](docs/BUILDING_SOURCES.md)。
+## 许可与项目资料
+
+FnMusic 使用 [MIT 许可](LICENSE)。FFmpeg 使用 LGPL 2.1 或更高版本，完整对应源码、补丁和构建材料随包位于 `licenses/corresponding-source`；其他运行库与安装器许可也随包提供。
+
+[第三方声明](THIRD_PARTY_NOTICES.md) · [源码构建与替换](docs/BUILDING_SOURCES.md) · [解码器说明](docs/NATIVE_DECODER_DEPENDENCIES.md) · [Windows 封装与验证](docs/WINDOWS_PACKAGING.md)
+
+[发布开发清单](docs/RELEASE_CHECKLIST.md) 是开发进度的统一入口；[路线图](docs/PRODUCT_ROADMAP.md) 保留后续计划。旧 Electron 客户端已归档，见 [归档说明](docs/ELECTRON_ARCHIVE.md)。

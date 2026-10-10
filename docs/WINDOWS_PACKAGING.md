@@ -89,8 +89,10 @@ MSI 与独立 MSI 一致、全部发行文件的外部 SHA-256。MSI/EXE 均为 
 
 `.github/workflows/windows-packages.yml` 提供手动 Windows 构建，固定 Actions
 提交、SDK、NuGet 锁和 WiX 版本；隐私检查及核心/脚本测试后构建 ZIP/EXE/MSI，
-只上传发行产物为工作流 artifact，保留 14 天，不自动创建 Release。
-当前工作流还未推送或在 GitHub 执行，不能视为云端构建已通过。
+上传发行产物为 artifact，保留 14 天。2026-10-10 用户授权远端发布后，新增
+`v0.2.0-rc.*` 标签触发：独立发布作业先核对九个附件的来源及 SHA-256，上传
+草稿并核对远端 digest 后公开 prerelease。实际远端状态与云端附件来源见
+[GitHub 发布记录](GITHUB_PUBLICATION.md)，不能用本机包的哈希替代云端附件。
 
 推送前检查见 [GitHub 隐私审查](GITHUB_PRIVACY_REVIEW.md)。
 
