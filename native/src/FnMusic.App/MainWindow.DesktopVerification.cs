@@ -108,6 +108,7 @@ public sealed partial class MainWindow
             Check("disable_removes_discovery", informationServer is null && !File.Exists(discovery));
             integrationSettings = integrationSettings with { InformationEnabled = true }; await ApplyDesktopIntegrationAsync();
             Check("reenable_new_server", informationServer is not null && File.Exists(informationServer.DiscoveryPath));
+            await VerifyDesktopShellAsync(Check, timed);
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; errorCode = ex is System.ComponentModel.Win32Exception native ? native.NativeErrorCode : ex.HResult; errorOrigin = (ex.TargetSite?.Name ?? "") + (ex.Data.Contains("StyleIndex") ? $"({ex.Data["StyleIndex"]},{ex.Data["WindowStyle"]})" : ""); smtcStage = SystemMediaBridgeVerification.Stage; bridgeStage = SystemMediaBridge.InitializationStage; }

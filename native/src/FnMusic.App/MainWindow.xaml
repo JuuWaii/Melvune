@@ -151,6 +151,22 @@
       <TextBlock Text="开启后，同一 Windows 用户的程序可按协议读取歌曲和歌词。关闭会移除本实例发现记录；第三方软件需自行接入。" TextWrapping="Wrap"/>
       <TextBlock x:Name="IntegrationStatus" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
      </StackPanel></Border>
+     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24"><StackPanel Spacing="12">
+      <TextBlock Text="桌面常驻" FontWeight="SemiBold"/>
+      <ToggleSwitch x:Name="ShellTrayEnabled" Header="系统托盘" IsOn="True" Toggled="DesktopShell_Toggled"/>
+      <ToggleSwitch x:Name="ShellCloseToTray" Header="关闭窗口时收起到托盘" Toggled="DesktopShell_Toggled"/>
+      <TextBlock Text="默认关闭窗口即退出。启用后，播放和歌词继续；从托盘菜单选择「退出」可结束应用。托盘不可用时仍正常退出。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+      <ToggleSwitch x:Name="ShellHotkeysEnabled" Header="全局播放与歌词快捷键" Toggled="DesktopShell_Toggled"/>
+      <TextBlock Text="Ctrl + Alt + 空格：播放/暂停；← / →：上一首/下一首；L：显示/隐藏桌面歌词；U：解锁并找回歌词。各组合均按住 Ctrl + Alt。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+      <TextBlock x:Name="ShellStatus" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
+     </StackPanel></Border>
+     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24"><StackPanel Spacing="12">
+      <TextBlock Text="睡眠定时" FontWeight="SemiBold"/>
+      <ComboBox x:Name="SleepTimerDuration" Header="停止播放前的时间" SelectedIndex="1" HorizontalAlignment="Stretch"><ComboBoxItem Content="15 分钟"/><ComboBoxItem Content="30 分钟"/><ComboBoxItem Content="60 分钟"/><ComboBoxItem Content="90 分钟"/></ComboBox>
+      <StackPanel Orientation="Horizontal" Spacing="8"><Button Content="开始定时" Click="SleepTimerStart_Click"/><Button x:Name="SleepTimerCancel" Content="取消定时" IsEnabled="False" Click="SleepTimerCancel_Click"/></StackPanel>
+      <TextBlock x:Name="SleepTimerStatus" Text="未设置睡眠定时。" TextWrapping="Wrap"/>
+      <TextBlock Text="重新开始会替换旧定时。暂停、切歌或收起窗口时仍继续计时；重启应用后不恢复定时。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+     </StackPanel></Border>
     </StackPanel>
     <StackPanel x:Name="SettingsLibrariesSection" Visibility="Collapsed" Spacing="16">
      <TextBlock Text="音乐库与素材库" FontSize="20" FontWeight="SemiBold"/>

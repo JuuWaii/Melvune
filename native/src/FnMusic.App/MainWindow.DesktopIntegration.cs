@@ -15,7 +15,8 @@ public sealed partial class MainWindow
     private bool updatingIntegration = true;
     private bool closingIntegration;
     private sealed record DesktopIntegrationSettings(bool LyricsEnabled = false, bool InformationEnabled = false,
-        DesktopLyricsOptions? Lyrics = null, bool SystemMediaEnabled = true);
+        DesktopLyricsOptions? Lyrics = null, bool SystemMediaEnabled = true,
+        bool TrayEnabled = true, bool CloseToTray = false, bool GlobalHotkeysEnabled = false);
     private DesktopIntegrationSettings integrationSettings = new();
     private string IntegrationSettingsFile => Path.Combine(AppDataDirectory.Resolve(), "desktop-integration.json");
 
@@ -40,6 +41,8 @@ public sealed partial class MainWindow
         SyncDesktopOptions(); updatingIntegration = false;
         AppWindow.Closing += PrepareDesktopClose;
         Root.ActualThemeChanged += (_, _) => ApplyDesktopTheme();
+        updatingIntegration = true;
+        InitializeDesktopShell(); updatingIntegration = false;
         _ = ApplyDesktopIntegrationAsync();
     }
     private void SyncDesktopOptions()
@@ -93,7 +96,7 @@ public sealed partial class MainWindow
                     {
                         if (closed || updatingIntegration) return;
                         integrationSettings = integrationSettings with { Lyrics = options };
-                        updatingIntegration = true; SyncDesktopOptions(); updatingIntegration = false; SaveDesktopIntegration();
+                        updatingIntegration = true; SyncDesktopOptions(); updatingIntegration = false; SaveDesktopIntegration(); SyncDesktopShellState();
                     };
                     desktopLyrics.Hidden += () =>
                     {
@@ -117,7 +120,7 @@ public sealed partial class MainWindow
             }
         }
         catch (Exception) { IntegrationStatus.Text = "桌面联动启停失败，请重新开启后重试。"; }
-        finally { integrationGate.Release(); }
+        finally { integrationGate.Release(); SyncDesktopShellState(); }
     }
     private async void DesktopIntegration_Toggled(object sender, RoutedEventArgs e)
     {
@@ -133,6 +136,7 @@ public sealed partial class MainWindow
         string action = integrationSettings.LyricsEnabled ? "隐藏桌面歌词" : "显示桌面歌词";
         Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(DesktopLyricsShortcut, action);
         ToolTipService.SetToolTip(DesktopLyricsShortcut, action);
+        SyncDesktopShellState();
     }
     private async void DesktopLyricsShortcut_Click(object sender, RoutedEventArgs e)
     {
@@ -152,17 +156,18 @@ public sealed partial class MainWindow
         if (updatingIntegration || closed) return;
         var options = (integrationSettings.Lyrics ?? new()) with { Topmost = DesktopLyricsTopmost.IsOn, Locked = DesktopLyricsLocked.IsOn,
             FontSize = DesktopLyricsFont.Value, Theme = DesktopLyricsTheme.SelectedIndex switch { 1 => "light", 2 => "dark", _ => "system" } };
-        integrationSettings = integrationSettings with { Lyrics = options }; SaveDesktopIntegration(); ApplyDesktopTheme();
+        integrationSettings = integrationSettings with { Lyrics = options }; SaveDesktopIntegration(); ApplyDesktopTheme(); SyncDesktopShellState();
     }
     private void RecoverDesktopLyrics_Click(object sender, RoutedEventArgs e)
     {
         updatingIntegration = true; DesktopLyricsLocked.IsOn = false; updatingIntegration = false;
         integrationSettings = integrationSettings with { Lyrics = (integrationSettings.Lyrics ?? new()) with { Locked = false } };
-        ApplyDesktopTheme(); desktopLyrics?.RecoverPosition(); SaveDesktopIntegration();
+        ApplyDesktopTheme(); desktopLyrics?.RecoverPosition(); SaveDesktopIntegration(); SyncDesktopShellState();
     }
     private void CloseLinkedServices()
     {
         closingIntegration = true;
+        CloseDesktopShell();
         systemMedia?.Dispose(); systemMedia = null;
         desktopLyrics?.Dispose(); desktopLyrics = null;
         // Disposal cancels I/O immediately; completion stays off the UI thread.
@@ -171,13 +176,8 @@ public sealed partial class MainWindow
     private async void PrepareDesktopClose(Microsoft.UI.Windowing.AppWindow sender, Microsoft.UI.Windowing.AppWindowClosingEventArgs args)
     {
         if (closingIntegration) return;
-        args.Cancel = true; closingIntegration = true;
-        await integrationGate.WaitAsync();
-        try
-        {
-            if (informationServer is { } server) { informationServer = null; await server.DisposeAsync(); }
-        }
-        catch (Exception) { /* Exit must still release windows and audio. */ }
-        finally { integrationGate.Release(); Close(); }
+        args.Cancel = true;
+        if (TryHideMainWindowToTray()) return;
+        await RequestDesktopExitAsync();
     }
 }

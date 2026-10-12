@@ -56,7 +56,7 @@ public sealed partial class MainWindow : Window
         { await VerifyCollectionWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-ui-motion") && IsSyntheticPreview)
         { await ShowSyntheticPreviewAsync(); await VerifyUiMotionWindowAsync(); Close(); return; }
-        if (IsSyntheticPreview) { await ShowSyntheticPreviewAsync(); return; }
+        if (IsSyntheticPreview) { await ShowSyntheticPreviewAsync(); await OpenTrayInteractionPreviewAsync(); return; }
 #endif
         await ViewModel.InitializeAsync();
         await ShowHomeAsync();
