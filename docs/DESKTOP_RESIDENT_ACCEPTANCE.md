@@ -27,4 +27,9 @@
 
 ## 交付
 
-待生成独立 `FnMusic-0.2.0-rc.2-win-x64-desktop-resident-20261012` ZIP 和 SHA-256；保留所有旧包和用户无关修改。最终包的启动及关键操作完成后更新本节。没有推送、上传或重新封装完整安装器。
+- 推荐包：[FnMusic-0.2.0-rc.2-win-x64-desktop-resident-20261012.zip](../dist/FnMusic-0.2.0-rc.2-win-x64-desktop-resident-20261012.zip)。解压后运行 `FnMusic.App.exe` 或 `Start-FnMusic.cmd`。
+- 源码修订：`874ec032901d758fa40d87f4d4bc4aa1ee5d0722`；版本 `0.2.0-rc.2`，独立批次不覆盖旧包。
+- ZIP SHA-256：`02CD94378DC043C00802DA3173A8EB4CFC8AADA51FEA3F91D05A1758E960DDA0`，另附 [校验文件](../dist/FnMusic-0.2.0-rc.2-win-x64-desktop-resident-20261012.SHA256SUMS.txt)。
+- 分发检查通过：593 个文件哈希匹配，总计 594 个文件（含哈希清单）；许可、对应解码器源码、独立信息接口示例、用户指南和验收单齐备。
+- 最终 Release 包使用独立空配置启动，实际点击播放栏「词」显示与隐藏歌词、新增设置卡片及默认值显示通过。保存配置确认托盘开启、关闭到托盘关闭、全局快捷键关闭；默认 Alt+F4 后该测试进程退出。记录：`.review-audit/desktop-resident-20261012/package-smoke-result.json`。
+- S01–S08 已完成。保留所有旧包和用户无关修改；没有推送、上传或重新封装完整安装器。
