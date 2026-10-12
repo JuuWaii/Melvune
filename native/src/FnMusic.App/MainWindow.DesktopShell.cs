@@ -144,6 +144,7 @@ public sealed partial class MainWindow
     {
         if (closed || closingIntegration) return;
         explicitDesktopExit = true; closingIntegration = true;
+        CloseAudioOutputs();
         CloseDesktopShell();
         await integrationGate.WaitAsync();
         try

@@ -5,8 +5,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Input;
-using Windows.Devices.Enumeration;
-using Windows.Media.Devices;
 using Windows.Media.Playback;
 
 namespace FnMusic.App;
@@ -26,7 +24,6 @@ public sealed partial class MainWindow
     private DateTimeOffset seekDeadline;
     private int page = 1, total;
     private bool updatingProgress, closed, mediaReady;
-    private sealed record OutputOption(string Name, DeviceInformation? Device);
 
     private void InitializePlayback()
     {
@@ -42,6 +39,7 @@ public sealed partial class MainWindow
         });
         UpdateQueueModeControl();
         UpdateVolumeControl();
+        InitializeAudioOutputs();
         // 单行 TextBox 会处理 Enter；仍接收该路由事件以提交搜索。
         SearchInput.AddHandler(UIElement.KeyDownEvent, new KeyEventHandler(Search_KeyDown), true);
         // Thumb 会处理指针事件，必须接收已处理事件才能可靠识别拖动结束。
@@ -424,27 +422,6 @@ public sealed partial class MainWindow
         PlaybackTime.Text = $"{position:mm\\:ss}";
         PlaybackDuration.Text = $"{duration:mm\\:ss}";
     }
-    private async void Devices_Click(object sender, RoutedEventArgs e) => await LoadDevicesAsync();
-    private async Task LoadDevicesAsync()
-    {
-        try
-        {
-            var selectedId = music.Player.AudioDevice?.Id;
-            var devices = await DeviceInformation.FindAllAsync(MediaDevice.GetAudioRenderSelector());
-            if (closed) return;
-            var options = new List<OutputOption> { new("系统默认设备", null) };
-            options.AddRange(devices.Select(d => new OutputOption(d.Name, d)));
-            OutputDevices.ItemsSource = options;
-            OutputDevices.SelectedItem = options.FirstOrDefault(o => o.Device?.Id == selectedId) ?? options[0];
-        }
-        catch (Exception) { if (!closed) PlaybackStatus.Text = "无法枚举音频设备，请检查设备连接后重试。"; }
-    }
-    private void Output_Changed(object sender, SelectionChangedEventArgs e)
-    {
-        if (OutputDevices.SelectedItem is not OutputOption option) return;
-        try { music.Player.AudioDevice = option.Device; }
-        catch (Exception) { PlaybackStatus.Text = "无法切换音频设备，请刷新设备列表。"; }
-    }
     private void CancelWork() { ResetSeek(); work.Cancel(); work.Dispose(); work = new(); }
     private void ResetLibrary()
     {
@@ -484,5 +461,5 @@ public sealed partial class MainWindow
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
     }
     private void ClosePlayback()
-    { CloseLinkedServices(); StopLinkedPlayback(); closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { CloseAudioOutputs(); CloseLinkedServices(); StopLinkedPlayback(); closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

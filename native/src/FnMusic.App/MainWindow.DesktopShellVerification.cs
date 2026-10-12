@@ -46,7 +46,8 @@ public sealed partial class MainWindow
         await Until(() => music.Player.PlaybackSession.PlaybackState == global::Windows.Media.Playback.MediaPlaybackState.Paused);
         check("shell_pause_reuses_player", mediaReady && snapshotTrack?.Reference == timed.Reference);
         await ExecuteDesktopShellCommandAsync(DesktopShellCommand.PlayPause);
-        await Until(() => music.Player.PlaybackSession.PlaybackState == global::Windows.Media.Playback.MediaPlaybackState.Playing);
+        await Until(() => music.Player.PlaybackSession.PlaybackState == global::Windows.Media.Playback.MediaPlaybackState.Playing
+            && playbackSnapshots.Current.State == FnMusic.Core.PlaybackStatus.Playing);
         check("shell_resume_reuses_player", mediaReady && playbackSnapshots.Current.State == FnMusic.Core.PlaybackStatus.Playing);
         await ExecuteDesktopShellCommandAsync(DesktopShellCommand.UnlockDesktopLyrics);
         DesktopLyricsLocked.IsOn = true;

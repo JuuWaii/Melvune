@@ -48,5 +48,5 @@ public sealed partial class MainWindow
     { if (sender is MenuFlyout menu) ApplyMenuTheme(menu); }
 
     private void PlayerOutput_Opening(object? sender, object args)
-    { if (sender is Flyout flyout) flyout.FlyoutPresenterStyle = CreatePopupStyle(typeof(FlyoutPresenter)); }
+    { if (sender is Flyout flyout) flyout.FlyoutPresenterStyle = CreatePopupStyle(typeof(FlyoutPresenter)); _ = LoadDevicesAsync(); }
 }

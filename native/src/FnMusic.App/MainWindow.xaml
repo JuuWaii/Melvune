@@ -137,6 +137,7 @@
       <ToggleButton x:Name="SettingsMute" Content="静音" IsChecked="{Binding IsChecked, ElementName=MuteToggle, Mode=TwoWay}" Click="SettingsMute_Click" HorizontalAlignment="Left"/>
       <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Button x:Name="SettingsModeButton" Content="播放模式" Click="SettingsMode_Click"/><TextBlock x:Name="SettingsModeSummary" Grid.Column="1" VerticalAlignment="Center"/></Grid>
       <Grid ColumnSpacing="16"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Button x:Name="SettingsOutputButton" Content="音频输出设备" Click="SettingsOutput_Click"/><TextBlock Grid.Column="1" Text="{Binding SelectedItem.Name, ElementName=OutputDevices}" VerticalAlignment="Center" TextWrapping="Wrap"/></Grid>
+      <TextBlock x:Name="SettingsOutputStatus" TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/>
      </StackPanel></Border>
      <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24"><StackPanel Spacing="12">
       <TextBlock Text="桌面播放联动" FontWeight="SemiBold"/>
@@ -242,7 +243,7 @@
      <StackPanel x:Name="PlayerOptionsPanel" Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
       <ToggleButton x:Name="DesktopLyricsShortcut" Width="32" Height="32" MinWidth="32" Padding="4" CornerRadius="16" BorderThickness="0" Click="DesktopLyricsShortcut_Click" AutomationProperties.Name="显示桌面歌词" ToolTipService.ToolTip="显示桌面歌词"><TextBlock Text="词" FontSize="16" FontWeight="SemiBold"/></ToggleButton>
       <Button x:Name="OutputDeviceButton" Style="{StaticResource PlayerIconButtonStyle}" AutomationProperties.Name="音频输出设备" ToolTipService.ToolTip="音频输出设备"><FontIcon Glyph="&#xE7F6;" FontSize="16"/>
-       <Button.Flyout><Flyout><StackPanel Spacing="8"><ComboBox x:Name="OutputDevices" Header="音频输出设备" MinWidth="240" DisplayMemberPath="Name" SelectionChanged="Output_Changed"/><Button Content="刷新设备" Click="Devices_Click"/></StackPanel></Flyout></Button.Flyout>
+       <Button.Flyout><Flyout><StackPanel Spacing="8" MaxWidth="360"><ComboBox x:Name="OutputDevices" Header="音频输出设备" MinWidth="240" DisplayMemberPath="Name" SelectionChanged="Output_Changed"/><TextBlock x:Name="OutputStatus" TextWrapping="Wrap" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" AutomationProperties.LiveSetting="Polite"/><Button Content="刷新设备" Click="Devices_Click"/></StackPanel></Flyout></Button.Flyout>
       </Button>
       <ToggleButton x:Name="MuteToggle" Width="32" Height="32" MinWidth="32" Padding="4" CornerRadius="16" BorderThickness="0" Click="Mute_Click" AutomationProperties.Name="静音" ToolTipService.ToolTip="静音"><FontIcon x:Name="VolumeIcon" Glyph="&#xE767;" FontSize="16"/></ToggleButton>
       <Slider x:Name="VolumeSlider" Width="88" VerticalAlignment="Center" AutomationProperties.Name="音量" Minimum="0" Maximum="100" Value="50" ValueChanged="Volume_Changed"/>

@@ -109,6 +109,9 @@ public sealed partial class MainWindow
             integrationSettings = integrationSettings with { InformationEnabled = true }; await ApplyDesktopIntegrationAsync();
             Check("reenable_new_server", informationServer is not null && File.Exists(informationServer.DiscoveryPath));
             await VerifyDesktopShellAsync(Check, timed);
+            queue.Select(timed.Reference); await PlayTrackAsync(timed);
+            await Until(() => mediaReady && music.Player.PlaybackSession.Position.TotalSeconds > .2);
+            await VerifyAudioOutputsAsync(Check);
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name; errorCode = ex is System.ComponentModel.Win32Exception native ? native.NativeErrorCode : ex.HResult; errorOrigin = (ex.TargetSite?.Name ?? "") + (ex.Data.Contains("StyleIndex") ? $"({ex.Data["StyleIndex"]},{ex.Data["WindowStyle"]})" : ""); smtcStage = SystemMediaBridgeVerification.Stage; bridgeStage = SystemMediaBridge.InitializationStage; }
