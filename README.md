@@ -94,6 +94,19 @@ node scripts/check-privacy.js
 
 ## 许可与项目资料
 
+仓库保留源码、构建与发布工具、测试、许可及技术文档：
+
+| 目录 | 内容 |
+| --- | --- |
+| `native/` | WinUI 应用、核心逻辑、解码依赖配置与原生测试 |
+| `assets/branding/` | 应用和安装包实际使用的 PNG/ICO 图标 |
+| `packaging/` | Windows 安装器与便携入口源码 |
+| `scripts/`、`tests/` | 构建、验证、隐私审查和发行工具 |
+| `.github/workflows/` | Windows 构建与候选版发布工作流 |
+| `docs/`、`licenses/` | 使用指南、设计与验收记录、许可材料 |
+
+原始反馈 `bug/`、本机截图 `img/` 和旧标志 `logo/` 不再进入源码仓库。
+
 FnMusic 使用 [MIT 许可](LICENSE)。FFmpeg 使用 LGPL 2.1 或更高版本，完整对应源码、补丁和构建材料随包位于 `licenses/corresponding-source`；其他运行库与安装器许可也随包提供。
 
 [第三方声明](THIRD_PARTY_NOTICES.md) · [源码构建与替换](docs/BUILDING_SOURCES.md) · [解码器说明](docs/NATIVE_DECODER_DEPENDENCIES.md) · [Windows 封装与验证](docs/WINDOWS_PACKAGING.md)
