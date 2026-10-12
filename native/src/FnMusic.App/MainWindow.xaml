@@ -116,7 +116,7 @@
     </Border>
     <ProgressRing IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" Width="24" Height="24" HorizontalAlignment="Left" />
     <TextBlock Text="{x:Bind ViewModel.Status, Mode=OneWay}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
-    <TextBlock Text="FNMusic 0.2.0-rc.1 · 非官方客户端。使用 FFmpeg（LGPL 2.1 或更高版本）；对应源码与许可证随包提供，见 licenses 目录。FN Connect 与 OAuth 后续支持。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+    <TextBlock Text="FNMusic 0.2.0-rc.2 · 非官方客户端。使用 FFmpeg（LGPL 2.1 或更高版本）；对应源码与许可证随包提供，见 licenses 目录。FN Connect 与 OAuth 后续支持。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
     </StackPanel>
     <StackPanel x:Name="SettingsAppearanceSection" Visibility="Collapsed" Spacing="16">
      <TextBlock Text="外观" FontSize="20" FontWeight="SemiBold"/>
