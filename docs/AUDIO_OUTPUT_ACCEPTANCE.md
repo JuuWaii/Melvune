@@ -26,4 +26,8 @@
 
 ## 交付
 
-待生成独立 `FnMusic-0.2.0-rc.2-win-x64-audio-output-20261012.zip`，完成分发校验、最终包实际启动与退出后补齐源码修订和 SHA-256。不上传、推送、打标签或重新封装完整安装器。
+- 推荐：[FnMusic-0.2.0-rc.2-win-x64-audio-output-20261012.zip](../dist/FnMusic-0.2.0-rc.2-win-x64-audio-output-20261012.zip)。解压后运行 `FnMusic.App.exe` 或 `Start-FnMusic.cmd`。
+- 源码修订：`fcf20f030825187e90122805fd456cef1318be24`；仍为 `0.2.0-rc.2`，使用独立批次目录。
+- ZIP SHA-256：`94138F8F7E91CA6642CA8C47DB73D5E8E0E38ECDDDBAFBCCCC3D23E9834EF0C5`，附 [校验文件](../dist/FnMusic-0.2.0-rc.2-win-x64-audio-output-20261012.SHA256SUMS.txt)。593 个文件哈希匹配，总计 594 个文件（含清单）；许可、对应源码、独立示例消费者及使用/验收说明随包附带。
+- 最终 Release 包以独立空配置实际启动，打开输出浮层、检查自动监视提示、点击刷新且保留默认输出、默认关闭退出均通过；测试进程已结束。记录 `.review-audit/audio-output-20261012/package-smoke-result.json`。
+- T01–T06 已完成。旧产物及无关用户修改保持；不上传、推送、打标签或重新封装完整安装器。
