@@ -10,6 +10,8 @@
 
 rc.2 新增 Windows 媒体控制、桌面歌词和可选本机只读信息接口，尚未上传 GitHub。入口和验证边界见 [rc.2 验收记录](docs/RC2_ACCEPTANCE.md)、[桌面联动指南](docs/DESKTOP_INTEGRATION.md) 与 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)。
 
+本轮推荐本地 ZIP：`dist/FnMusic-0.2.0-rc.2-win-x64-final.zip`，解压后运行 `Start-FnMusic.cmd`。便携 EXE、安装 EXE 和 MSI 位于 `dist/FnMusic-0.2.0-rc.2-win-x64-windows-final/`。最终包已完成实际本地/飞牛播放、桌面歌词交互、独立系统媒体控制与信息接口、关闭重启及隔离安装升级验收；哈希见验收记录。
+
 本项目与飞牛官方无关联或背书。当前为候选版，发行文件尚未进行代码签名。
 
 ## 下载与安装
@@ -63,9 +65,9 @@ Release 同时提供 SHA-256 校验文件与构建来源信息。请下载 Relea
 
 MP3 远距离首次定位可能读取较多数据；素材库重关联缺少完成计数时仍显示“未确认”。飞牛歌单的网页修改需要显式刷新，不承诺实时同步或并发编辑事务。
 
-第三方音乐源、FN Connect/OAuth、桌面歌词、媒体键/托盘、对外接口和自动更新留待后续版本。全部编码、DPI、触摸、设备热插拔及长期压力组合尚未覆盖。
+第三方音乐源、FN Connect/OAuth、托盘、全局快捷键和自动更新留待后续版本。rc.2 的信息接口需第三方按协议接入，不承诺自动兼容。实体媒体键、系统媒体卡片完整图形操作，以及全部编码、DPI、触摸、设备热插拔和长期压力组合尚未覆盖。
 
-遇到问题可提交 [Issue](https://github.com/JuuWaii/fnmusic_pc/issues)，注明版本、复现步骤、预期与实际结果。附截图或日志前，请隐去密码、令牌、服务地址和私人路径；集中验证项目见 [用户验证单](docs/RC1_USER_VALIDATION.md)。
+遇到问题可提交 [Issue](https://github.com/JuuWaii/fnmusic_pc/issues)，注明版本、复现步骤、预期与实际结果。附截图或日志前，请隐去密码、令牌、服务地址和私人路径；集中验证项目见 [rc.2 用户验证单](docs/RC2_USER_VALIDATION.md)（公开 rc.1 使用[原验证单](docs/RC1_USER_VALIDATION.md)）。
 
 ## 从源码构建
 
@@ -81,8 +83,8 @@ MP3 远距离首次定位可能读取较多数据；素材库重关联缺少完�
 构建发行包：
 
 ```powershell
-./scripts/package-preview.ps1 -Name FnMusic-0.2.0-rc.1-win-x64
-./scripts/package-windows.ps1 -Name FnMusic-0.2.0-rc.1-win-x64-windows
+./scripts/package-preview.ps1 -Name FnMusic-0.2.0-rc.2-win-x64
+./scripts/package-windows.ps1 -Name FnMusic-0.2.0-rc.2-win-x64-windows
 ```
 
 脚本拒绝覆盖同名输出；已有产物时使用新名称，并用 `-Payload` 指向对应应用目录。辅助检查无需安装 npm 依赖：
