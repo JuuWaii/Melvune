@@ -46,6 +46,10 @@
     <Setter Property="Width" Value="32"/><Setter Property="Height" Value="32"/><Setter Property="MinWidth" Value="32"/><Setter Property="Padding" Value="4"/>
     <Setter Property="Background" Value="Transparent"/><Setter Property="BorderThickness" Value="0"/><Setter Property="CornerRadius" Value="16"/>
    </Style>
+   <Style x:Key="PlayerAccentButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+    <Setter Property="Width" Value="44"/><Setter Property="Height" Value="44"/><Setter Property="MinWidth" Value="44"/>
+    <Setter Property="Padding" Value="4"/><Setter Property="CornerRadius" Value="22"/><Setter Property="BorderThickness" Value="0"/>
+   </Style>
    <DataTemplate x:Key="SongRowTemplate">
     <Grid Height="60" Padding="8" ColumnSpacing="16" Background="Transparent">
      <Grid.ColumnDefinitions><ColumnDefinition Width="48"/><ColumnDefinition Width="2*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="60"/></Grid.ColumnDefinitions>
@@ -136,7 +140,7 @@
      </StackPanel></Border>
      <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24"><StackPanel Spacing="12">
       <TextBlock Text="桌面播放联动" FontWeight="SemiBold"/>
-      <TextBlock Text="Windows 媒体控制随播放启用。以下两个可选功能默认关闭。" TextWrapping="Wrap"/>
+      <ToggleSwitch x:Name="SystemMediaEnabled" Header="SMTC 开关" Toggled="DesktopIntegration_Toggled"/>
       <ToggleSwitch x:Name="DesktopLyricsEnabled" Header="显示桌面歌词" Toggled="DesktopIntegration_Toggled"/>
       <ToggleSwitch x:Name="DesktopLyricsTopmost" Header="歌词置顶" Toggled="DesktopOptions_Changed"/>
       <ToggleSwitch x:Name="DesktopLyricsLocked" Header="锁定歌词窗口（可在此解锁）" Toggled="DesktopOptions_Changed"/>
@@ -215,11 +219,12 @@
        <Button.Flyout><MenuFlyout><ToggleMenuFlyoutItem x:Name="SequentialModeItem" Text="顺序播放" Tag="Sequential" IsChecked="True" Click="QueueMode_Click"/><ToggleMenuFlyoutItem x:Name="RepeatAllModeItem" Text="列表循环" Tag="RepeatAll" Click="QueueMode_Click"/><ToggleMenuFlyoutItem x:Name="RepeatOneModeItem" Text="单曲循环" Tag="RepeatOne" Click="QueueMode_Click"/><ToggleMenuFlyoutItem x:Name="ShuffleModeItem" Text="随机播放" Tag="Shuffle" Click="QueueMode_Click"/></MenuFlyout></Button.Flyout>
       </Button>
       <Button x:Name="PreviousTrackButton" Style="{StaticResource PlayerIconButtonStyle}" Click="PreviousTrack_Click" AutomationProperties.Name="上一首" ToolTipService.ToolTip="上一首"><FontIcon Glyph="&#xE892;" FontSize="16"/></Button>
-      <Button x:Name="PlayPauseButton" Style="{StaticResource PlayerIconButtonStyle}" Width="44" Height="44" CornerRadius="22" Background="{ThemeResource AccentFillColorDefaultBrush}" Foreground="{ThemeResource TextOnAccentFillColorPrimaryBrush}" Click="PlayPause_Click" AutomationProperties.Name="播放" ToolTipService.ToolTip="播放"><FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="22"/></Button>
+      <Button x:Name="PlayPauseButton" Style="{StaticResource PlayerAccentButtonStyle}" Click="PlayPause_Click" AutomationProperties.Name="播放" ToolTipService.ToolTip="播放"><FontIcon x:Name="PlayPauseIcon" Glyph="&#xE768;" FontSize="22"/></Button>
       <Button x:Name="NextTrackButton" Style="{StaticResource PlayerIconButtonStyle}" Click="NextTrack_Click" AutomationProperties.Name="下一首" ToolTipService.ToolTip="下一首"><FontIcon Glyph="&#xE893;" FontSize="16"/></Button>
       <Button x:Name="StopButton" Style="{StaticResource PlayerIconButtonStyle}" Click="Stop_Click" AutomationProperties.Name="停止" ToolTipService.ToolTip="停止"><FontIcon Glyph="&#xE71A;" FontSize="16"/></Button>
      </StackPanel>
      <StackPanel x:Name="PlayerOptionsPanel" Grid.Column="2" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center" HorizontalAlignment="Right">
+      <ToggleButton x:Name="DesktopLyricsShortcut" Width="32" Height="32" MinWidth="32" Padding="4" CornerRadius="16" BorderThickness="0" Click="DesktopLyricsShortcut_Click" AutomationProperties.Name="显示桌面歌词" ToolTipService.ToolTip="显示桌面歌词"><TextBlock Text="词" FontSize="16" FontWeight="SemiBold"/></ToggleButton>
       <Button x:Name="OutputDeviceButton" Style="{StaticResource PlayerIconButtonStyle}" AutomationProperties.Name="音频输出设备" ToolTipService.ToolTip="音频输出设备"><FontIcon Glyph="&#xE7F6;" FontSize="16"/>
        <Button.Flyout><Flyout><StackPanel Spacing="8"><ComboBox x:Name="OutputDevices" Header="音频输出设备" MinWidth="240" DisplayMemberPath="Name" SelectionChanged="Output_Changed"/><Button Content="刷新设备" Click="Devices_Click"/></StackPanel></Flyout></Button.Flyout>
       </Button>

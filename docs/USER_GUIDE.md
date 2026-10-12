@@ -1,4 +1,4 @@
-# FNMusic 0.2.0-rc.1 使用指南
+# FNMusic 0.2.0-rc.2 使用指南
 
 Windows x64 候选版，支持 Windows 10 2004（19041）及以上的 x64 系统。ZIP 版保持完整目录，双击 `Start-FnMusic.cmd` 或 `FnMusic.App.exe`。也提供便携 EXE 和 EXE/MSI 安装包，随包包含 .NET、Windows App SDK 与解码动态库，无需安装 FFmpeg。首次启动无账号也可使用本地音乐。候选版未签名，自动更新后续提供。
 
@@ -20,7 +20,7 @@ EXE 安装包通过 **Options → Browse** 选择目录，MSI 提供中文目录
 
 ## 配置、升级与错误恢复
 
-默认配置在 `%LOCALAPPDATA%/FnMusic.Native/`，与原生预览共用。关闭旧客户端后备份整个配置目录，再解压 rc.1 到新目录启动；不要覆盖旧包或同时运行两版写入同一配置。本地歌单保存为第 2 版，preview.5 及更早客户端不能读取，回退应同时恢复备份。会话不能复制给其他 Windows 用户使用。
+默认配置在 `%LOCALAPPDATA%/FnMusic.Native/`，与原生预览共用。关闭旧客户端后备份整个配置目录，再解压新版本到新目录启动；不要覆盖旧包或同时运行两版写入同一配置。本地歌单保存为第 2 版，preview.5 及更早客户端不能读取，回退应同时恢复备份。会话不能复制给其他 Windows 用户使用。
 
 需要独立配置时可运行 `FnMusic.App.exe "--data-directory=D:\FNMusicProfile"`，参数必须为绝对目录；连接、索引、歌单、主题与会话均使用该目录。它不会把已有配置自动迁入新目录。
 
@@ -28,10 +28,10 @@ EXE 安装包通过 **Options → Browse** 选择目录，MSI 提供中文目录
 
 ## 已知限制和反馈
 
-MP3 远距离首次定位可能读取较多数据；准确模式保持启用。尚未承诺全部编码、DPI/触摸、设备热插拔或长期压力组合。第三方源、桌面歌词、媒体键/托盘、对外接口和自动更新后续添加。
+MP3 远距离首次定位可能读取较多数据；准确模式保持启用。尚未承诺全部编码、DPI/触摸、设备热插拔或长期压力组合。第三方源、托盘、全局快捷键和自动更新后续添加。
 
-集中验证见 `RC1_USER_VALIDATION.md`。反馈提供步骤、预期/实际、版本、格式和错误提示，隐去密码、令牌和私人路径。软件使用 FFmpeg（LGPL 2.1 或更高版本），完整对应源码见 `licenses/corresponding-source/decoder-corresponding-source.zip`；构建与替换方式见 `BUILDING_SOURCES.md`，其他许可见 `licenses/`。
+集中验证见 `RC2_USER_VALIDATION.md`。反馈提供步骤、预期/实际、版本、格式和错误提示，隐去密码、令牌和私人路径。软件使用 FFmpeg（LGPL 2.1 或更高版本），完整对应源码见 `licenses/corresponding-source/decoder-corresponding-source.zip`；构建与替换方式见 `BUILDING_SOURCES.md`，其他许可见 `licenses/`。
 
 ## rc.2 桌面联动
 
-设置 → 播放可开启桌面歌词和本机只读信息接口（默认关闭）。Windows 媒体信息复用当前播放链路。完整用法见 DESKTOP_INTEGRATION.md，独立消费者和接口见 PLAYBACK_INFORMATION_PROTOCOL.md，用户验证见 RC2_USER_VALIDATION.md。
+设置 → 播放的「SMTC 开关」控制系统媒体联动，默认开启。桌面歌词和本机只读信息接口默认关闭；播放栏右侧的「词」按钮可直接显示/隐藏透明歌词，右键歌词可快速调整置顶、锁定、字号和颜色模式。仅主操作按钮和选中控件的背景使用 Windows 强调色；文字、普通图标、滑块和页面保持黑白主题。完整用法见 DESKTOP_INTEGRATION.md，独立消费者和接口见 PLAYBACK_INFORMATION_PROTOCOL.md，用户验证见 RC2_USER_VALIDATION.md。

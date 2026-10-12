@@ -1,6 +1,8 @@
 #if DEBUG
 using FnMusic.Core;
 using Microsoft.UI.Windowing;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using System.Runtime.InteropServices;
 
 namespace FnMusic.App;
@@ -23,6 +25,8 @@ internal static class DesktopLyricsWindowVerification
         hub.Publish(current);
         await Task.Delay(80);
         verify("desktop_lyrics_real_snapshot_line", window.DisplayedLyrics == "第一行");
+        verify("desktop_lyrics_native_surface_is_transparent", window.HasTransparentSurface);
+        verify("desktop_lyrics_text_has_contrasting_outline", window.HasContrastingOutline);
         hub.Publish(current with { State = PlaybackStatus.Paused, PositionSeconds = 10, CurrentLine = "暂停位置" });
         await Task.Delay(80);
         verify("desktop_lyrics_pause_keeps_actual_line", window.DisplayedLyrics == "暂停位置" && window.DisplayedStatus.Contains("已暂停"));
@@ -43,11 +47,23 @@ internal static class DesktopLyricsWindowVerification
         var presenter = (OverlappedPresenter)window.AppWindow.Presenter;
         verify("desktop_lyrics_lock_and_bounded_options", !presenter.HasTitleBar && !presenter.IsResizable
             && presenter.IsAlwaysOnTop && window.Options.FontSize == 28);
+        var lockSetting = window.QuickSettings.Items.OfType<ToggleMenuFlyoutItem>().Single(item => item.Text == "锁定位置");
+        lockSetting.IsChecked = false;
+        verify("desktop_lyrics_locked_context_menu_unlocks", !window.Options.Locked && presenter.IsResizable);
+        var topmostSetting = window.QuickSettings.Items.OfType<ToggleMenuFlyoutItem>().Single(item => item.Text == "置顶");
+        topmostSetting.IsChecked = false;
+        verify("desktop_lyrics_context_menu_topmost", !window.Options.Topmost && !presenter.IsAlwaysOnTop);
+        var colorSettings = window.QuickSettings.Items.OfType<MenuFlyoutSubItem>().Single(item => item.Text == "歌词颜色");
+        colorSettings.Items.OfType<ToggleMenuFlyoutItem>().Single(item => item.Text == "浅色文字").IsChecked = true;
+        window.SetAppTheme(ElementTheme.Light);
+        verify("desktop_lyrics_custom_color_survives_app_theme", window.Options.Theme == "dark" && window.EffectiveTheme == ElementTheme.Dark);
+        colorSettings.Items.OfType<ToggleMenuFlyoutItem>().Single(item => item.Text == "跟随主窗口").IsChecked = true;
+        verify("desktop_lyrics_system_color_follows_app_without_mutating_preference", window.Options.Theme == "system" && window.EffectiveTheme == ElementTheme.Light);
         window.ApplyOptions(window.Options with { Locked = false, Theme = "light", X = int.MinValue, Y = int.MinValue });
         window.RecoverPosition();
         var area = DisplayArea.GetFromWindowId(window.AppWindow.Id, DisplayAreaFallback.Nearest).WorkArea;
         var position = window.AppWindow.Position; var size = window.AppWindow.Size;
-        verify("desktop_lyrics_unlock_and_recover", presenter.HasTitleBar && presenter.IsResizable
+        verify("desktop_lyrics_unlock_and_recover", !presenter.HasTitleBar && presenter.IsResizable
             && position.X >= area.X && position.Y >= area.Y
             && (long)position.X + size.Width <= (long)area.X + area.Width
             && (long)position.Y + size.Height <= (long)area.Y + area.Height);
@@ -58,6 +74,8 @@ internal static class DesktopLyricsWindowVerification
         verify("desktop_lyrics_close_hides_only", !window.IsLyricsVisible && hidden == 1 && hub.Current.State == PlaybackStatus.Playing);
         window.ShowLyrics();
         verify("desktop_lyrics_can_reopen", window.IsLyricsVisible);
+        await Task.Delay(80);
+        verify("desktop_lyrics_reopen_restores_transparent_surface", window.HasTransparentSurface);
         hub.Publish(current with { State = PlaybackStatus.Stopped });
         await Task.Delay(80);
         verify("desktop_lyrics_stop_clears_line", window.DisplayedLyrics == "尚未播放");

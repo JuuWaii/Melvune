@@ -25,6 +25,7 @@ public sealed partial class MainWindow
             stage = "smtc-api-regression";
             await SystemMediaBridgeVerification.RunAsync(DispatcherQueue, WinRT.Interop.WindowNative.GetWindowHandle(this)); Check("smtc_api_regression", true);
             await DesktopLyricsWindowVerification.RunAsync(Check);
+            await VerifyDialogThemeAsync(Check);
             music.Player.IsMuted = true;
             string fixture = Path.Combine(AppDataDirectory.Resolve(), "fixture"); Directory.CreateDirectory(fixture);
             foreach (string name in new[] { "timed", "plain", "empty" })
@@ -43,6 +44,12 @@ public sealed partial class MainWindow
             await Until(() => mediaReady && currentLyrics.IsTimed && music.Player.PlaybackSession.Position.TotalSeconds > .2);
             UpdateProgress(); var first = playbackSnapshots.Current;
             Check("actual_clock_and_anonymous_generation", first.State == FnMusic.Core.PlaybackStatus.Playing && first.TrackGeneration.HasValue && first.PositionSeconds > 0 && first.LyricsKind == PlaybackLyricsKind.Timed);
+            SystemMediaEnabled.IsOn = false;
+            await Until(() => systemMedia is null);
+            Check("smtc_switch_does_not_stop_audio", mediaReady && music.Player.Source is not null && !integrationSettings.SystemMediaEnabled);
+            SystemMediaEnabled.IsOn = true;
+            await Until(() => systemMedia is not null);
+            Check("smtc_switch_recreates_current_session", integrationSettings.SystemMediaEnabled && playbackSnapshots.Current.TrackGeneration == first.TrackGeneration);
             pendingSeek = 30; draggingSeek = true; UpdateProgress();
             Check("drag_preview_is_not_actual_clock", playbackSnapshots.Current.PositionSeconds < 10); ResetSeek();
             await ExecutePlaybackCommandAsync(new(PlaybackCommandKind.Pause, trackGeneration));
@@ -51,6 +58,25 @@ public sealed partial class MainWindow
             await ExecutePlaybackCommandAsync(new(PlaybackCommandKind.Seek, trackGeneration, 20));
             await Until(() => Math.Abs(music.Player.PlaybackSession.Position.TotalSeconds - 20) < 1); UpdateProgress();
             Check("seek_snapshot_and_lyrics", playbackSnapshots.Current.PositionSeconds >= 19 && playbackSnapshots.Current.CurrentLine == "第三行");
+            DesktopLyricsShortcut.IsChecked = true; DesktopLyricsShortcut_Click(DesktopLyricsShortcut, new());
+            await Until(() => desktopLyrics is { IsLyricsVisible: true });
+            Check("player_shortcut_opens_lyrics", DesktopLyricsEnabled.IsOn && integrationSettings.LyricsEnabled);
+            DesktopLyricsShortcut.IsChecked = false; DesktopLyricsShortcut_Click(DesktopLyricsShortcut, new());
+            await Until(() => desktopLyrics is { IsLyricsVisible: false });
+            Check("player_shortcut_hides_without_stopping", !DesktopLyricsEnabled.IsOn && music.Player.Source is not null);
+            await OpenNowPlayingAsync(); Root.UpdateLayout();
+            Check("lyrics_page_has_visible_desktop_shortcut", ReferenceEquals(FullTransportHost.Content, TransportPanel)
+                && DesktopLyricsShortcut.IsLoaded && DesktopLyricsShortcut.ActualWidth >= 32
+                && PlayerOptionsPanel.Children.Contains(DesktopLyricsShortcut));
+            DesktopLyricsShortcut.IsChecked = true; DesktopLyricsShortcut_Click(DesktopLyricsShortcut, new());
+            await Until(() => desktopLyrics is { IsLyricsVisible: true });
+            Check("lyrics_page_shortcut_opens_same_window", DesktopLyricsEnabled.IsOn && integrationSettings.LyricsEnabled);
+            desktopLyrics!.HideLyrics();
+            Check("lyrics_window_close_resets_shortcut", DesktopLyricsShortcut.IsChecked == false && !DesktopLyricsEnabled.IsOn);
+            await CloseNowPlayingAsync();
+            await Until(() => DesktopLyricsShortcut.IsLoaded); Root.UpdateLayout();
+            Check("main_player_keeps_desktop_shortcut", PlayerLayout.Children.Contains(TransportPanel)
+                && DesktopLyricsShortcut.IsLoaded && DesktopLyricsShortcut.ActualWidth >= 32);
             integrationSettings = integrationSettings with { LyricsEnabled = true, InformationEnabled = true }; await ApplyDesktopIntegrationAsync();
             Check("optional_services_enabled", desktopLyrics is not null && informationServer is not null && File.Exists(informationServer.DiscoveryPath));
             desktopLyrics!.ApplyOptions(new(Locked: true)); desktopLyrics.RecoverPosition(); desktopLyrics.HideLyrics();

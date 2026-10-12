@@ -18,7 +18,8 @@ public sealed partial class MainWindow
         bool tight = width < 760;
         VolumeSlider.Width = tight ? 64 : 88;
         TransportButtons.Spacing = tight ? 0 : 8;
-        double side = Math.Clamp((width - 48) * .22, tight ? 172 : 196, 270);
+        // Reserve the whole options group, including the desktop lyrics shortcut.
+        double side = Math.Clamp((width - 48) * .22, tight ? 216 : 240, 270);
         NowPlayingColumn.Width = PlayerRightColumn.Width = new GridLength(side);
         TransportLeftColumn.Width = lyrics ? new GridLength(0) : new GridLength(side);
         TransportRightColumn.Width = lyrics ? GridLength.Auto : new GridLength(side);
