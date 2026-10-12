@@ -143,7 +143,7 @@
       <ToggleSwitch x:Name="SystemMediaEnabled" Header="SMTC 开关" Toggled="DesktopIntegration_Toggled"/>
       <ToggleSwitch x:Name="DesktopLyricsEnabled" Header="显示桌面歌词" Toggled="DesktopIntegration_Toggled"/>
       <ToggleSwitch x:Name="DesktopLyricsTopmost" Header="歌词置顶" Toggled="DesktopOptions_Changed"/>
-      <ToggleSwitch x:Name="DesktopLyricsLocked" Header="锁定歌词窗口（可在此解锁）" Toggled="DesktopOptions_Changed"/>
+      <ToggleSwitch x:Name="DesktopLyricsLocked" Header="锁定并穿透鼠标（可在此解锁）" Toggled="DesktopOptions_Changed"/>
       <Slider x:Name="DesktopLyricsFont" Header="歌词字号" Minimum="16" Maximum="64" Value="28" ValueChanged="DesktopFont_Changed"/>
       <ComboBox x:Name="DesktopLyricsTheme" Header="歌词颜色模式" SelectionChanged="DesktopTheme_Changed"><ComboBoxItem Content="跟随主窗口"/><ComboBoxItem Content="浅色"/><ComboBoxItem Content="深色"/></ComboBox>
       <Button Content="解锁并找回歌词窗口" Click="RecoverDesktopLyrics_Click" HorizontalAlignment="Left"/>

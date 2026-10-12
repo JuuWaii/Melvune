@@ -34,7 +34,7 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
     private readonly TransparentLyricsBackdrop transparentBackdrop;
     private readonly MenuFlyout quickSettings = new();
     private readonly ToggleMenuFlyoutItem topmostSetting = new() { Text = "置顶" };
-    private readonly ToggleMenuFlyoutItem lockedSetting = new() { Text = "锁定位置" };
+    private readonly ToggleMenuFlyoutItem lockedSetting = new() { Text = "锁定并穿透鼠标" };
     private readonly ToggleMenuFlyoutItem systemColorSetting = new() { Text = "跟随主窗口" };
     private readonly ToggleMenuFlyoutItem lightColorSetting = new() { Text = "深色文字" };
     private readonly ToggleMenuFlyoutItem darkColorSetting = new() { Text = "浅色文字" };
@@ -58,6 +58,7 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
         this.hub = hub;
         this.options = Normalize(options);
         transparentBackdrop = new TransparentLyricsBackdrop(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        transparentBackdrop.PrepareNativeHost();
         Title = "飞牛音乐 · 桌面歌词";
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "FnMusic.ico"));
         root.Resources.MergedDictionaries.Add(new ResourceDictionary
@@ -66,7 +67,7 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         topmostButton = AddButton("\uE718", "置顶", () => ChangeOptions(this.options with { Topmost = !this.options.Topmost }));
-        AddButton("\uE72E", "锁定位置", () => ChangeOptions(this.options with { Locked = true }));
+        AddButton("\uE72E", "锁定并穿透鼠标", () => ChangeOptions(this.options with { Locked = true }));
         var settingsButton = AddButton("\uE713", "桌面歌词快速设置", () => { });
         settingsButton.Flyout = quickSettings;
         AddButton("\uE8BB", "隐藏桌面歌词", HideLyrics);
@@ -88,6 +89,7 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
         systemTheme.ColorValuesChanged += SystemThemeChanged;
         AppWindow.Closing += WindowClosing;
         AppWindow.Changed += WindowChanged;
+        Activated += WindowActivated;
         hub.Changed += SnapshotChanged;
         ApplyOptions(this.options);
         RenderSnapshot();
@@ -246,7 +248,9 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
         RecoverPosition();
         RenderSnapshot();
         visible = true;
-        Activate();
+        if (options.Locked) AppWindow.Show(false);
+        else Activate();
+        transparentBackdrop.SuppressNativeFrame();
     }
 
     public void HideLyrics()
@@ -268,9 +272,17 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
             presenter.IsAlwaysOnTop = options.Topmost;
             presenter.IsMaximizable = false;
             presenter.IsMinimizable = false;
-            presenter.IsResizable = !options.Locked;
+            presenter.IsResizable = false;
             presenter.SetBorderAndTitleBar(false, false);
             transparentBackdrop.SuppressNativeFrame();
+            if (options.Locked)
+            {
+                quickSettings.Hide();
+                dragStart = null; dragPosition = null; root.ReleasePointerCaptures();
+            }
+            root.ContextFlyout = options.Locked ? null : quickSettings;
+            root.IsHitTestVisible = !options.Locked;
+            transparentBackdrop.SetInputPassThrough(options.Locked);
             root.RowDefinitions[0].Height = new GridLength(options.Locked ? 0 : 30);
             SetControlsVisibility(false);
             ToolTipService.SetToolTip(topmostButton, options.Topmost ? "取消置顶" : "置顶");
@@ -318,6 +330,8 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
 
     private void WindowClosing(AppWindow sender, AppWindowClosingEventArgs args)
     { if (disposed) return; args.Cancel = true; HideLyrics(); }
+    private void WindowActivated(object sender, WindowActivatedEventArgs args)
+    { if (!disposed) transparentBackdrop.SuppressNativeFrame(); }
 
     private void WindowChanged(AppWindow sender, AppWindowChangedEventArgs args)
     {
@@ -358,7 +372,7 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
             PlaybackStatus.Buffering => "缓冲中", _ => "已停止" };
         string kind = snapshot.LyricsKind == PlaybackLyricsKind.Plain ? " · 纯文本歌词（无时间轴）" : "";
         statusText.Text = string.IsNullOrWhiteSpace(snapshot.Title) ? state : $"{snapshot.Title} · {state}{kind}";
-        if (options.Locked) statusText.Text += " · 已锁定，右键解锁";
+        if (options.Locked) statusText.Text += " · 已锁定并穿透鼠标，在设置中解锁";
         foreach (var outline in statusOutlines) outline.Text = statusText.Text;
     }
 
@@ -412,6 +426,7 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
     internal string DisplayedLyrics => lyricText.Text;
     internal string DisplayedStatus => statusText.Text;
     internal bool HasTransparentSurface => transparentBackdrop.IsConfigured && root.Background is SolidColorBrush brush && brush.Color.A == 0;
+    internal bool IsNativeInputPassThrough => transparentBackdrop.IsInputPassThrough;
     internal MenuFlyout QuickSettings => quickSettings;
     internal ElementTheme EffectiveTheme => root.RequestedTheme;
     internal bool HasContrastingOutline => lyricOutlines.Count == 8 && lyricOutlines.All(outline => outline.Text == lyricText.Text && outline.Foreground is SolidColorBrush color && lyricText.Foreground is SolidColorBrush text && color.Color != text.Color);
@@ -426,6 +441,7 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
         root.ActualThemeChanged -= RootThemeChanged;
         AppWindow.Closing -= WindowClosing;
         AppWindow.Changed -= WindowChanged;
+        Activated -= WindowActivated;
         OptionsChanged = null; Hidden = null;
         SystemBackdrop = null;
         transparentBackdrop.Dispose();

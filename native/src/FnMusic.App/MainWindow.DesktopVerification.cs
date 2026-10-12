@@ -12,7 +12,7 @@ public sealed partial class MainWindow
     private async Task VerifyDesktopIntegrationAsync()
     {
         var checks = new Dictionary<string, bool>(); string stage = "smtc-api", error = ""; int errorCode = 0;
-        string smtcStage = "", bridgeStage = "";
+        string smtcStage = "", bridgeStage = "", errorOrigin = "";
         void Check(string key, bool value) { stage = key; checks[key] = value; if (!value) throw new InvalidOperationException(); }
         async Task Until(Func<bool> predicate)
         { for (int i = 0; i < 200 && !predicate(); i++) await Task.Delay(50); if (!predicate()) throw new TimeoutException(); }
@@ -71,6 +71,11 @@ public sealed partial class MainWindow
             DesktopLyricsShortcut.IsChecked = true; DesktopLyricsShortcut_Click(DesktopLyricsShortcut, new());
             await Until(() => desktopLyrics is { IsLyricsVisible: true });
             Check("lyrics_page_shortcut_opens_same_window", DesktopLyricsEnabled.IsOn && integrationSettings.LyricsEnabled);
+            DesktopLyricsLocked.IsOn = true;
+            Check("lyrics_settings_enable_native_passthrough", desktopLyrics!.Options.Locked && desktopLyrics.IsNativeInputPassThrough);
+            RecoverDesktopLyrics_Click(this, new());
+            Check("lyrics_settings_recover_restores_input", !desktopLyrics.Options.Locked && !desktopLyrics.IsNativeInputPassThrough
+                && !DesktopLyricsLocked.IsOn && integrationSettings.Lyrics?.Locked == false);
             desktopLyrics!.HideLyrics();
             Check("lyrics_window_close_resets_shortcut", DesktopLyricsShortcut.IsChecked == false && !DesktopLyricsEnabled.IsOn);
             await CloseNowPlayingAsync();
@@ -105,9 +110,9 @@ public sealed partial class MainWindow
             Check("reenable_new_server", informationServer is not null && File.Exists(informationServer.DiscoveryPath));
             stage = "complete";
         }
-        catch (Exception ex) { error = ex.GetType().Name; errorCode = ex.HResult; smtcStage = SystemMediaBridgeVerification.Stage; bridgeStage = SystemMediaBridge.InitializationStage; }
+        catch (Exception ex) { error = ex.GetType().Name; errorCode = ex is System.ComponentModel.Win32Exception native ? native.NativeErrorCode : ex.HResult; errorOrigin = (ex.TargetSite?.Name ?? "") + (ex.Data.Contains("StyleIndex") ? $"({ex.Data["StyleIndex"]},{ex.Data["WindowStyle"]})" : ""); smtcStage = SystemMediaBridgeVerification.Stage; bridgeStage = SystemMediaBridge.InitializationStage; }
         finally { lyricsBeforeCommit = null; Stop_Click(this, new()); }
-        await File.WriteAllTextAsync(Path.Combine(AppDataDirectory.Resolve(), "desktop-verification.json"), JsonSerializer.Serialize(new { stage, error, errorCode, smtcStage, bridgeStage, checks }));
+        await File.WriteAllTextAsync(Path.Combine(AppDataDirectory.Resolve(), "desktop-verification.json"), JsonSerializer.Serialize(new { stage, error, errorCode, errorOrigin, smtcStage, bridgeStage, checks }));
     }
 }
 #endif
