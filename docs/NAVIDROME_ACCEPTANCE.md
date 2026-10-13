@@ -18,4 +18,10 @@
 
 ## 交付
 
-推荐独立 [Windows x64 ZIP](../dist/FnMusic-0.2.0-rc.2-win-x64-navidrome-20261013.zip)，及 [SHA-256](../dist/FnMusic-0.2.0-rc.2-win-x64-navidrome-20261013.SHA256SUMS.txt)。程序版本仍为 rc.2，完整安装器尚未重新打包。最终包构建和启动核验结果将在打包后补入此处。
+推荐独立 [Windows x64 ZIP](../dist/FnMusic-0.2.0-rc.2-win-x64-navidrome-20261013.zip)，及 [SHA-256](../dist/FnMusic-0.2.0-rc.2-win-x64-navidrome-20261013.SHA256SUMS.txt)。程序版本仍为 rc.2，完整安装器尚未重新打包。
+
+- ZIP SHA-256：`A0AA0B83A437868394A2E43788D8F066780A5808E08577EAC4330FDF6B453206`。
+- 594 个清单文件哈希通过，共 595 文件；ZIP CRC 检查通过。许可、解码器对应源码、独立信息消费者、使用指南和本阶段验收快照随包附带。包内验收文件是打包前快照，最终包结果以本仓库记录为准。
+- 功能源码提交 `c162bed4c9944d47f8b12d9dc31c61c49a8c3a41`，编译版本包含该修订；包 `release.json` 的 `6b7f16b49b5972b43575bbdd179beb537225876b` 另包含随后修正的隐私扫描夹具豁免，功能源码不变。隐私扫描最终通过，未加入真实账号/地址/凭据。
+- 最终 Release 包以独立空配置启动，Windows UI 快照观察到首页、播放栏及音乐库管理入口；两次激活窗口均返回 `failed to activate captured window`，停止自动键鼠操作，因此最终包交互与正常关闭未计为通过。测试进程已清理，正常退出行为由上述开发构建窗口回归覆盖。记录 `.review-audit/navidrome-20261013/package-smoke-result.json`。
+- 本轮本地交付，没有创建 GitHub Release 或上传；用户既有 bug/logo 删除及 img/ 文件保持原状。完整安装器、真实 Navidrome 服务和硬件验收沿后续队列处理。
