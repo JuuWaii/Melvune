@@ -26,6 +26,8 @@ FORBIDDEN = re.compile(r'(^|/)(dev\.config\.json|settings\.json|session[^/]*\.(j
 # Exact reviewed synthetic fixtures, including removed historical tests. No
 # blanket exception for a test file: a different value remains a blocker.
 REVIEWED_FIXTURES = {
+    # Historical privacy checker itself names this exact reviewed synthetic value.
+    ('scripts/check-privacy.js', 'assigned-credential', '00309c34e2ce97d5'),
     ('native/src/FnMusic.App/MainWindow.NavidromeVerification.cs', 'assigned-credential', '00309c34e2ce97d5'),
     ('tests/nas-browser-probe.test.cjs', 'assigned-credential', 'c2a1e943e897abe2'),
     ('scripts/test-headless.js', 'assigned-credential', '31773c851b2d9f01'),

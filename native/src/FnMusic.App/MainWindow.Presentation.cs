@@ -116,7 +116,7 @@ public sealed partial class MainWindow
         SidebarHost.Visibility = SettingsPanel.Visibility = LibraryPanel.Visibility = PlayerBar.Visibility = Visibility.Collapsed;
         PlaylistPanel.Visibility = HomePanel.Visibility = Visibility.Collapsed;
         if (LyricsPanel.Visibility == Visibility.Visible && lyricsNeedsRetry && queue.Current is { } track
-            && TrackSupports(track, MusicSourceCapabilities.Lyrics)) await LoadLyricsAsync(track);
+            && CanLoadTrackLyrics(track)) await LoadLyricsAsync(track);
         if (closed) return;
         if (LyricsPanel.Visibility == Visibility.Visible && activeLyric >= 0) CenterActiveLyric();
     }
@@ -187,7 +187,8 @@ public sealed partial class MainWindow
         object? context = image.DataContext;
         var track = ContextTrack(context);
         object? source = track is not null && localSources.TryGetValue(track.SourceInstanceId, out var local)
-            ? local : track is not null && navidromeSources.TryGetValue(track.SourceInstanceId, out var nav) ? nav : ViewModel.AuthenticatedClient;
+            ? local : track is not null && navidromeSources.TryGetValue(track.SourceInstanceId, out var nav) ? nav
+                : track is not null && embySources.TryGetValue(track.SourceInstanceId, out var emby) ? emby : ViewModel.AuthenticatedClient;
         bool canLoad = !closed && (!ReferenceEquals(image, FullNowCover) || LyricsPanel.Visibility == Visibility.Visible)
             && (track is not null ? TrackSupports(track, MusicSourceCapabilities.Artwork)
                 : ViewModel.AuthenticatedClient is { } currentApi && ViewModel.PlaybackRouter.Supports(currentApi.SourceInstanceId, MusicSourceCapabilities.Artwork));
@@ -220,9 +221,11 @@ public sealed partial class MainWindow
         var api = ViewModel.AuthenticatedClient;
         var source = track is not null ? localSources.GetValueOrDefault(track.SourceInstanceId) : null;
         var nav = track is not null ? navidromeSources.GetValueOrDefault(track.SourceInstanceId) : null;
+        var emby = track is not null ? embySources.GetValueOrDefault(track.SourceInstanceId) : null;
         string? coverId = track?.CoverId ?? (context as MusicCollection)?.CoverId;
         string? key = track is not null && source?.Source.Id == track.SourceInstanceId ? "local:" + track.Reference
             : nav is not null && !string.IsNullOrEmpty(coverId) ? "nav:" + track!.Reference + ":" + coverId
+            : emby is not null && !string.IsNullOrEmpty(coverId) ? "emby:" + track!.Reference + ":" + coverId
             : api is not null && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.Artwork)
                 && !string.IsNullOrEmpty(coverId) && (track is null || track.SourceInstanceId == api.SourceInstanceId)
                 ? api.SourceInstanceId + ":" + coverId : null;
@@ -232,6 +235,7 @@ public sealed partial class MainWindow
             && (track is null || TrackSupports(track, MusicSourceCapabilities.Artwork))
             && (source is not null ? ReferenceEquals(localSources.GetValueOrDefault(source.Source.Id), source)
                 : nav is not null ? CurrentNavidrome(nav)
+                : emby is not null ? CurrentEmby(emby)
                 : ReferenceEquals(api, ViewModel.AuthenticatedClient) && api is not null
                     && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.Artwork));
         try
@@ -264,6 +268,12 @@ public sealed partial class MainWindow
                     if (artwork is null) return;
                     using var bytes = new MemoryStream(); await artwork.CopyToAsync(bytes, ct);
                     bitmap = await Services.ArtworkDecoder.DecodeAsync(bytes.ToArray(), decodeEdge, ct);
+                }
+                else if (emby is not null && track is not null)
+                {
+                    var bytes = await emby.ReadCoverAsync(track, ct);
+                    if (bytes.Length == 0) return;
+                    bitmap = await Services.ArtworkDecoder.DecodeAsync(bytes, decodeEdge, ct);
                 }
                 else
                 {
@@ -300,22 +310,27 @@ public sealed partial class MainWindow
         FullNowCover.Source = null;
         FullNowTitle.Text = "尚未播放歌曲"; FullNowArtist.Text = "";
     }
+    private bool CanLoadTrackLyrics(MusicTrack track) => TrackSupports(track, MusicSourceCapabilities.Lyrics)
+        || embySources.ContainsKey(track.SourceInstanceId) && ViewModel.PlaybackRouter.CanPlay(track.Reference);
+
     private async Task LoadLyricsAsync(MusicTrack track)
     {
         if (closed) return;
         ClearPresentation(); NowCover.DataContext = FullNowCover.DataContext = track; NowAlbum.Text = track.Album;
         FullNowTitle.Text = track.Title; FullNowArtist.Text = string.Join(" · ", new[] { track.Artist, track.Album }.Where(value => !string.IsNullOrWhiteSpace(value)));
-        if (!TrackSupports(track, MusicSourceCapabilities.Lyrics))
+        if (!CanLoadTrackLyrics(track))
         { lyricsNeedsRetry = true; snapshotLyricsKind = PlaybackLyricsKind.Unavailable; playbackSnapshots.SetLyrics(trackGeneration, snapshotLyricsKind, Lyrics.Empty); PublishPlaybackSnapshot(); LyricsStatus.Text = "当前歌曲来源未连接或不支持歌词。"; return; }
         var generation = trackGeneration; snapshotLyricsKind = PlaybackLyricsKind.Loading;
         playbackSnapshots.SetLyrics(generation, snapshotLyricsKind, Lyrics.Empty); PublishPlaybackSnapshot();
         var ct = lyricsWork.Token; LyricsStatus.Text = "正在加载歌词…";
         var source = localSources.GetValueOrDefault(track.SourceInstanceId);
         var nav = navidromeSources.GetValueOrDefault(track.SourceInstanceId);
+        var emby = embySources.GetValueOrDefault(track.SourceInstanceId);
         var api = ViewModel.AuthenticatedClient;
-        bool SourceIsCurrent() => TrackSupports(track, MusicSourceCapabilities.Lyrics) && (source is not null
+        bool SourceIsCurrent() => CanLoadTrackLyrics(track) && (source is not null
             ? ReferenceEquals(source, localSources.GetValueOrDefault(track.SourceInstanceId))
             : nav is not null ? CurrentNavidrome(nav)
+            : emby is not null ? CurrentEmby(emby)
             : api is not null && track.SourceInstanceId == api.SourceInstanceId && ReferenceEquals(api, ViewModel.AuthenticatedClient)
 #if DEBUG
                 || (IsSyntheticPreview && track.SourceInstanceId == Guid.Empty)

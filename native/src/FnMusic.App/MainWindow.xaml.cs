@@ -36,6 +36,8 @@ public sealed partial class MainWindow : Window
 #if DEBUG
         if (Environment.GetCommandLineArgs().Contains("--verify-playback-resume-window") && IsSyntheticPreview)
         { await VerifyPlaybackResumeWindowAsync(Environment.GetCommandLineArgs().FirstOrDefault(arg => arg.StartsWith("--resume-phase=", StringComparison.Ordinal))?.Split('=', 2)[1] ?? "save"); Close(); return; }
+        if (Environment.GetCommandLineArgs().Contains("--verify-emby-window") && IsSyntheticPreview)
+        { await VerifyEmbyWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-navidrome-window") && IsSyntheticPreview)
         { await VerifyNavidromeWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-desktop-integration") && IsSyntheticPreview)
@@ -67,6 +69,7 @@ public sealed partial class MainWindow : Window
         await RestorePlaybackResumeAsync();
         await RestoreLocalIndexesAtStartupAsync();
         _ = RestoreNavidromeAtStartupAsync();
+        _ = RestoreEmbyAtStartupAsync();
         await RefreshPlaylistNavigationAsync();
         await LoadDevicesAsync();
     }

@@ -23,7 +23,7 @@ public sealed partial class MainWindow
 #endif
         new(connection.SourceId, connection.Name, connection.ServerAddress, credentials);
 
-    private bool IndependentSource(Guid id) => localSources.ContainsKey(id) || navidromeSources.ContainsKey(id);
+    private bool IndependentSource(Guid id) => localSources.ContainsKey(id) || navidromeSources.ContainsKey(id) || embySources.ContainsKey(id);
     private bool CurrentNavidrome(NavidromeClient client) => !closed && ReferenceEquals(navidromeSources.GetValueOrDefault(client.Source.Id), client);
 
     private async Task RefreshNavidromeAsync(CancellationToken ct, bool force = false)

@@ -126,7 +126,7 @@ public sealed partial class MainWindow
         var selected = (TrackList.SelectedItem as MusicTrack)?.Reference;
         var scroll = FindPresentationScroll(TrackList); double offset = scroll?.VerticalOffset ?? 0;
         var definitions = FilteredLocalLibraries().ToArray();
-        var local = allMusicView && browseScope is BrowseScope.Nas or BrowseScope.Navidrome ? [] : definitions.SelectMany(item =>
+        var local = allMusicView && browseScope is BrowseScope.Nas or BrowseScope.Navidrome or BrowseScope.Emby ? [] : definitions.SelectMany(item =>
             localSources.TryGetValue(item.SourceId, out var source) ? source.Tracks.Select(track => track with { SourceLabel = item.Name }) : [])
             .Where(track => track.Title.Contains(searchQuery, StringComparison.OrdinalIgnoreCase) || track.Artist.Contains(searchQuery, StringComparison.OrdinalIgnoreCase))
             .OrderBy(track => track.Title, StringComparer.OrdinalIgnoreCase).ThenBy(track => track.SourceInstanceId).ThenBy(track => track.Id).ToArray();
@@ -135,9 +135,10 @@ public sealed partial class MainWindow
         {
             var remote = current.Where(track => !localCatalog.Libraries.Any(item => item.SourceId == track.SourceInstanceId)).ToArray();
             rows = remote.Concat(local).ToArray(); total = rows.Length; page = 1;
-            string scope = browseScope == BrowseScope.All ? "所有音乐" : browseScope == BrowseScope.Local ? "本地音乐" : browseScope == BrowseScope.Navidrome ? "Navidrome" : "飞牛音乐";
+            string scope = browseScope == BrowseScope.All ? "所有音乐" : browseScope == BrowseScope.Local ? "本地音乐" : browseScope == BrowseScope.Navidrome ? "Navidrome" : browseScope == BrowseScope.Emby ? "Emby" : "飞牛音乐";
             int navCount = remote.Count(track => navidromeSources.ContainsKey(track.SourceInstanceId));
-            PageStatus.Text = $"{scope} · 共 {total} 首" + (browseScope == BrowseScope.All ? $"（飞牛 {remote.Length - navCount} / 本地 {local.Length} / Navidrome {navCount}）" : "");
+            int embyCount = remote.Count(track => embySources.ContainsKey(track.SourceInstanceId));
+            PageStatus.Text = $"{scope} · 共 {total} 首" + (browseScope == BrowseScope.All ? $"（飞牛 {remote.Length - navCount - embyCount} / 本地 {local.Length} / Navidrome {navCount} / Emby {embyCount}）" : "");
             PreviousPage.IsEnabled = NextPage.IsEnabled = false;
         }
         else

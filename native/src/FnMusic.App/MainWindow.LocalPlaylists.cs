@@ -28,6 +28,8 @@ public sealed partial class MainWindow
         if (entry.IsCue || !ViewModel.PlaybackRouter.CanPlay(entry.Track)) return false;
         if (navidromeSources.ContainsKey(entry.Track.SourceInstanceId))
             return navidromeTracks.GetValueOrDefault(entry.Track.SourceInstanceId)?.Any(track => track.Reference == entry.Track) == true;
+        if (embySources.ContainsKey(entry.Track.SourceInstanceId))
+            return embyTracks.GetValueOrDefault(entry.Track.SourceInstanceId)?.Any(track => track.Reference == entry.Track) == true;
         if (!localSources.TryGetValue(entry.Track.SourceInstanceId, out var source)) return true;
         try { return File.Exists(source.GetFilePath(entry.Track)); }
         catch (Exception) { return false; }
@@ -38,6 +40,7 @@ public sealed partial class MainWindow
         var library = localCatalog.Libraries.FirstOrDefault(item => item.SourceId == entry.Track.SourceInstanceId);
         return library is not null ? (library.Group.Length > 0 ? library.Group + " / " : "") + library.Name
             : navidromeConnections.FirstOrDefault(item => item.SourceId == entry.Track.SourceInstanceId)?.Name
+                ?? embyConnections.FirstOrDefault(item => item.SourceId == entry.Track.SourceInstanceId)?.Name
                 ?? (ViewModel.AuthenticatedClient?.SourceInstanceId == entry.Track.SourceInstanceId ? "飞牛音乐" : "离线来源");
     }
 

@@ -19,7 +19,8 @@ public sealed partial class MainWindow
     {
         if (closed) return;
         var catalog = LocalLibraryCatalog.Empty;
-        bool busy = false, loaded = false, admin = false, navOperation = false;
+        bool busy = false, loaded = false, admin = false, thirdPartyOperation = false;
+        string thirdPartyName = "Navidrome";
         NasApiClient? api = null;
         IReadOnlyList<string> authorizedPaths = [];
         var rows = new List<LibraryManagerRow>();
@@ -83,7 +84,7 @@ public sealed partial class MainWindow
                 if (background && !closed) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); }
             }
             catch (OperationCanceledException) when (operationCt.IsCancellationRequested || mutation)
-            { if (!closed) { view.Status.Text = "扫描已取消，原音乐库保留。"; if (background) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); } } }
+            { if (!closed) { view.Status.Text = thirdPartyOperation ? "连接操作已取消，原音乐库保留。" : "扫描已取消，原音乐库保留。"; if (background) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); } } }
             catch (LocalLibraryConflictException)
             { view.Status.Text = "音乐库已在其他窗口修改，请刷新核对后重试。原配置未被覆盖。"; InvalidateRows(); if (background && !closed) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); } }
             catch (RemoteSettingsConflictException)
@@ -92,15 +93,15 @@ public sealed partial class MainWindow
             {
                 if (!operationCt.IsCancellationRequested)
                 {
-                    view.Status.Text = navOperation ? "Navidrome 操作未完成，请检查服务地址、账号密码和访问权限后重试。原配置保留。" : ex.Failure == MusicFailure.Unavailable ? "连接失败或请求超时，请刷新核对音乐库状态后重试。" : "飞牛音乐库操作未完成，请检查连接和权限后刷新。";
-                    if (!navOperation && ex.Failure == MusicFailure.Unauthorized && api is not null && ReferenceEquals(api, ViewModel.AuthenticatedClient)) await ViewModel.ExpireSessionAsync();
+                    view.Status.Text = thirdPartyOperation ? thirdPartyName + " 操作未完成，请检查服务地址、账号密码和访问权限后重试。原配置保留。" : ex.Failure == MusicFailure.Unavailable ? "连接失败或请求超时，请刷新核对音乐库状态后重试。" : "飞牛音乐库操作未完成，请检查连接和权限后刷新。";
+                    if (!thirdPartyOperation && ex.Failure == MusicFailure.Unauthorized && api is not null && ReferenceEquals(api, ViewModel.AuthenticatedClient)) await ViewModel.ExpireSessionAsync();
                 }
             }
             catch (Exception)
             { if (!closed) { view.Status.Text = "操作未完成，请检查名称、目录或重复路径。原音乐库保留。"; if (background) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); } } }
             finally
             {
-                busy = false; navOperation = false; view.BlockNavigation = false;
+                busy = false; thirdPartyOperation = false; view.BlockNavigation = false;
                 if (mutation)
                 { localImportBusy = false; Render((list.SelectedItem as LibraryManagerRow)?.Key); }
                 if (background && ReferenceEquals(localLibraryWork, detached))
@@ -120,6 +121,9 @@ public sealed partial class MainWindow
             await RefreshNavidromeAsync(ct);
             rows.AddRange(navidromeConnections.Select(connection => new LibraryManagerRow(null, null, true)
             { Navidrome = connection, ConnectionStatus = navidromeStatus.GetValueOrDefault(connection.SourceId) ?? (navidromeTracks.TryGetValue(connection.SourceId, out var tracks) ? tracks.Count + " 首" : "未连接") }));
+            await RefreshEmbyAsync(ct);
+            rows.AddRange(embyConnections.Select(connection => new LibraryManagerRow(null, null, true)
+            { Emby = connection, ConnectionStatus = embyStatus.GetValueOrDefault(connection.SourceId) ?? (embyTracks.TryGetValue(connection.SourceId, out var tracks) ? tracks.Count + " 首" : "未连接") }));
             api = ViewModel.AuthenticatedClient;
 #if DEBUG
             if (IsSyntheticPreview) api ??= settingsTestClient;
@@ -156,9 +160,15 @@ public sealed partial class MainWindow
             var expected = catalog; var expectedApi = api;
             var request = await EditLibraryDialogAsync(selected, api, CurrentRemote(true), authorizedPaths, ct);
             if (request is null || ct.IsCancellationRequested || !ReferenceEquals(fullPageView, view)) return;
-            navOperation = request.Kind == 2;
+            thirdPartyOperation = request.Kind is 2 or 3; thirdPartyName = request.Kind == 3 ? "Emby" : "Navidrome";
             await Run(async operationCt =>
             {
+                if (request.Kind == 3)
+                {
+                    await SaveEmbyAsync(selected, request, operationCt);
+                    await Refresh(); view.Status.Text = "Emby 已连接。打开所有音乐即可浏览、搜索并播放。";
+                    await RefreshVisibleLocalCatalogAsync(); return;
+                }
                 if (request.Kind == 2)
                 {
                     await SaveNavidromeAsync(selected, request, operationCt);
@@ -214,9 +224,14 @@ public sealed partial class MainWindow
             if (busy || localImportBusy || !loaded || ct.IsCancellationRequested || themedDialogOpen || !rows.Any(row => row.Key == selected.Key) || !selected.CanDelete) return;
             var expected = catalog; var expectedApi = api;
             if (!await ConfirmLibraryDeleteAsync(selected, ct) || ct.IsCancellationRequested || !ReferenceEquals(fullPageView, view)) return;
-            navOperation = selected.Navidrome is not null;
+            thirdPartyOperation = selected.Navidrome is not null || selected.Emby is not null; thirdPartyName = selected.Emby is not null ? "Emby" : "Navidrome";
             await Run(async _ =>
             {
+                if (selected.Emby is { } emby)
+                {
+                    await DeleteEmbyAsync(emby.SourceId, ct); await Refresh();
+                    view.Status.Text = "已移除 Emby 连接，服务端音乐及本地歌单引用保留。"; return;
+                }
                 if (selected.Navidrome is { } nav)
                 {
                     await DeleteNavidromeAsync(nav.SourceId, ct); await Refresh();
@@ -235,7 +250,7 @@ public sealed partial class MainWindow
             }, true);
         }
         add.Click += async (_, _) => await Edit(null);
-        refresh.Click += async (_, _) => await Run(async token => { await RefreshNavidromeAsync(token, force: true); await Refresh((list.SelectedItem as LibraryManagerRow)?.Key); }, false);
+        refresh.Click += async (_, _) => await Run(async token => { await RefreshNavidromeAsync(token, force: true); await RefreshEmbyAsync(token, force: true); await Refresh((list.SelectedItem as LibraryManagerRow)?.Key); }, false);
         view.CancelButton.Click += CancelLocalScan_Click;
         scan.Click += async (_, _) =>
         {

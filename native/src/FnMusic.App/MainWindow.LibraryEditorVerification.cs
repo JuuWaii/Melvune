@@ -74,7 +74,7 @@ public sealed partial class MainWindow
         long revision = (await localLibraryStore.LoadAsync()).Revision;
         await WithLibraryEditorAsync(view, () => ((IInvokeProvider)new ButtonAutomationPeer(FindFullPageButton(view, "新建音乐库")).GetPattern(PatternInterface.Invoke)).Invoke(), editor =>
         {
-            verify("library_create_dialog_local_defaults_and_theme", editor.Kind.Items.Count == 3 && editor.Kind.SelectedIndex == 0
+            verify("library_create_dialog_local_defaults_and_theme", editor.Kind.Items.Count == 4 && editor.Kind.SelectedIndex == 0
                 && editor.LocalFields.Visibility == Visibility.Visible && editor.NasFields.Visibility == Visibility.Collapsed
                 && editor.Dialog.ActualTheme == Root.ActualTheme && !editor.Dialog.IsPrimaryButtonEnabled);
             editor.LocalPath.Text = selected.Directory; editor.Name.Text = "未保存名称";

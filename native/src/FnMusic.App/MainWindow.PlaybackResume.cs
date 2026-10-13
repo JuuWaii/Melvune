@@ -42,6 +42,8 @@ public sealed partial class MainWindow
             return local.Tracks.FirstOrDefault(track => track.Reference == saved.Reference);
         if (navidromeSources.ContainsKey(saved.SourceInstanceId))
             return navidromeTracks.GetValueOrDefault(saved.SourceInstanceId)?.FirstOrDefault(track => track.Reference == saved.Reference);
+        if (embySources.ContainsKey(saved.SourceInstanceId))
+            return embyTracks.GetValueOrDefault(saved.SourceInstanceId)?.FirstOrDefault(track => track.Reference == saved.Reference);
         return ViewModel.AuthenticatedClient?.SourceInstanceId == saved.SourceInstanceId ? saved : null;
     }
 
