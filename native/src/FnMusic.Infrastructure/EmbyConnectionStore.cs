@@ -207,4 +207,3 @@ public sealed class EmbyConnectionStore(string directory, ISessionVault vault)
         catch (CryptographicException) { }
     }
 }
-
