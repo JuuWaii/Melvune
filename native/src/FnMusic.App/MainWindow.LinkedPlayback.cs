@@ -9,6 +9,7 @@ public sealed partial class MainWindow
     private readonly PlaybackSnapshotHub playbackSnapshots = new();
     private MusicTrack? snapshotTrack;
     private Guid? trackGeneration;
+    private TrackReference? pendingResumeSnapshotReference;
     private bool snapshotLoading;
     private PlaybackLyricsKind snapshotLyricsKind = PlaybackLyricsKind.Empty;
 
@@ -31,6 +32,25 @@ public sealed partial class MainWindow
     private void PublishPlaybackSnapshot()
     {
         if (closed) return;
+        if (!closingIntegration && snapshotTrack is null && !snapshotLoading && pendingPlaybackResume is { } saved)
+        {
+            // A restored song is paused metadata, not an opened audio stream. Give it
+            // a stable command identity so SMTC can invoke the same resume path as
+            // the playback button without permitting seeks or pauses before loading.
+            if (trackGeneration is null || pendingResumeSnapshotReference != saved.Track.Reference)
+            {
+                trackGeneration = Guid.NewGuid(); pendingResumeSnapshotReference = saved.Track.Reference;
+                playbackSnapshots.SetLyrics(trackGeneration, PlaybackLyricsKind.Empty, Lyrics.Empty);
+            }
+            var pendingTrack = saved.Track;
+            playbackSnapshots.Publish(new(1, playbackSnapshots.InstanceId, 0, trackGeneration, DateTimeOffset.UtcNow,
+                FnMusic.Core.PlaybackStatus.Paused, saved.PositionSeconds, pendingTrack.DurationSeconds,
+                pendingTrack.Title, pendingTrack.Artist, pendingTrack.Album, PlaybackLyricsKind.Empty, -1, "",
+                ResolveResumeTrack(pendingTrack) is not null, false, queue.CanPrevious, queue.CanNext, false));
+            return;
+        }
+        pendingResumeSnapshotReference = null;
+        if (snapshotTrack is null && !snapshotLoading) trackGeneration = null;
         var session = music.Player.PlaybackSession;
         bool hasSource = snapshotTrack is not null && music.Player.Source is not null;
         var state = snapshotLoading ? FnMusic.Core.PlaybackStatus.Loading : !hasSource ? FnMusic.Core.PlaybackStatus.Stopped
@@ -50,7 +70,7 @@ public sealed partial class MainWindow
             state, position, hasSource ? session.NaturalDuration.TotalSeconds : 0,
             track?.Title ?? "", track?.Artist ?? "", track?.Album ?? "", snapshotLyricsKind,
             line, line >= 0 ? currentLyrics.Lines[line].Text : "",
-            mediaReady || queue.Current is not null, mediaReady,
+            mediaReady || queue.Current is not null || pendingPlaybackResume is not null, mediaReady,
             queue.CanPrevious, queue.CanNext, hasSource && mediaReady && session.CanSeek));
     }
     private async Task ExecutePlaybackCommandAsync(PlaybackCommand command)
@@ -60,13 +80,13 @@ public sealed partial class MainWindow
         {
             case PlaybackCommandKind.Play:
                 if (mediaReady) music.Player.Play();
-                else if (queue.Current is { } track) await PlayTrackAsync(track);
+                else await PlayCurrentOrResumeAsync();
                 break;
-            case PlaybackCommandKind.Pause: if (mediaReady) music.Player.Pause(); break;
+            case PlaybackCommandKind.Pause: Pause_Click(this, new()); break;
             case PlaybackCommandKind.Toggle:
                 if (mediaReady && music.Player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing) music.Player.Pause();
                 else if (mediaReady) music.Player.Play();
-                else if (queue.Current is { } current) await PlayTrackAsync(current);
+                else await PlayCurrentOrResumeAsync();
                 break;
             case PlaybackCommandKind.Stop: Stop_Click(this, new()); break;
             case PlaybackCommandKind.Previous: if (queue.Previous() is { } previous) await PlayTrackAsync(previous); break;

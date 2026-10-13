@@ -34,6 +34,8 @@ public sealed partial class MainWindow : Window
     {
         Root.Loaded -= Root_Loaded;
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-playback-resume-window") && IsSyntheticPreview)
+        { await VerifyPlaybackResumeWindowAsync(Environment.GetCommandLineArgs().FirstOrDefault(arg => arg.StartsWith("--resume-phase=", StringComparison.Ordinal))?.Split('=', 2)[1] ?? "save"); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-navidrome-window") && IsSyntheticPreview)
         { await VerifyNavidromeWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-desktop-integration") && IsSyntheticPreview)
@@ -62,6 +64,7 @@ public sealed partial class MainWindow : Window
 #endif
         await ViewModel.InitializeAsync();
         await ShowHomeAsync();
+        await RestorePlaybackResumeAsync();
         await RestoreLocalIndexesAtStartupAsync();
         _ = RestoreNavidromeAtStartupAsync();
         await RefreshPlaylistNavigationAsync();

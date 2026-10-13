@@ -6,6 +6,8 @@ using FnMusic.Core;
 using FnMusic.Infrastructure;
 using FnMusic.Windows;
 
+if (args.Contains("--verify-playback-resume")) { await PlaybackResumeVerification.RunAsync(); Console.WriteLine("Playback resume storage checks passed."); return; }
+
 if (args.Contains("--verify-navidrome")) { await NavidromeVerification.RunAsync(); Console.WriteLine("Navidrome专项通过。"); return; }
 
 int passed = 0;

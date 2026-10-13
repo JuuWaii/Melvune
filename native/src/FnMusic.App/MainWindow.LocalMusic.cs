@@ -77,7 +77,7 @@ public sealed partial class MainWindow
         }
         foreach (var id in localSources.Keys.Where(id => !catalog.Libraries.Any(item => item.SourceId == id)).ToArray())
         {
-            if (queue.Current?.SourceInstanceId == id) Stop_Click(this, new RoutedEventArgs());
+            if (queue.Current?.SourceInstanceId == id) StopUnavailableSource(id);
             foreach (var track in queue.Tracks.Where(track => track.SourceInstanceId == id).ToArray()) queue.Remove(track.Reference);
             ViewModel.PlaybackRouter.Unregister(id); localSources.Remove(id); unavailableLibraries.Remove(id);
         }

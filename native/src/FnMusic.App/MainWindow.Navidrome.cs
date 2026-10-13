@@ -78,7 +78,7 @@ public sealed partial class MainWindow
 
     private void RemoveNavidromeSource(Guid id)
     {
-        if (queue.Current?.SourceInstanceId == id) Stop_Click(this, new());
+        if (queue.Current?.SourceInstanceId == id) StopUnavailableSource(id);
         foreach (var track in queue.Tracks.Where(track => track.SourceInstanceId == id).ToArray()) queue.Remove(track.Reference);
         ViewModel.PlaybackRouter.Unregister(id);
         if (navidromeSources.Remove(id, out var previous)) previous.Dispose();

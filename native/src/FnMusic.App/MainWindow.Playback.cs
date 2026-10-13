@@ -61,7 +61,7 @@ public sealed partial class MainWindow
         {
             var openedSource = sender.Source;
             DispatcherQueue.TryEnqueue(() =>
-            { if (!closed && openedSource is not null && ReferenceEquals(music.Player.Source, openedSource)) { mediaReady = true; PlaybackStatus.Text = "正在播放（FFmpeg）"; } });
+            { if (!closed && !playbackResumeOpening && openedSource is not null && ReferenceEquals(music.Player.Source, openedSource)) { mediaReady = true; PlaybackStatus.Text = "正在播放（FFmpeg）"; } });
         };
         music.Player.MediaEnded += (sender, _) =>
         {
@@ -71,7 +71,7 @@ public sealed partial class MainWindow
                 if (closed || endedSource is null || !ReferenceEquals(music.Player.Source, endedSource)) return;
                 var next = queue.Next(automatic: true);
                 if (next is not null) await PlayTrackAsync(next);
-                else { PlaybackStatus.Text = "队列播放结束"; mediaReady = false; StopLinkedPlayback(); }
+                else { PlaybackStatus.Text = "队列播放结束"; pendingPlaybackResume = null; lastPlaybackResume = queue.Current is { SourceInstanceId: var id } ended && id != Guid.Empty ? new(ended, 0) : null; mediaReady = false; StopLinkedPlayback(); }
             });
         };
         music.Player.MediaFailed += (sender, args) =>
@@ -280,14 +280,17 @@ public sealed partial class MainWindow
         RepeatOneModeItem.IsChecked = queue.Mode == QueueMode.RepeatOne;
         ShuffleModeItem.IsChecked = queue.Mode == QueueMode.Shuffle;
     }
-    private async Task PlayTrackAsync(MusicTrack track)
+    private async Task PlayTrackAsync(MusicTrack track, double? initialPositionSeconds = null)
     {
         if (closed) return;
+        resumeStartupAbandoned = true;
+        if (initialPositionSeconds is null) { pendingPlaybackResume = null; lastPlaybackResume = track.SourceInstanceId != Guid.Empty ? new(track, 0) : null; }
         CancelWork(); StopLinkedPlayback(); mediaReady = false;
+        playbackResumeOpening = initialPositionSeconds is not null;
         ClearDecoderLyrics();
         UpdateQueueStatus();
         if (!IsSyntheticPreview && !ViewModel.PlaybackRouter.CanPlay(track.Reference))
-        { ClearPresentation(); NowPlaying.Text = ""; PlaybackStatus.Text = "歌曲来源未连接或不支持播放。"; return; }
+        { playbackResumeOpening = false; ClearPresentation(); NowPlaying.Text = ""; PlaybackStatus.Text = "歌曲来源未连接或不支持播放。"; return; }
         BeginLinkedPlayback(track);
         var embedded = new TaskCompletionSource<Lyrics>(TaskCreationOptions.RunContinuationsAsynchronously);
         decoderLyrics = embedded; decoderLyricsReference = track.Reference;
@@ -299,7 +302,10 @@ public sealed partial class MainWindow
             var stream = await OpenPlaybackStreamAsync(track, ct);
             if (ct.IsCancellationRequested || closed) { stream.Dispose(); return; }
             NowPlaying.Text = track.Title + " · " + track.Artist;
-            await music.OpenAsync(stream, ct);
+            await music.OpenAsync(stream, ct, initialPositionSeconds);
+            if (ct.IsCancellationRequested || closed) return;
+            if (initialPositionSeconds is not null)
+            { playbackResumeOpening = false; mediaReady = true; pendingPlaybackResume = null; lastPlaybackResume = CapturePlaybackResume(); PlaybackStatus.Text = "正在播放（已恢复进度）"; UpdateProgress(); }
             embedded.TrySetResult(music.EmbeddedLyrics);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested) { }
@@ -316,17 +322,18 @@ public sealed partial class MainWindow
         }
         catch (FileNotFoundException) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "音频文件或 FFmpeg 不可用，请检查文件位置与解码器安装。"; }
         catch (Exception) { if (!closed && !ct.IsCancellationRequested) PlaybackStatus.Text = "音频加载失败，请检查网络、登录状态或选择其他曲目。"; }
-        finally { embedded.TrySetResult(Lyrics.Empty); if (!ct.IsCancellationRequested && !closed) { snapshotLoading = false; if (music.Player.Source is null) StopLinkedPlayback(); else PublishPlaybackSnapshot(); } }
+        finally { embedded.TrySetResult(Lyrics.Empty); if (!ct.IsCancellationRequested && !closed) { playbackResumeOpening = false; snapshotLoading = false; if (music.Player.Source is null) { mediaReady = false; StopLinkedPlayback(); ApplyPendingResumePresentation(); } else PublishPlaybackSnapshot(); } }
     }
-    private void Pause_Click(object sender, RoutedEventArgs e) { music.Player.Pause(); if (mediaReady) PlaybackStatus.Text = "已暂停"; }
+    private void Pause_Click(object sender, RoutedEventArgs e) { if (playbackResumeOpening) { playbackResumeOpening = false; CancelWork(); StopLinkedPlayback(); mediaReady = false; } else music.Player.Pause(); if (mediaReady || pendingPlaybackResume is not null) PlaybackStatus.Text = "已暂停"; }
     private async void PlayPause_Click(object sender, RoutedEventArgs e)
     {
+        if (playbackResumeOpening || snapshotLoading) return;
         if (mediaReady)
         {
             if (music.Player.PlaybackSession.PlaybackState == MediaPlaybackState.Playing) Pause_Click(sender, e);
             else Resume_Click(sender, e);
         }
-        else if (queue.Current is { } current) await PlayTrackAsync(current);
+        else if (pendingPlaybackResume is not null || queue.Current is not null) await PlayCurrentOrResumeAsync();
         else if (LyricsPanel.Visibility != Visibility.Visible) PlaySelected_Click(sender, e);
     }
     private void UpdateQueueStatus()
@@ -339,7 +346,7 @@ public sealed partial class MainWindow
     private async void ManageQueue_Click(object sender, RoutedEventArgs e)
     { if (queuePage is not null) await CloseQueuePageAsync(); else ShowQueuePage(); }
     private void Resume_Click(object sender, RoutedEventArgs e) { if (mediaReady) { music.Player.Play(); PlaybackStatus.Text = "正在播放"; } }
-    private void Stop_Click(object sender, RoutedEventArgs e) { ClearDecoderLyrics(); ClearPresentation(); CancelWork(); StopLinkedPlayback(); mediaReady = false; PlaybackStatus.Text = "已停止"; NowPlaying.Text = ""; }
+    private void Stop_Click(object sender, RoutedEventArgs e) { resumeStartupAbandoned = true; playbackResumeOpening = false; pendingPlaybackResume = null; lastPlaybackResume = queue.Current is { SourceInstanceId: var id } current && id != Guid.Empty ? new(current, 0) : null; ClearDecoderLyrics(); ClearPresentation(); CancelWork(); StopLinkedPlayback(); mediaReady = false; PlaybackStatus.Text = "已停止"; NowPlaying.Text = ""; }
     private void Mute_Click(object sender, RoutedEventArgs e)
     { music.Player.IsMuted = MuteToggle.IsChecked == true; UpdateVolumeControl(); }
     private void Volume_Changed(object sender, RangeBaseValueChangedEventArgs e)
@@ -397,7 +404,7 @@ public sealed partial class MainWindow
         if (!mediaReady)
         {
             updatingProgress = true;
-            try { SeekSlider.IsEnabled = false; SeekSlider.Value = 0; UpdatePlaybackTimes(TimeSpan.Zero, TimeSpan.Zero); }
+            try { SeekSlider.IsEnabled = false; SeekSlider.Maximum = Math.Max(1, pendingPlaybackResume?.Track.DurationSeconds ?? 1); SeekSlider.Value = Math.Min(pendingPlaybackResume?.PositionSeconds ?? 0, SeekSlider.Maximum); UpdatePlaybackTimes(TimeSpan.FromSeconds(pendingPlaybackResume?.PositionSeconds ?? 0), TimeSpan.FromSeconds(pendingPlaybackResume?.Track.DurationSeconds ?? 0)); ApplyPendingResumePresentation(); }
             finally { updatingProgress = false; }
             return;
         }
@@ -424,9 +431,10 @@ public sealed partial class MainWindow
         PlaybackTime.Text = $"{position:mm\\:ss}";
         PlaybackDuration.Text = $"{duration:mm\\:ss}";
     }
-    private void CancelWork() { ResetSeek(); work.Cancel(); work.Dispose(); work = new(); }
+    private void CancelWork() { playbackResumeOpening = false; ResetSeek(); work.Cancel(); work.Dispose(); work = new(); }
     private void ResetLibrary()
     {
+        if (snapshotTrack is { } previous && !IndependentSource(previous.SourceInstanceId)) RememberPlaybackBeforeSourceRemoval(previous.SourceInstanceId);
         ResetMetadataSync();
         ResetPlaylistNavigation();
         coverCache.Clear();
@@ -463,5 +471,5 @@ public sealed partial class MainWindow
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
     }
     private void ClosePlayback()
-    { CloseAudioOutputs(); CloseLinkedServices(); StopLinkedPlayback(); closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); CloseNavidrome(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { SavePlaybackResumeAtExit(); CloseAudioOutputs(); CloseLinkedServices(); StopLinkedPlayback(); closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); CloseNavidrome(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

@@ -52,10 +52,11 @@ public sealed partial class MainWindow
         remove.Click += (_, _) =>
         {
             if (list.SelectedItem is not MusicTrack track) return;
-            if (queue.Current?.Reference == track.Reference) Stop_Click(this, new RoutedEventArgs());
+            if (queue.Current?.Reference == track.Reference)
+            { Stop_Click(this, new RoutedEventArgs()); ForgetPlaybackResume(); }
             queue.Remove(track.Reference); UpdateQueueStatus();
         };
-        clear.Click += (_, _) => { Stop_Click(this, new RoutedEventArgs()); queue.Clear(); UpdateQueueStatus(); };
+        clear.Click += (_, _) => { Stop_Click(this, new RoutedEventArgs()); ForgetPlaybackResume(); queue.Clear(); UpdateQueueStatus(); };
         view.SourceChanged = UpdateButtons;
         view.Reload = () => { RenderQueuePage(); return Task.CompletedTask; };
         view.Closing = () =>

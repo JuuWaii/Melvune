@@ -29,7 +29,7 @@ if (($contents | Where-Object { ($_.Attributes -band [IO.FileAttributes]::Repars
 $files = @($contents | Where-Object { -not $_.PSIsContainer -and $_.FullName -ne $manifestPath })
 if ($files | Where-Object { [IO.Path]::GetRelativePath($previewRoot, $_.FullName) -match '^(local-index|nas-metadata|playback-information)[\\/]' }) { throw 'Personal music index found in preview' }
 if ($files.Count -ne $manifest.Count -or @($files | Where-Object { -not $known.Contains($_.FullName) }).Count -gt 0) { throw 'Manifest does not describe every package file' }
-if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|navidrome-connections|appearance|desktop-integration)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Development or personal artifact found' }
+if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|playback-resume|navidrome-connections|appearance|desktop-integration)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Development or personal artifact found' }
 $requiredFiles = @('FnMusic.App.exe', 'FnMusic.App.dll', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf',
     'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Start-FnMusic.cmd',
     'LICENSE', 'THIRD_PARTY_NOTICES.md', 'NATIVE_DECODER_DEPENDENCIES.md', 'native-decoder-build.json',
