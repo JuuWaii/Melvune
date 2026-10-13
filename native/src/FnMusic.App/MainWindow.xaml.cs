@@ -34,6 +34,8 @@ public sealed partial class MainWindow : Window
     {
         Root.Loaded -= Root_Loaded;
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-navidrome-window") && IsSyntheticPreview)
+        { await VerifyNavidromeWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-desktop-integration") && IsSyntheticPreview)
         { await VerifyDesktopIntegrationAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-nas-settings-permissions-window") && IsSyntheticPreview)
@@ -61,6 +63,7 @@ public sealed partial class MainWindow : Window
         await ViewModel.InitializeAsync();
         await ShowHomeAsync();
         await RestoreLocalIndexesAtStartupAsync();
+        _ = RestoreNavidromeAtStartupAsync();
         await RefreshPlaylistNavigationAsync();
         await LoadDevicesAsync();
     }

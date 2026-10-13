@@ -151,6 +151,13 @@ function checkFile(file) {
       .filter(match => name !== '外网 IPv4（非文档示例）' || !reviewedDecoderVersion(file, match, content))
       .map(match => match[0]);
     if (!matches.length) continue;
+    // Exact dummy password used only with the in-process .invalid Navidrome fixture.
+    if (file === 'native/src/FnMusic.App/MainWindow.NavidromeVerification.cs' && name === '凭据（token/secret/password/key）') {
+      for (let i = matches.length - 1; i >= 0; i--) {
+        if (/^Password = "fixture-only"$/.test(matches[i])) matches.splice(i, 1);
+      }
+      if (!matches.length) continue;
+    }
     // 仅豁免这个已审查测试中的固定合成值，其后的其他匹配仍继续检查。
     if (file === 'tests/nas-browser-probe.test.cjs' && name === '凭据（token/secret/password/key）') {
       for (let i = matches.length - 1; i >= 0; i--) {

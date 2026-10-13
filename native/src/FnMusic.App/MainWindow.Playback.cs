@@ -309,6 +309,8 @@ public sealed partial class MainWindow
             {
                 if (ViewModel.AuthenticatedClient?.SourceInstanceId == track.SourceInstanceId)
                     await ViewModel.ExpireSessionAsync();
+                else if (navidromeSources.ContainsKey(track.SourceInstanceId))
+                { RemoveNavidromeSource(track.SourceInstanceId); navidromeStatus[track.SourceInstanceId] = "认证失效，请编辑后重新输入密码"; }
                 PlaybackStatus.Text = "歌曲来源的登录已失效，请重新连接。";
             }
         }
@@ -431,9 +433,9 @@ public sealed partial class MainWindow
         favoriteWork.Cancel(); favoriteWork.Dispose(); favoriteWork = new();
         favoritesView = false; FavoriteStatus.Text = "";
         // 只移除旧飞牛来源；混合队列中的本地条目及正在播放的本地流仍可保留。
-        bool preserveLocalQueue = queue.Current is { } current && localSources.ContainsKey(current.SourceInstanceId)
+        bool preserveLocalQueue = queue.Current is { } current && IndependentSource(current.SourceInstanceId)
             && ViewModel.PlaybackRouter.CanPlay(current.Reference);
-        foreach (var track in queue.Tracks.Where(track => !localSources.ContainsKey(track.SourceInstanceId)
+        foreach (var track in queue.Tracks.Where(track => !IndependentSource(track.SourceInstanceId)
             || !ViewModel.PlaybackRouter.CanPlay(track.Reference)).ToArray()) queue.Remove(track.Reference);
         if (!preserveLocalQueue)
         {
@@ -445,10 +447,10 @@ public sealed partial class MainWindow
         if (allMusicView)
         {
             libraryWork.Cancel();
-            var localRows = (TrackList.ItemsSource as IEnumerable<MusicTrack>)?.Where(track => localSources.ContainsKey(track.SourceInstanceId)).ToArray() ?? [];
+            var localRows = (TrackList.ItemsSource as IEnumerable<MusicTrack>)?.Where(track => IndependentSource(track.SourceInstanceId)).ToArray() ?? [];
             TrackList.ItemsSource = localRows; TrackList.SelectedIndex = localRows.Length > 0 ? 0 : -1;
             page = 1; total = localRows.Length; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
-            PageStatus.Text = "飞牛连接已变化；当前保留本地歌曲，点击刷新重新汇总。";
+            PageStatus.Text = "飞牛连接已变化；当前保留其他来源歌曲，点击刷新重新汇总。";
             UpdateFavoriteButton(); return;
         }
         // 浏览来源与播放来源可以不同；保留本地筛选、分页及正在进行的扫描。
@@ -461,5 +463,5 @@ public sealed partial class MainWindow
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
     }
     private void ClosePlayback()
-    { CloseAudioOutputs(); CloseLinkedServices(); StopLinkedPlayback(); closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { CloseAudioOutputs(); CloseLinkedServices(); StopLinkedPlayback(); closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); CloseNavidrome(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

@@ -7,7 +7,7 @@ namespace FnMusic.App;
 
 public sealed partial class MainWindow
 {
-    private enum BrowseScope { All, Nas, Local }
+    private enum BrowseScope { All, Nas, Local, Navidrome }
     private bool allMusicView, updatingBrowseSource;
     private BrowseScope browseScope;
 #if DEBUG
@@ -38,7 +38,7 @@ public sealed partial class MainWindow
         BrowseSourceFilter.SelectedIndex = (int)browseScope;
         Grid.SetColumn(LocalLibraryFilters, allMusicView ? 1 : 0);
         Grid.SetColumnSpan(LocalLibraryFilters, allMusicView ? 1 : 2);
-        Grid.SetColumnSpan(BrowseSourceFilter, browseScope == BrowseScope.Nas ? 2 : 1);
+        Grid.SetColumnSpan(BrowseSourceFilter, browseScope is BrowseScope.Nas or BrowseScope.Navidrome ? 2 : 1);
         updatingBrowseSource = false;
     }
 
@@ -64,13 +64,17 @@ public sealed partial class MainWindow
         try
         {
             allMusicLoads++;
+            if (scope is BrowseScope.All or BrowseScope.Navidrome) await RefreshNavidromeAsync(ct, force: rescan);
+            long navRevision = navidromeRevision;
+            var navTracks = scope is BrowseScope.All or BrowseScope.Navidrome ? navidromeTracks.Values.SelectMany(tracks => tracks)
+                .Where(track => track.Title.Contains(query, StringComparison.OrdinalIgnoreCase) || track.Artist.Contains(query, StringComparison.OrdinalIgnoreCase) || track.Album.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray() : [];
             var catalog = await localLibraryStore.LoadAsync(ct);
             var definitions = catalog.Libraries.Where(item => (selectedLocalGroup is null || item.Group == selectedLocalGroup)
                 && (selectedLocalLibrary is null || item.SourceId == selectedLocalLibrary)).ToArray();
             var staged = new Dictionary<Guid, LocalMusicSource>();
             var cachedSources = new HashSet<Guid>();
             var failed = new List<Guid>();
-            if (scope != BrowseScope.Nas)
+            if (scope is BrowseScope.All or BrowseScope.Local)
                 foreach (var definition in definitions)
                 {
                     if (!rescan && localSources.TryGetValue(definition.SourceId, out var source)
@@ -88,7 +92,7 @@ public sealed partial class MainWindow
                     catch (OperationCanceledException) { throw; }
                     catch (Exception) { failed.Add(definition.SourceId); }
                 }
-            var localTracks = scope == BrowseScope.Nas ? [] : definitions.SelectMany(item =>
+            var localTracks = scope is BrowseScope.Nas or BrowseScope.Navidrome ? [] : definitions.SelectMany(item =>
             {
                 var source = staged.GetValueOrDefault(item.SourceId) ?? localSources.GetValueOrDefault(item.SourceId);
                 // A cache from an old folder must not appear under the new folder's identity.
@@ -108,7 +112,7 @@ public sealed partial class MainWindow
 #endif
                 return query.Length == 0 ? await api!.ListTracksAsync(index, 50, ct) : await api!.SearchTracksAsync(query, index, 50, ct);
             }
-            if (scope != BrowseScope.Local)
+            if (scope is BrowseScope.All or BrowseScope.Nas)
             {
                 if (!RemoteSupports(capability)) remoteStatus = ViewModel.AuthenticatedClient is null ? "飞牛未连接" : "飞牛不支持当前浏览或搜索";
                 else
@@ -140,7 +144,7 @@ public sealed partial class MainWindow
                 }
             }
             ct.ThrowIfCancellationRequested();
-            if (closed || !allMusicView || !ReferenceEquals(api, AllMusicClient)) return;
+            if (closed || !allMusicView || !ReferenceEquals(api, AllMusicClient) || navRevision != navidromeRevision) return;
             if ((await localLibraryStore.LoadAsync(ct)).Revision != catalog.Revision) throw new LocalLibraryConflictException();
 #if DEBUG
             if (allMusicBeforeCommit is { } beforeCommit) await beforeCommit();
@@ -155,14 +159,16 @@ public sealed partial class MainWindow
             if (closed || !allMusicView || !ReferenceEquals(api, AllMusicClient)) return;
             foreach (var id in failed) unavailableLibraries.Add(id);
             RenderLocalFilters();
-            total = checked(remoteTotal + localTracks.Length);
+            if (navRevision != navidromeRevision) return;
+            total = checked(remoteTotal + localTracks.Length + navTracks.Length);
             page = 1;
-            var rows = remoteTracks.Concat(localTracks).ToArray();
+            var rows = remoteTracks.Concat(localTracks).Concat(navTracks).ToArray();
             TrackList.ItemsSource = rows;
             TrackList.SelectedIndex = oldSelection is MusicTrack selected ? Array.FindIndex(rows, track => track.Reference == selected.Reference) : -1;
             if (TrackList.SelectedIndex < 0 && rows.Length > 0) TrackList.SelectedIndex = 0;
-            string scopeName = scope == BrowseScope.All ? "所有音乐" : scope == BrowseScope.Nas ? "飞牛音乐" : "本地音乐";
-            PageStatus.Text = $"{scopeName} · 共 {total} 首" + (scope == BrowseScope.All ? $"（飞牛 {remoteTotal} / 本地 {localTracks.Length}）" : "")
+            string scopeName = scope == BrowseScope.All ? "所有音乐" : scope == BrowseScope.Nas ? "飞牛音乐" : scope == BrowseScope.Navidrome ? "Navidrome" : "本地音乐";
+            PageStatus.Text = $"{scopeName} · 共 {total} 首" + (scope == BrowseScope.All ? $"（飞牛 {remoteTotal} / 本地 {localTracks.Length} / Navidrome {navTracks.Length}）" : "")
+                + (scope is BrowseScope.All or BrowseScope.Navidrome && navidromeStatus.Count > 0 ? " · Navidrome 部分连接不可用，可在音乐库管理中重试" : "")
                 + (remoteStatus.Length > 0 ? " · " + remoteStatus : "") + (failed.Count > 0 ? $" · {failed.Count} 个本地库读取失败，配置与可用缓存保留" : "");
             PreviousPage.IsEnabled = NextPage.IsEnabled = false;
         }

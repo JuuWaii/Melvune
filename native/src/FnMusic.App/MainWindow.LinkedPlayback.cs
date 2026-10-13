@@ -96,6 +96,12 @@ public sealed partial class MainWindow
                 }
                 bytes ??= await LocalArtworkReader.ReadThumbnailAsync(local.GetFilePath(track.Reference), ArtworkDecoder.ThumbnailEdge, ct);
             }
+            else if (navidromeSources.GetValueOrDefault(track.SourceInstanceId) is { } nav)
+            {
+                using var artwork = await nav.OpenArtworkAsync(track, ArtworkDecoder.ThumbnailEdge, ct);
+                if (artwork is not null) { using var output = new MemoryStream(); await artwork.CopyToAsync(output, ct); bytes = output.ToArray(); }
+                if (!CurrentNavidrome(nav)) return;
+            }
             else if (ViewModel.AuthenticatedClient is { } api && api.SourceInstanceId == track.SourceInstanceId && track.CoverId is { } cover)
                 bytes = await ReadRemoteCoverAsync(api, cover, FnMusic.Infrastructure.NasCoverSize.Medium, ct);
             if (!closed && !ct.IsCancellationRequested && generation == trackGeneration && bytes is { Length: > 0 and <= 4 * 1024 * 1024 } && systemMedia is not null)

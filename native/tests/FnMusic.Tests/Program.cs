@@ -6,6 +6,8 @@ using FnMusic.Core;
 using FnMusic.Infrastructure;
 using FnMusic.Windows;
 
+if (args.Contains("--verify-navidrome")) { await NavidromeVerification.RunAsync(); Console.WriteLine("Navidrome专项通过。"); return; }
+
 int passed = 0;
 void Check(bool value) { if (!value) throw new Exception("Assertion failed"); }
 async Task Test(string name, Func<Task> run) { await run(); passed++; Console.WriteLine("PASS " + name); }

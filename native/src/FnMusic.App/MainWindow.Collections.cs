@@ -17,7 +17,7 @@ public sealed partial class MainWindow
         UpdateSourceCommands();
         UpdateBrowseSourceFilter();
         PreviousPage.Visibility = NextPage.Visibility = allMusicView ? Visibility.Collapsed : Visibility.Visible;
-        LocalLibraryFilters.Visibility = localView || allMusicView && browseScope != BrowseScope.Nas ? Visibility.Visible : Visibility.Collapsed;
+        LocalLibraryFilters.Visibility = localView || allMusicView && browseScope is BrowseScope.All or BrowseScope.Local ? Visibility.Visible : Visibility.Collapsed;
         bool listing = collectionKind is not null && collection is null;
         CollectionList.Visibility = CollectionOpen.Visibility = listing ? Visibility.Visible : Visibility.Collapsed;
         TrackList.Visibility = listing ? Visibility.Collapsed : Visibility.Visible;

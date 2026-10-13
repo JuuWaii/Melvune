@@ -4,13 +4,13 @@
 
 # FnMusic · 飞牛音乐 Windows 客户端
 
-一个使用 C#、WinUI 3 和 FFmpeg 构建的非官方桌面音乐播放器，支持飞牛音乐与本地音乐。黑白界面，统一音乐库、歌单、播放队列和应用内歌词。
+一个使用 C#、WinUI 3 和 FFmpeg 构建的非官方桌面音乐播放器，支持飞牛音乐、本地音乐和 Navidrome 只读音乐源。黑白界面，统一音乐库、歌单、播放队列和应用内歌词。
 
 **本地候选版：0.2.0-rc.2；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
 
 rc.2 新增 Windows 媒体控制、桌面歌词和可选本机只读信息接口，尚未上传 GitHub。入口和验证边界见 [rc.2 验收记录](docs/RC2_ACCEPTANCE.md)、[桌面联动指南](docs/DESKTOP_INTEGRATION.md) 与 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)。
 
-本轮推荐本地 ZIP：`dist/FnMusic-0.2.0-rc.2-win-x64-final.zip`，解压后运行 `Start-FnMusic.cmd`。便携 EXE、安装 EXE 和 MSI 位于 `dist/FnMusic-0.2.0-rc.2-win-x64-windows-final/`。最终包已完成实际本地/飞牛播放、桌面歌词交互、独立系统媒体控制与信息接口、关闭重启及隔离安装升级验收；哈希见验收记录。
+本轮推荐本地 ZIP：[Navidrome 首版](dist/FnMusic-0.2.0-rc.2-win-x64-navidrome-20261013.zip)，解压后运行 `Start-FnMusic.cmd`。验收和真实服务兼容性边界见 [Navidrome 验收记录](docs/NAVIDROME_ACCEPTANCE.md)。完整安装器保持之前批次，尚未包含本轮功能；旧产物保留。
 
 本项目与飞牛官方无关联或背书。当前为候选版，发行文件尚未进行代码签名。
 

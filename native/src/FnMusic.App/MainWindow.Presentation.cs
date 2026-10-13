@@ -187,7 +187,7 @@ public sealed partial class MainWindow
         object? context = image.DataContext;
         var track = ContextTrack(context);
         object? source = track is not null && localSources.TryGetValue(track.SourceInstanceId, out var local)
-            ? local : ViewModel.AuthenticatedClient;
+            ? local : track is not null && navidromeSources.TryGetValue(track.SourceInstanceId, out var nav) ? nav : ViewModel.AuthenticatedClient;
         bool canLoad = !closed && (!ReferenceEquals(image, FullNowCover) || LyricsPanel.Visibility == Visibility.Visible)
             && (track is not null ? TrackSupports(track, MusicSourceCapabilities.Artwork)
                 : ViewModel.AuthenticatedClient is { } currentApi && ViewModel.PlaybackRouter.Supports(currentApi.SourceInstanceId, MusicSourceCapabilities.Artwork));
@@ -219,8 +219,10 @@ public sealed partial class MainWindow
         image.Tag = request; request.CancelAfter(TimeSpan.FromSeconds(15)); var ct = request.Token;
         var api = ViewModel.AuthenticatedClient;
         var source = track is not null ? localSources.GetValueOrDefault(track.SourceInstanceId) : null;
+        var nav = track is not null ? navidromeSources.GetValueOrDefault(track.SourceInstanceId) : null;
         string? coverId = track?.CoverId ?? (context as MusicCollection)?.CoverId;
         string? key = track is not null && source?.Source.Id == track.SourceInstanceId ? "local:" + track.Reference
+            : nav is not null && !string.IsNullOrEmpty(coverId) ? "nav:" + track!.Reference + ":" + coverId
             : api is not null && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.Artwork)
                 && !string.IsNullOrEmpty(coverId) && (track is null || track.SourceInstanceId == api.SourceInstanceId)
                 ? api.SourceInstanceId + ":" + coverId : null;
@@ -229,6 +231,7 @@ public sealed partial class MainWindow
         bool IsCurrent() => !ct.IsCancellationRequested && !closed && ReferenceEquals(image.DataContext, context)
             && (track is null || TrackSupports(track, MusicSourceCapabilities.Artwork))
             && (source is not null ? ReferenceEquals(localSources.GetValueOrDefault(source.Source.Id), source)
+                : nav is not null ? CurrentNavidrome(nav)
                 : ReferenceEquals(api, ViewModel.AuthenticatedClient) && api is not null
                     && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.Artwork));
         try
@@ -254,6 +257,13 @@ public sealed partial class MainWindow
                         if (thumbnail is null) return;
                         bitmap = await Services.ArtworkDecoder.DecodeAsync(thumbnail, decodeEdge, ct);
                     }
+                }
+                else if (nav is not null && track is not null)
+                {
+                    using var artwork = await nav.OpenArtworkAsync(track, decodeEdge, ct);
+                    if (artwork is null) return;
+                    using var bytes = new MemoryStream(); await artwork.CopyToAsync(bytes, ct);
+                    bitmap = await Services.ArtworkDecoder.DecodeAsync(bytes.ToArray(), decodeEdge, ct);
                 }
                 else
                 {
@@ -301,9 +311,11 @@ public sealed partial class MainWindow
         playbackSnapshots.SetLyrics(generation, snapshotLyricsKind, Lyrics.Empty); PublishPlaybackSnapshot();
         var ct = lyricsWork.Token; LyricsStatus.Text = "正在加载歌词…";
         var source = localSources.GetValueOrDefault(track.SourceInstanceId);
+        var nav = navidromeSources.GetValueOrDefault(track.SourceInstanceId);
         var api = ViewModel.AuthenticatedClient;
         bool SourceIsCurrent() => TrackSupports(track, MusicSourceCapabilities.Lyrics) && (source is not null
             ? ReferenceEquals(source, localSources.GetValueOrDefault(track.SourceInstanceId))
+            : nav is not null ? CurrentNavidrome(nav)
             : api is not null && track.SourceInstanceId == api.SourceInstanceId && ReferenceEquals(api, ViewModel.AuthenticatedClient)
 #if DEBUG
                 || (IsSyntheticPreview && track.SourceInstanceId == Guid.Empty)
@@ -318,6 +330,7 @@ public sealed partial class MainWindow
             else
 #endif
             if (source is not null) result = await source.GetLyricsAsync(track.Reference, ct);
+            else if (nav is not null) result = await nav.GetLyricsAsync(track, ct);
             else if (api is not null && api.SourceInstanceId == track.SourceInstanceId) result = await ReadRemoteLyricsAsync(api, track.Reference, ct);
             else result = Lyrics.Empty;
             if (source is null && result.Lines.Count == 0) result = await ReadDecoderLyricsAsync(track, ct);
