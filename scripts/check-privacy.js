@@ -154,7 +154,7 @@ function checkFile(file) {
     // Exact dummy password used only with the in-process .invalid Navidrome fixture.
     if (file === 'native/src/FnMusic.App/MainWindow.NavidromeVerification.cs' && name === '凭据（token/secret/password/key）') {
       for (let i = matches.length - 1; i >= 0; i--) {
-        if (/^Password = "fixture-only"$/.test(matches[i])) matches.splice(i, 1);
+        if (/^Password\x20=\x20"fixture-only"$/.test(matches[i])) matches.splice(i, 1);
       }
       if (!matches.length) continue;
     }
