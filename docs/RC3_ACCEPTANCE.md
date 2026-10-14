@@ -10,4 +10,15 @@
 
 集中验证：Debug 应用/测试零警告、零错误；核心 120/120，窗口 328/328 通过（来源撤销 18、Subsonic 45、Navidrome 20、Emby 25、桌面/设备/主题 152、六个独立续播进程 68）。Navidrome/Subsonic 八组、Emby 十组协议/存储及续播存储专项通过。新增便携完整性 14 项、Node 24 项和发布材料 9 项通过；源码隐私扫描 blockerCount 为 0。报告位于 `.review-audit/rc3-20261014/`，使用隔离配置和受控音频，不写入真实账号或服务。
 
-最终 Release 构建、便携实际解包/启动及交付哈希在 C05/C06 完成后填入。真实第三方服务、实际听音、硬件、更多 DPI 和安装器图形流程保持用户验证边界。用户集中验证见 RC3_USER_VALIDATION.md；功能延期与唯一进度见 NEXT_DEVELOPMENT_CHECKLIST.md。
+最终 Release 发布成功。ZIP 与便携包来源和程序集均为 `3cf319bf9af81dbc701fcb2b3f61ad22959e2cf4`，598 项文件清单/599 个实际文件与 CRC 通过；应用、便携 EXE 七档图标匹配。便携尾部、长度、嵌入 ZIP 及逐文件摘要和来源独立核对通过。运行后 ZIP 展开目录的文件校验仍通过。
+
+实际运行：ZIP 以独立配置启动，首页、播放器、rc.3 标题观察通过，界面关闭后进程正常退出。便携 EXE extract-only 真实运行退出码 0，599 文件均与 ZIP 内容匹配；再在隔离目录实际启动便携入口，既有本地库记录与数据哨兵文件哈希保持。实际点击所有音乐读取一首受控 WAV，静音双击播放后观察 FFmpeg 正在播放；退出保存实际 36.3765562 秒，重新打开显示同一歌曲和进度并保持暂停。重启后的播放按钮已操作，后续观察为队列结束，未捕获最终 Release 的首个 Playing 事件，因此不计为首次定位验收；该路径的受控窗口第一事件定位与六进程检查仍独立通过。
+
+界面工具曾出现 `failed to activate captured window`、用户输入及几何变化提示，按技能重新选择/获取当前状态后完成以上操作；不沿用旧坐标。全部新测试实例正常退出，正式个人配置未使用。证据在 `.review-audit/rc3-20261014/` 的 final-smoke-result、portable-extraction、portable-runtime 与 delivery-summary；便携静态报告在 `.tools/installers/FnMusic-0.2.0-rc.3-win-x64-portable/portable-verification.json`。
+
+| 产物 | 字节 | SHA-256 |
+| --- | ---: | --- |
+| [rc.3 ZIP](../dist/FnMusic-0.2.0-rc.3-win-x64.zip) | 239831178 | 0E649418E8EB1072D291CE2B10E21BC63A08F96766A2B7531BCFED95A6EE2271 |
+| [便携 EXE](../dist/FnMusic-0.2.0-rc.3-win-x64-portable/FnMusic-0.2.0-rc.3-win-x64-portable.exe) | 277600512 | 5221A4F0B3AEB39E7D74CAF67D11B246EE2ED513D706AEE6074A4B396F172B3D |
+
+ZIP/便携二选一即可。运行时、解码器、独立信息消费者、许可、对应解码源码及使用/验证说明随包提供；包内验收是打包前快照，最终数字与摘要以本仓库记录和独立摘要文件为准。旧包及用户改动保留；本轮只有本地交付，没有推送、打标签、远端构建或 Release 上传。真实第三方服务、实际听音、硬件、更多 DPI、全部最终包操作与安装器图形流程仍按 RC3_USER_VALIDATION.md 集中验收，功能延期见 NEXT_DEVELOPMENT_CHECKLIST.md。

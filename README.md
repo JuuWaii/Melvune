@@ -6,11 +6,11 @@
 
 一个使用 C#、WinUI 3 和 FFmpeg 构建的非官方桌面音乐播放器，支持飞牛音乐、本地音乐，以及 Navidrome、Emby 和 Subsonic 兼容只读音乐源。黑白界面，统一音乐库、歌单、播放队列和应用内歌词。
 
-**当前开发候选版：0.2.0-rc.3；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
+**本地候选版：0.2.0-rc.3；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
 
 rc.3 将桌面联动、音频设备监视、第三方来源和关闭后续播整合为同一候选版本。本轮交付 ZIP 与便携 EXE，完整安装器和远端发布另行安排。开发状态、最终下载入口及校验值统一见 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)；验收边界见 [rc.3 验收记录](docs/RC3_ACCEPTANCE.md)。
 
-本轮只推荐清单列出的统一 rc.3 产物；功能批次的旧 ZIP 和安装器保留用于回退。真实第三方服务版本、权限与代理兼容性仍需按 [用户验证单](docs/RC3_USER_VALIDATION.md) 验收。
+当前推荐 [rc.3 ZIP](dist/FnMusic-0.2.0-rc.3-win-x64.zip)，可选 [便携 EXE](dist/FnMusic-0.2.0-rc.3-win-x64-portable/FnMusic-0.2.0-rc.3-win-x64-portable.exe)。源码、摘要和本地实际运行记录见 [验收记录](docs/RC3_ACCEPTANCE.md)。功能批次的旧 ZIP 和安装器保留用于回退；真实第三方服务版本、权限与代理兼容性仍需按 [用户验证单](docs/RC3_USER_VALIDATION.md) 验收。
 
 本项目与飞牛官方无关联或背书。当前为候选版，发行文件尚未进行代码签名。
 
