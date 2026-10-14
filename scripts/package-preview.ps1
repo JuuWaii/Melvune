@@ -1,11 +1,11 @@
-param(
-    [string]$Version = '0.2.0-rc.3',
+﻿param(
+    [string]$Version = '0.2.0-rc.4',
     [string]$Name = ('FnMusic-' + $Version + '-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 )
 $ErrorActionPreference = 'Stop'
 if ($Name -notmatch '^[a-zA-Z0-9._-]+$' -or $Name -in @('.', '..')) { throw 'Invalid package name' }
 $repo = Split-Path $PSScriptRoot -Parent
-if ($Version -notin @('0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3')) { throw 'Unsupported release version' }
+if ($Version -notin @('0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3','0.2.0-rc.4')) { throw 'Unsupported release version' }
 $appProject = Join-Path $repo 'native/src/FnMusic.App/FnMusic.App.csproj'
 [xml]$appDefinition = Get-Content -LiteralPath $appProject -Raw
 $declaredVersions = @($appDefinition.Project.PropertyGroup.Version | Where-Object { $_ })
@@ -39,7 +39,8 @@ Copy-Item -LiteralPath (Join-Path $repo 'docs/NAVIDROME_ACCEPTANCE.md') -Destina
 Copy-Item -LiteralPath (Join-Path $repo 'docs/PLAYBACK_RESUME_ACCEPTANCE.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'docs/EMBY_ACCEPTANCE.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'docs/SUBSONIC_ACCEPTANCE.md') -Destination $destination
-if ($Version -eq '0.2.0-rc.3') { Copy-Item -LiteralPath (Join-Path $repo 'docs/RC3_ACCEPTANCE.md') -Destination $destination }
+if ($Version -in @('0.2.0-rc.3', '0.2.0-rc.4')) { Copy-Item -LiteralPath (Join-Path $repo ('docs/RC' + $candidateNumber + '_ACCEPTANCE.md')) -Destination $destination }
+if ($Version -eq '0.2.0-rc.4') { Copy-Item -LiteralPath (Join-Path $repo 'docs/HTTP_JSON_SOURCES.md') -Destination $destination }
 New-Item -ItemType Directory -Path $decoderLicenses | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'licenses/FFmpegInteropX-Apache-2.0.txt') -Destination $decoderLicenses
 $decoderBuildMaterials = Join-Path $decoderLicenses 'FFmpegInteropX-build'
@@ -63,7 +64,7 @@ start "" "%~dp0FnMusic.App.exe"
 '@ | Set-Content -LiteralPath (Join-Path $destination 'Start-FnMusic.cmd') -Encoding ascii
 $files = Get-ChildItem -LiteralPath $destination -Recurse -File
 if ($files | Where-Object { [IO.Path]::GetRelativePath($destination, $_.FullName) -match '^(local-index|nas-metadata)[\\/]' }) { throw 'Personal music index found in preview' }
-if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|playback-resume|navidrome-connections|emby-connections|appearance)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Unexpected development or personal artifact in preview' }
+if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|playback-resume|navidrome-connections|emby-connections|http-json-connections|appearance)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Unexpected development or personal artifact in preview' }
 $manifest = $files | Sort-Object FullName | ForEach-Object {
     [ordered]@{ path = [IO.Path]::GetRelativePath($destination, $_.FullName); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
 }

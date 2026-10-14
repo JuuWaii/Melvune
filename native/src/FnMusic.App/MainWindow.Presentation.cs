@@ -188,7 +188,8 @@ public sealed partial class MainWindow
         var track = ContextTrack(context);
         object? source = track is not null && localSources.TryGetValue(track.SourceInstanceId, out var local)
             ? local : track is not null && navidromeSources.TryGetValue(track.SourceInstanceId, out var nav) ? nav
-                : track is not null && embySources.TryGetValue(track.SourceInstanceId, out var emby) ? emby : ViewModel.AuthenticatedClient;
+                : track is not null && embySources.TryGetValue(track.SourceInstanceId, out var emby) ? emby
+                    : track is not null && httpJsonSources.TryGetValue(track.SourceInstanceId, out var json) ? json : ViewModel.AuthenticatedClient;
         bool canLoad = !closed && (!ReferenceEquals(image, FullNowCover) || LyricsPanel.Visibility == Visibility.Visible)
             && (track is not null ? TrackSupports(track, MusicSourceCapabilities.Artwork)
                 : ViewModel.AuthenticatedClient is { } currentApi && ViewModel.PlaybackRouter.Supports(currentApi.SourceInstanceId, MusicSourceCapabilities.Artwork));
@@ -222,10 +223,12 @@ public sealed partial class MainWindow
         var source = track is not null ? localSources.GetValueOrDefault(track.SourceInstanceId) : null;
         var nav = track is not null ? navidromeSources.GetValueOrDefault(track.SourceInstanceId) : null;
         var emby = track is not null ? embySources.GetValueOrDefault(track.SourceInstanceId) : null;
+        var json = track is not null ? httpJsonSources.GetValueOrDefault(track.SourceInstanceId) : null;
         string? coverId = track?.CoverId ?? (context as MusicCollection)?.CoverId;
         string? key = track is not null && source?.Source.Id == track.SourceInstanceId ? "local:" + track.Reference
             : nav is not null && !string.IsNullOrEmpty(coverId) ? "nav:" + track!.Reference + ":" + coverId
             : emby is not null && !string.IsNullOrEmpty(coverId) ? "emby:" + track!.Reference + ":" + coverId
+            : json is not null && !string.IsNullOrEmpty(coverId) ? "json:" + track!.Reference + ":" + coverId
             : api is not null && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.Artwork)
                 && !string.IsNullOrEmpty(coverId) && (track is null || track.SourceInstanceId == api.SourceInstanceId)
                 ? api.SourceInstanceId + ":" + coverId : null;
@@ -236,6 +239,7 @@ public sealed partial class MainWindow
             && (source is not null ? ReferenceEquals(localSources.GetValueOrDefault(source.Source.Id), source)
                 : nav is not null ? CurrentNavidrome(nav)
                 : emby is not null ? CurrentEmby(emby)
+                : json is not null ? CurrentHttpJson(json)
                 : ReferenceEquals(api, ViewModel.AuthenticatedClient) && api is not null
                     && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.Artwork));
         try
@@ -273,6 +277,12 @@ public sealed partial class MainWindow
                 {
                     var bytes = await emby.ReadCoverAsync(track, ct);
                     if (bytes.Length == 0) return;
+                    bitmap = await Services.ArtworkDecoder.DecodeAsync(bytes, decodeEdge, ct);
+                }
+                else if (json is not null && track is not null)
+                {
+                    var bytes = await json.ReadCoverAsync(track, ct);
+                    if (bytes is not { Length: > 0 }) return;
                     bitmap = await Services.ArtworkDecoder.DecodeAsync(bytes, decodeEdge, ct);
                 }
                 else
@@ -326,11 +336,13 @@ public sealed partial class MainWindow
         var source = localSources.GetValueOrDefault(track.SourceInstanceId);
         var nav = navidromeSources.GetValueOrDefault(track.SourceInstanceId);
         var emby = embySources.GetValueOrDefault(track.SourceInstanceId);
+        var json = httpJsonSources.GetValueOrDefault(track.SourceInstanceId);
         var api = ViewModel.AuthenticatedClient;
         bool SourceIsCurrent() => CanLoadTrackLyrics(track) && (source is not null
             ? ReferenceEquals(source, localSources.GetValueOrDefault(track.SourceInstanceId))
             : nav is not null ? CurrentNavidrome(nav)
             : emby is not null ? CurrentEmby(emby)
+            : json is not null ? CurrentHttpJson(json)
             : api is not null && track.SourceInstanceId == api.SourceInstanceId && ReferenceEquals(api, ViewModel.AuthenticatedClient)
 #if DEBUG
                 || (IsSyntheticPreview && track.SourceInstanceId == Guid.Empty)
@@ -349,6 +361,12 @@ public sealed partial class MainWindow
             else if (nav is not null)
             {
                 try { result = await nav.GetLyricsAsync(track, ct); }
+                catch (MusicApiException ex) when (ex.Failure != MusicFailure.Unauthorized)
+                { serviceLyricsFailure = ex; result = Lyrics.Empty; }
+            }
+            else if (json is not null)
+            {
+                try { result = await json.GetLyricsAsync(track, ct); }
                 catch (MusicApiException ex) when (ex.Failure != MusicFailure.Unauthorized)
                 { serviceLyricsFailure = ex; result = Lyrics.Empty; }
             }

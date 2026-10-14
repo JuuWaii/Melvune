@@ -266,7 +266,8 @@ public sealed partial class MainWindow
                     ContentType = OutputDeviceButton.Content?.GetType().Name, AccessibleName = AutomationProperties.GetName(OutputDeviceButton) }));
             verify("player_output_icon_opens_device_picker", outputOpened.Task.IsCompleted && OutputDeviceButton.Flyout.IsOpen
                 && OutputDevices.ActualWidth > 0 && OutputDevices.ActualHeight > 0 && OutputDevices.XamlRoot == Root.XamlRoot && OutputDeviceButton.Content is FontIcon
-                && AutomationProperties.GetName(OutputDeviceButton) == "音频输出设备");
+                && OutputDevices.SelectedItem is OutputOption selectedOutput
+                && AutomationProperties.GetName(OutputDeviceButton) == "音频输出设备：" + selectedOutput.Name);
             OutputDeviceButton.Flyout.Hide(); await Task.Delay(50);
             ((IInvokeProvider)new ButtonAutomationPeer(QueueButton).GetPattern(PatternInterface.Invoke)).Invoke(); await Task.Delay(50);
             verify("player_rightmost_queue_icon_opens_drawer", queuePage is not null && QueueOverlay.Visibility == Visibility.Visible

@@ -82,7 +82,7 @@ public sealed partial class MainWindow
             await WithLibraryEditorAsync(view, () => Invoke(add), async editor =>
             {
                 editor.Kind.SelectedIndex = 3;
-                Check("emby_editor_dynamic_fields", editor.Kind.Items.Count == 5 && editor.OtherFields.Visibility == Visibility.Visible
+                Check("emby_editor_dynamic_fields", editor.Kind.Items.Count == 6 && editor.OtherFields.Visibility == Visibility.Visible
                     && editor.LocalFields.Visibility == Visibility.Collapsed && Equals(editor.Server.Header, "Emby 服务地址") && !editor.Dialog.IsPrimaryButtonEnabled);
                 Check("emby_editor_explains_embedded_lyrics_and_token_storage", editor.OtherDescription.Text.Contains("音频内嵌") && editor.OtherDescription.Text.Contains("不保存原始密码"));
                 editor.NavName.Text = "Emby 验证库"; editor.Server.Text = "https://emby.example.invalid/"; editor.Username.Text = "fixture"; editor.Password.Password = fixtureInput;

@@ -19,7 +19,7 @@ public sealed partial class MainWindow : Window
         ConfigureSongList(TrackList);
         QueueModeButton.Flyout.Opening += PlayerMenu_Opening;
         OutputDeviceButton.Flyout.Opening += PlayerOutput_Opening;
-        Title = "飞牛音乐 · 0.2.0-rc.3";
+        Title = "飞牛音乐 · 0.2.0-rc.4";
         AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1360, 900));
         InitializePlayback();
         InitializePresentation();
@@ -34,6 +34,8 @@ public sealed partial class MainWindow : Window
     {
         Root.Loaded -= Root_Loaded;
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-httpjson-window") && IsSyntheticPreview)
+        { await VerifyHttpJsonWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-catalog-revocation-window") && IsSyntheticPreview)
         { await VerifyCatalogRevocationWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-subsonic-window") && IsSyntheticPreview)
@@ -74,6 +76,7 @@ public sealed partial class MainWindow : Window
         await RestoreLocalIndexesAtStartupAsync();
         _ = RestoreNavidromeAtStartupAsync();
         _ = RestoreEmbyAtStartupAsync();
+        _ = RestoreHttpJsonAtStartupAsync();
         await RefreshPlaylistNavigationAsync();
         await LoadDevicesAsync();
     }

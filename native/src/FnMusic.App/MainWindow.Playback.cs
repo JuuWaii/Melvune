@@ -319,6 +319,8 @@ public sealed partial class MainWindow
                 { RemoveNavidromeSource(track.SourceInstanceId); navidromeStatus[track.SourceInstanceId] = "认证失效，请编辑后重新输入密码"; }
                 else if (embySources.ContainsKey(track.SourceInstanceId))
                 { RemoveEmbySource(track.SourceInstanceId); embyStatus[track.SourceInstanceId] = "认证失效，请编辑后重新输入密码"; }
+                else if (httpJsonSources.ContainsKey(track.SourceInstanceId))
+                { RemoveHttpJsonSource(track.SourceInstanceId); httpJsonStatus[track.SourceInstanceId] = "服务需要认证，当前仅支持匿名接口"; }
                 PlaybackStatus.Text = "歌曲来源的登录已失效，请重新连接。";
             }
         }
@@ -473,5 +475,5 @@ public sealed partial class MainWindow
         page = 1; total = 0; PreviousPage.IsEnabled = NextPage.IsEnabled = false;
     }
     private void ClosePlayback()
-    { SavePlaybackResumeAtExit(); CloseAudioOutputs(); CloseLinkedServices(); StopLinkedPlayback(); closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); CloseNavidrome(); CloseEmby(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
+    { SavePlaybackResumeAtExit(); CloseAudioOutputs(); CloseLinkedServices(); StopLinkedPlayback(); closed = true; CloseQueuePage(force: true, restoreFocus: false); CloseFullPage(force: true, restoreFocus: false); activePlaylistPage?.Dispose(); activePlaylistPage = null; playlistNavigationWork?.Cancel(); StopAllUiMotions(); systemTheme.AnimationsEnabledChanged -= SystemMotionChanged; systemTheme.ColorValuesChanged -= SystemThemeChanged; lyricsWork.Cancel(); lyricsWork.Dispose(); localLifetime.Cancel(); CloseNavidrome(); CloseEmby(); CloseHttpJson(); localLifetime.Dispose(); foreach (var id in localSources.Keys) ViewModel.PlaybackRouter.Unregister(id); ResetSeek(); progressTimer?.Stop(); favoriteWork.Cancel(); favoriteWork.Dispose(); libraryWork.Cancel(); libraryWork.Dispose(); work.Cancel(); work.Dispose(); music.Dispose(); }
 }

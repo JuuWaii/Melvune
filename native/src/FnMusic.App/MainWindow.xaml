@@ -120,7 +120,7 @@
     </Border>
     <ProgressRing IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" Width="24" Height="24" HorizontalAlignment="Left" />
     <TextBlock Text="{x:Bind ViewModel.Status, Mode=OneWay}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
-    <TextBlock Text="FNMusic 0.2.0-rc.3 · 非官方客户端。使用 FFmpeg（LGPL 2.1 或更高版本）；对应源码与许可证随包提供，见 licenses 目录。FN Connect 与 OAuth 后续支持。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+    <TextBlock Text="FNMusic 0.2.0-rc.4 · 非官方客户端。使用 FFmpeg（LGPL 2.1 或更高版本）；对应源码与许可证随包提供，见 licenses 目录。FN Connect 与 OAuth 后续支持。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
     </StackPanel>
     <StackPanel x:Name="SettingsAppearanceSection" Visibility="Collapsed" Spacing="16">
      <TextBlock Text="外观" FontSize="20" FontWeight="SemiBold"/>
@@ -187,7 +187,7 @@
      <Button x:Name="ArtistAlbums" Content="歌手专辑" Click="ArtistAlbums_Click" Visibility="Collapsed"/>
     </StackPanel></ScrollViewer>
     <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="2*"/></Grid.ColumnDefinitions>
-     <ComboBox x:Name="BrowseSourceFilter" Header="来源" HorizontalAlignment="Stretch" Visibility="Collapsed" SelectionChanged="BrowseSource_Changed"><ComboBoxItem Content="全部来源"/><ComboBoxItem Content="飞牛音乐"/><ComboBoxItem Content="本地音乐"/><ComboBoxItem Content="Navidrome"/><ComboBoxItem Content="Emby"/><ComboBoxItem Content="Subsonic 兼容源"/></ComboBox>
+     <ComboBox x:Name="BrowseSourceFilter" Header="来源" HorizontalAlignment="Stretch" Visibility="Collapsed" SelectionChanged="BrowseSource_Changed"><ComboBoxItem Content="全部来源"/><ComboBoxItem Content="飞牛音乐"/><ComboBoxItem Content="本地音乐"/><ComboBoxItem Content="Navidrome"/><ComboBoxItem Content="Emby"/><ComboBoxItem Content="Subsonic 兼容源"/><ComboBoxItem Content="自定义 HTTP/JSON"/></ComboBox>
      <Grid x:Name="LocalLibraryFilters" Grid.Column="1" Visibility="Collapsed" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><ComboBox x:Name="LocalGroupFilter" Header="本地分组" HorizontalAlignment="Stretch" SelectionChanged="LocalFilter_Changed"/><ComboBox x:Name="LocalLibraryFilter" Grid.Column="1" Header="本地音乐库" DisplayMemberPath="Name" HorizontalAlignment="Stretch" SelectionChanged="LocalFilter_Changed"/></Grid>
     </Grid>
     <TextBlock x:Name="CollectionHeading" TextWrapping="Wrap" Visibility="Collapsed"/>

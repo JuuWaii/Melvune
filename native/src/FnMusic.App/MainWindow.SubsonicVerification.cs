@@ -82,7 +82,7 @@ public sealed partial class MainWindow
             await WithLibraryEditorAsync(view, () => Invoke(add), async editor =>
             {
                 editor.Kind.SelectedIndex = 4;
-                Check("subsonic_editor_has_distinct_kind_and_dynamic_fields", editor.Kind.Items.Count == 5
+                Check("subsonic_editor_has_distinct_kind_and_dynamic_fields", editor.Kind.Items.Count == 6
                     && editor.OtherFields.Visibility == Visibility.Visible && editor.LocalFields.Visibility == Visibility.Collapsed
                     && editor.ServiceType.SelectedIndex == 2 && !editor.Dialog.IsPrimaryButtonEnabled);
                 editor.NavName.Text = "通用验证库"; editor.Server.Text = "https://subsonic.example.invalid/music/";

@@ -93,12 +93,19 @@ public sealed partial class MainWindow
             {
                 if (!operationCt.IsCancellationRequested)
                 {
-                    view.Status.Text = thirdPartyOperation ? thirdPartyName + " 操作未完成，请检查服务地址、账号密码和访问权限后重试。原配置保留。" : ex.Failure == MusicFailure.Unavailable ? "连接失败或请求超时，请刷新核对音乐库状态后重试。" : "飞牛音乐库操作未完成，请检查连接和权限后刷新。";
+                    view.Status.Text = thirdPartyOperation
+                        ? thirdPartyName + (thirdPartyName == "自定义 HTTP/JSON"
+                            ? " 操作未完成，请检查匿名访问、服务地址和 JSON 字段方案后重试。原配置保留。"
+                            : " 操作未完成，请检查服务地址、账号密码和访问权限后重试。原配置保留。")
+                        : ex.Failure == MusicFailure.Unavailable ? "连接失败或请求超时，请刷新核对音乐库状态后重试。" : "飞牛音乐库操作未完成，请检查连接和权限后刷新。";
                     if (!thirdPartyOperation && ex.Failure == MusicFailure.Unauthorized && api is not null && ReferenceEquals(api, ViewModel.AuthenticatedClient)) await ViewModel.ExpireSessionAsync();
                 }
             }
             catch (Exception)
-            { if (!closed) { view.Status.Text = "操作未完成，请检查名称、目录或重复路径。原音乐库保留。"; if (background) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); } } }
+            { if (!closed) { view.Status.Text = thirdPartyOperation && thirdPartyName == "自定义 HTTP/JSON"
+                    ? "操作未完成，请检查名称、服务地址、JSON 字段方案或重复连接。原音乐库保留。"
+                    : "操作未完成，请检查名称、目录或重复路径。原音乐库保留。";
+                if (background) { ReportLocalLoading(view.Status.Text, true); ShowMetadataNotice(view.Status.Text); } } }
             finally
             {
                 busy = false; thirdPartyOperation = false; view.BlockNavigation = false;
@@ -124,6 +131,9 @@ public sealed partial class MainWindow
             await RefreshEmbyAsync(ct);
             rows.AddRange(embyConnections.Select(connection => new LibraryManagerRow(null, null, true)
             { Emby = connection, ConnectionStatus = embyStatus.GetValueOrDefault(connection.SourceId) ?? (embyTracks.TryGetValue(connection.SourceId, out var tracks) ? tracks.Count + " 首" : "未连接") }));
+            await RefreshHttpJsonAsync(ct);
+            rows.AddRange(httpJsonConnections.Select(connection => new LibraryManagerRow(null, null, true)
+            { HttpJson = connection, ConnectionStatus = httpJsonStatus.GetValueOrDefault(connection.SourceId) ?? (httpJsonTracks.TryGetValue(connection.SourceId, out var tracks) ? tracks.Count + " 首" : "未连接") }));
             api = ViewModel.AuthenticatedClient;
 #if DEBUG
             if (IsSyntheticPreview) api ??= settingsTestClient;
@@ -158,11 +168,13 @@ public sealed partial class MainWindow
         {
             if (closed || view.IsDisposed) return;
             // The store has already committed. Use that known state rather than a fallible reread.
-            rows = rows.Where(row => row.Navidrome is null && row.Emby is null).ToList();
+            rows = rows.Where(row => row.Navidrome is null && row.Emby is null && row.HttpJson is null).ToList();
             rows.AddRange(navidromeConnections.Select(connection => new LibraryManagerRow(null, null, true)
             { Navidrome = connection, ConnectionStatus = navidromeStatus.GetValueOrDefault(connection.SourceId) ?? (navidromeTracks.TryGetValue(connection.SourceId, out var tracks) ? tracks.Count + " 首" : "未连接") }));
             rows.AddRange(embyConnections.Select(connection => new LibraryManagerRow(null, null, true)
             { Emby = connection, ConnectionStatus = embyStatus.GetValueOrDefault(connection.SourceId) ?? (embyTracks.TryGetValue(connection.SourceId, out var tracks) ? tracks.Count + " 首" : "未连接") }));
+            rows.AddRange(httpJsonConnections.Select(connection => new LibraryManagerRow(null, null, true)
+            { HttpJson = connection, ConnectionStatus = httpJsonStatus.GetValueOrDefault(connection.SourceId) ?? (httpJsonTracks.TryGetValue(connection.SourceId, out var tracks) ? tracks.Count + " 首" : "未连接") }));
             Render(key); view.Status.Text = message;
             try { await RefreshVisibleLocalCatalogAsync(); }
             catch (Exception)
@@ -176,9 +188,14 @@ public sealed partial class MainWindow
             var expected = catalog; var expectedApi = api;
             var request = await EditLibraryDialogAsync(selected, api, CurrentRemote(true), authorizedPaths, ct);
             if (request is null || ct.IsCancellationRequested || !ReferenceEquals(fullPageView, view)) return;
-            thirdPartyOperation = request.Kind is 2 or 3 or 4; thirdPartyName = request.Kind == 3 ? "Emby" : request.Kind == 4 ? "Subsonic 兼容源" : "Navidrome";
+            thirdPartyOperation = request.Kind is 2 or 3 or 4 or 5; thirdPartyName = request.Kind == 5 ? "自定义 HTTP/JSON" : request.Kind == 3 ? "Emby" : request.Kind == 4 ? "Subsonic 兼容源" : "Navidrome";
             await Run(async operationCt =>
             {
+                if (request.Kind == 5)
+                {
+                    await SaveHttpJsonAsync(selected, request, operationCt);
+                    await ShowCommittedThirdPartyAsync("自定义 HTTP/JSON 已连接。打开所有音乐即可浏览、搜索并播放。", selected?.Key); return;
+                }
                 if (request.Kind == 3)
                 {
                     await SaveEmbyAsync(selected, request, operationCt);
@@ -238,9 +255,14 @@ public sealed partial class MainWindow
             if (busy || localImportBusy || !loaded || ct.IsCancellationRequested || themedDialogOpen || !rows.Any(row => row.Key == selected.Key) || !selected.CanDelete) return;
             var expected = catalog; var expectedApi = api;
             if (!await ConfirmLibraryDeleteAsync(selected, ct) || ct.IsCancellationRequested || !ReferenceEquals(fullPageView, view)) return;
-            thirdPartyOperation = selected.Navidrome is not null || selected.Emby is not null; thirdPartyName = selected.Emby is not null ? "Emby" : selected.Navidrome?.Provider == "subsonic" ? "Subsonic 兼容源" : "Navidrome";
+            thirdPartyOperation = selected.Navidrome is not null || selected.Emby is not null || selected.HttpJson is not null; thirdPartyName = selected.HttpJson is not null ? "自定义 HTTP/JSON" : selected.Emby is not null ? "Emby" : selected.Navidrome?.Provider == "subsonic" ? "Subsonic 兼容源" : "Navidrome";
             await Run(async _ =>
             {
+                if (selected.HttpJson is { } json)
+                {
+                    await DeleteHttpJsonAsync(json.SourceId, ct);
+                    await ShowCommittedThirdPartyAsync("已移除自定义 HTTP/JSON 连接，服务端音乐及本地歌单引用保留。"); return;
+                }
                 if (selected.Emby is { } emby)
                 {
                     await DeleteEmbyAsync(emby.SourceId, ct);
@@ -264,7 +286,7 @@ public sealed partial class MainWindow
             }, true);
         }
         add.Click += async (_, _) => await Edit(null);
-        refresh.Click += async (_, _) => await Run(async token => { await RefreshNavidromeAsync(token, force: true); await RefreshEmbyAsync(token, force: true); await Refresh((list.SelectedItem as LibraryManagerRow)?.Key); }, false);
+        refresh.Click += async (_, _) => await Run(async token => { await RefreshNavidromeAsync(token, force: true); await RefreshEmbyAsync(token, force: true); await RefreshHttpJsonAsync(token, force: true); await Refresh((list.SelectedItem as LibraryManagerRow)?.Key); }, false);
         view.CancelButton.Click += CancelLocalScan_Click;
         scan.Click += async (_, _) =>
         {

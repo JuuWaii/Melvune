@@ -7,7 +7,7 @@ namespace FnMusic.App;
 
 public sealed partial class MainWindow
 {
-    private enum BrowseScope { All, Nas, Local, Navidrome, Emby, Subsonic }
+    private enum BrowseScope { All, Nas, Local, Navidrome, Emby, Subsonic, HttpJson }
     private bool IsSubsonicSource(Guid id) => navidromeConnections.Any(connection => connection.SourceId == id && connection.Provider == "subsonic");
     private bool allMusicView, updatingBrowseSource;
     private BrowseScope browseScope;
@@ -39,7 +39,7 @@ public sealed partial class MainWindow
         BrowseSourceFilter.SelectedIndex = (int)browseScope;
         Grid.SetColumn(LocalLibraryFilters, allMusicView ? 1 : 0);
         Grid.SetColumnSpan(LocalLibraryFilters, allMusicView ? 1 : 2);
-        Grid.SetColumnSpan(BrowseSourceFilter, browseScope is BrowseScope.Nas or BrowseScope.Navidrome or BrowseScope.Emby or BrowseScope.Subsonic ? 2 : 1);
+        Grid.SetColumnSpan(BrowseSourceFilter, browseScope is BrowseScope.Nas or BrowseScope.Navidrome or BrowseScope.Emby or BrowseScope.Subsonic or BrowseScope.HttpJson ? 2 : 1);
         updatingBrowseSource = false;
     }
 
@@ -67,6 +67,7 @@ public sealed partial class MainWindow
             allMusicLoads++;
             if (scope is BrowseScope.All or BrowseScope.Navidrome or BrowseScope.Subsonic) await RefreshNavidromeAsync(ct, force: rescan);
             if (scope is BrowseScope.All or BrowseScope.Emby) await RefreshEmbyAsync(ct, force: rescan);
+            if (scope is BrowseScope.All or BrowseScope.HttpJson) await RefreshHttpJsonAsync(ct, force: rescan);
             var catalog = await localLibraryStore.LoadAsync(ct);
             var definitions = catalog.Libraries.Where(item => (selectedLocalGroup is null || item.Group == selectedLocalGroup)
                 && (selectedLocalLibrary is null || item.SourceId == selectedLocalLibrary)).ToArray();
@@ -91,7 +92,7 @@ public sealed partial class MainWindow
                     catch (OperationCanceledException) { throw; }
                     catch (Exception) { failed.Add(definition.SourceId); }
                 }
-            var localTracks = scope is BrowseScope.Nas or BrowseScope.Navidrome or BrowseScope.Emby or BrowseScope.Subsonic ? [] : definitions.SelectMany(item =>
+            var localTracks = scope is BrowseScope.Nas or BrowseScope.Navidrome or BrowseScope.Emby or BrowseScope.Subsonic or BrowseScope.HttpJson ? [] : definitions.SelectMany(item =>
             {
                 var source = staged.GetValueOrDefault(item.SourceId) ?? localSources.GetValueOrDefault(item.SourceId);
                 // A cache from an old folder must not appear under the new folder's identity.
@@ -165,18 +166,20 @@ public sealed partial class MainWindow
             var embyRows = scope is BrowseScope.All or BrowseScope.Emby ? embyTracks.Values.SelectMany(tracks => tracks).Where(Matches).ToArray() : [];
             var navTracks = scope is BrowseScope.All or BrowseScope.Navidrome or BrowseScope.Subsonic ? navidromeTracks
                 .Where(pair => scope == BrowseScope.All || IsSubsonicSource(pair.Key) == (scope == BrowseScope.Subsonic)).SelectMany(pair => pair.Value).Where(Matches).ToArray() : [];
-            total = checked(remoteTotal + localTracks.Length + navTracks.Length + embyRows.Length);
+            var jsonRows = scope is BrowseScope.All or BrowseScope.HttpJson ? httpJsonTracks.Values.SelectMany(tracks => tracks).Where(Matches).ToArray() : [];
+            total = checked(remoteTotal + localTracks.Length + navTracks.Length + embyRows.Length + jsonRows.Length);
             page = 1;
-            var rows = remoteTracks.Concat(localTracks).Concat(navTracks).Concat(embyRows).ToArray();
+            var rows = remoteTracks.Concat(localTracks).Concat(navTracks).Concat(embyRows).Concat(jsonRows).ToArray();
             TrackList.ItemsSource = rows;
             TrackList.SelectedIndex = oldSelection is MusicTrack selected ? Array.FindIndex(rows, track => track.Reference == selected.Reference) : -1;
             if (TrackList.SelectedIndex < 0 && rows.Length > 0) TrackList.SelectedIndex = 0;
             int subsonicCount = navTracks.Count(track => IsSubsonicSource(track.SourceInstanceId));
-            string scopeName = scope == BrowseScope.All ? "所有音乐" : scope == BrowseScope.Nas ? "飞牛音乐" : scope == BrowseScope.Navidrome ? "Navidrome" : scope == BrowseScope.Emby ? "Emby" : scope == BrowseScope.Subsonic ? "Subsonic 兼容源" : "本地音乐";
-            PageStatus.Text = $"{scopeName} · 共 {total} 首" + (scope == BrowseScope.All ? $"（飞牛 {remoteTotal} / 本地 {localTracks.Length} / Navidrome {navTracks.Length - subsonicCount} / Emby {embyRows.Length} / Subsonic {subsonicCount}）" : "")
+            string scopeName = scope == BrowseScope.All ? "所有音乐" : scope == BrowseScope.Nas ? "飞牛音乐" : scope == BrowseScope.Navidrome ? "Navidrome" : scope == BrowseScope.Emby ? "Emby" : scope == BrowseScope.Subsonic ? "Subsonic 兼容源" : scope == BrowseScope.HttpJson ? "自定义 HTTP/JSON" : "本地音乐";
+            PageStatus.Text = $"{scopeName} · 共 {total} 首" + (scope == BrowseScope.All ? $"（飞牛 {remoteTotal} / 本地 {localTracks.Length} / Navidrome {navTracks.Length - subsonicCount} / Emby {embyRows.Length} / Subsonic {subsonicCount} / JSON {jsonRows.Length}）" : "")
                 + (scope is BrowseScope.All or BrowseScope.Navidrome && navidromeStatus.Keys.Any(id => !IsSubsonicSource(id)) ? " · Navidrome 部分连接不可用，可在音乐库管理中重试" : "")
                 + (scope is BrowseScope.All or BrowseScope.Subsonic && navidromeStatus.Keys.Any(IsSubsonicSource) ? " · Subsonic 部分连接不可用，可在音乐库管理中重试" : "")
                 + (scope is BrowseScope.All or BrowseScope.Emby && embyStatus.Count > 0 ? " · Emby 部分连接不可用，可在音乐库管理中重试" : "")
+                + (scope is BrowseScope.All or BrowseScope.HttpJson && httpJsonStatus.Count > 0 ? " · JSON 部分连接不可用，可在音乐库管理中重试" : "")
                 + (remoteStatus.Length > 0 ? " · " + remoteStatus : "") + (failed.Count > 0 ? $" · {failed.Count} 个本地库读取失败，配置与可用缓存保留" : "");
             PreviousPage.IsEnabled = NextPage.IsEnabled = false;
         }

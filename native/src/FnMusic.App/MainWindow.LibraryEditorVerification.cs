@@ -72,9 +72,9 @@ public sealed partial class MainWindow
         LibraryManagerRow Row() => view.List.Items.Cast<LibraryManagerRow>().Single(row => row.Local?.SourceId == selected.SourceId);
         Action Edit() => () => InvokeLibraryCard(view, Row(), "编辑音乐库");
         long revision = (await localLibraryStore.LoadAsync()).Revision;
-        await WithLibraryEditorAsync(view, () => ((IInvokeProvider)new ButtonAutomationPeer(FindFullPageButton(view, "新建音乐库")).GetPattern(PatternInterface.Invoke)).Invoke(), editor =>
+        await WithLibraryEditorAsync(view, () => ((IInvokeProvider)new ButtonAutomationPeer(FindFullPageButton(view, "新建音乐库")).GetPattern(PatternInterface.Invoke)).Invoke(), async editor =>
         {
-            verify("library_create_dialog_local_defaults_and_theme", editor.Kind.Items.Count == 5 && editor.Kind.SelectedIndex == 0
+            verify("library_create_dialog_local_defaults_and_theme", editor.Kind.Items.Count == 6 && editor.Kind.SelectedIndex == 0
                 && editor.LocalFields.Visibility == Visibility.Visible && editor.NasFields.Visibility == Visibility.Collapsed
                 && editor.Dialog.ActualTheme == Root.ActualTheme && !editor.Dialog.IsPrimaryButtonEnabled);
             editor.LocalPath.Text = selected.Directory; editor.Name.Text = "未保存名称";
@@ -90,18 +90,34 @@ public sealed partial class MainWindow
             editor.Username.Text = "fixture-user";
             verify("library_subsonic_new_account_requires_credentials", !editor.Dialog.IsPrimaryButtonEnabled);
             editor.Password.Password = string.Concat("fixture-", "input");
+            await Task.Delay(100);
             var subsonicRequest = editor.Read();
             verify("library_subsonic_request_retains_service_subpath_and_identity", editor.Dialog.IsPrimaryButtonEnabled
                 && subsonicRequest.Kind == 4 && subsonicRequest.Name == "通用音乐测试库"
                 && subsonicRequest.Server == "https://music.example.invalid/airsonic/" && subsonicRequest.Username == "fixture-user"
                 && subsonicRequest.Password.Length > 0);
             editor.Password.Password = "";
+            editor.Kind.SelectedIndex = 5;
+            verify("library_httpjson_anonymous_fields_and_default_scheme", editor.OtherFields.Visibility == Visibility.Visible
+                && editor.JsonDefinition.Visibility == Visibility.Visible && editor.Username.Visibility == Visibility.Collapsed
+                && editor.Password.Visibility == Visibility.Collapsed && editor.ServiceType.SelectedIndex == 3
+                && editor.OtherDescription.Text.Contains("匿名") && editor.Dialog.IsPrimaryButtonEnabled);
+            var validDefinition = editor.JsonDefinition.Text;
+            editor.JsonDefinition.Text = "{";
+            await Task.Delay(100);
+            verify("library_httpjson_invalid_scheme_disables_save", !editor.Dialog.IsPrimaryButtonEnabled && editor.Status.Text.Contains("无效"));
+            editor.JsonDefinition.Text = validDefinition;
+            await Task.Delay(100);
+            var jsonRequest = editor.Read();
+            verify("library_httpjson_request_excludes_other_provider_credentials", editor.Dialog.IsPrimaryButtonEnabled
+                && jsonRequest.Kind == 5 && jsonRequest.Username.Length == 0 && jsonRequest.Password.Length == 0
+                && jsonRequest.JsonDefinition == validDefinition);
             editor.Kind.SelectedIndex = 1;
             verify("library_disconnected_nas_fields_are_read_only", editor.NasFields.Visibility == Visibility.Visible
                 && editor.LocalFields.Visibility == Visibility.Collapsed && !editor.NasPath.IsEnabled && !editor.Dialog.IsPrimaryButtonEnabled);
             editor.Kind.SelectedIndex = 0;
             verify("library_type_switch_retains_local_draft", editor.LocalPath.Text == selected.Directory && editor.Name.Text == "未保存名称" && editor.Dialog.IsPrimaryButtonEnabled);
-            return Task.CompletedTask;
+            return;
         }, false);
         verify("library_create_cancel_has_no_write", (await localLibraryStore.LoadAsync()).Revision == revision && view.Fields.Visibility == Visibility.Collapsed);
         await WithLibraryEditorAsync(view, Edit(), async editor =>

@@ -4,21 +4,21 @@
 
 # FnMusic · 飞牛音乐 Windows 客户端
 
-一个使用 C#、WinUI 3 和 FFmpeg 构建的非官方桌面音乐播放器，支持飞牛音乐、本地音乐，以及 Navidrome、Emby 和 Subsonic 兼容只读音乐源。黑白界面，统一音乐库、歌单、播放队列和应用内歌词。
+一个使用 C#、WinUI 3 和 FFmpeg 构建的非官方桌面音乐播放器，支持飞牛音乐、本地音乐，以及 Navidrome、Emby、Subsonic 兼容和匿名 HTTP/JSON 只读音乐源。黑白界面，统一音乐库、歌单、播放队列和应用内歌词。
 
-**本地候选版：0.2.0-rc.3；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
+**当前开发目标：0.2.0-rc.4；此前本地交付：0.2.0-rc.3；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
 
-rc.3 将桌面联动、音频设备监视、第三方来源和关闭后续播整合为同一候选版本。本轮交付 ZIP 与便携 EXE，完整安装器和远端发布另行安排。开发状态、最终下载入口及校验值统一见 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)；验收边界见 [rc.3 验收记录](docs/RC3_ACCEPTANCE.md)。
+rc.4 在统一候选版本上新增声明式 HTTP/JSON 来源，接入目录、原始播放、封面、歌词和跨库歌单。本轮实现与集中回归已完成，最终构建进行中；目标为 ZIP 与便携 EXE，完整安装器和远端发布另行安排。开发状态、最终下载入口及校验值统一见 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)；本批证据见 [rc.4 验收记录](docs/RC4_ACCEPTANCE.md)。
 
-当前推荐 [rc.3 ZIP](dist/FnMusic-0.2.0-rc.3-win-x64.zip)，可选 [便携 EXE](dist/FnMusic-0.2.0-rc.3-win-x64-portable/FnMusic-0.2.0-rc.3-win-x64-portable.exe)。源码、摘要和本地实际运行记录见 [验收记录](docs/RC3_ACCEPTANCE.md)。功能批次的旧 ZIP 和安装器保留用于回退；真实第三方服务版本、权限与代理兼容性仍需按 [用户验证单](docs/RC3_USER_VALIDATION.md) 验收。
+此前已交付 [rc.3 ZIP](dist/FnMusic-0.2.0-rc.3-win-x64.zip)，可选 [rc.3 便携 EXE](dist/FnMusic-0.2.0-rc.3-win-x64-portable/FnMusic-0.2.0-rc.3-win-x64-portable.exe)，原摘要和实际运行记录见 [rc.3 验收](docs/RC3_ACCEPTANCE.md)。本轮 rc.4 产物尚待构建，不将计划路径当作已发布下载；完成状态以清单为准。旧 ZIP 和安装器保留用于回退，真实第三方服务仍需按 [用户验证单](docs/RC4_USER_VALIDATION.md) 验收。
 
 本项目与飞牛官方无关联或背书。当前为候选版，发行文件尚未进行代码签名。
 
 ## 下载与安装
 
-rc.3 本地交付入口见 [开发清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)：ZIP 解压后运行 `Start-FnMusic.cmd`；便携 EXE 放在可写目录双击启动。运行库与解码依赖随包提供，无需另装 .NET 或 FFmpeg。ZIP 与便携 EXE 选择一种即可。
+本地交付入口及状态见 [开发清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)：ZIP 解压后运行 `Start-FnMusic.cmd`；便携 EXE 放在可写目录双击启动。运行库与解码依赖随包提供，无需另装 .NET 或 FFmpeg。ZIP 与便携 EXE 选择一种即可。
 
-以下为已公开的 [0.2.0-rc.1 Release](https://github.com/JuuWaii/fnmusic_pc/releases/tag/v0.2.0-rc.1)，功能早于本轮 rc.3，不包含其新增能力：
+以下为已公开的 [0.2.0-rc.1 Release](https://github.com/JuuWaii/fnmusic_pc/releases/tag/v0.2.0-rc.1)，功能早于本轮 rc.4，不包含其新增能力：
 
 | 版本 | 下载 | 使用方式 |
 | --- | --- | --- |
@@ -38,6 +38,7 @@ Release 同时提供 SHA-256 校验文件与构建来源信息。请下载 Relea
 - **飞牛与本地音乐**：连接飞牛音乐服务、登录与加密会话恢复，浏览音乐、收藏、搜索、专辑和歌手。
 - **音乐库管理**：多个本地库、来源/分组筛选、启动索引恢复、后台扫描与取消，离线目录保留记录。
 - **第三方只读来源**：Navidrome、Emby 与 Subsonic 兼容连接分别管理，支持目录、搜索、原始音频与封面；歌词依服务接口或音频内嵌信息提供。服务端收藏/歌单写入及转码后续添加。
+- **自定义 HTTP/JSON 来源（rc.4）**：声明式字段方案与受控分页接入匿名同源目录，支持原始 Range 音频、封面、UTF-8 LRC/纯文本歌词和跨库本地歌单；配置示例见 [来源说明](docs/HTTP_JSON_SOURCES.md)。
 - **两类歌单**：跨音乐库的本地歌单，以及当前飞牛账号的专属歌单管理。
 - **播放与队列**：播放/暂停/停止、进度拖动、音量、输出设备、双击切歌和四种播放模式；队列从右侧打开。
 - **关闭后续播**：正常退出保存当前一首及实际位置，重启保持暂停，点击播放继续；来源暂时离线时保留记录。
@@ -72,9 +73,9 @@ MP3 远距离首次定位可能读取较多数据；素材库重关联缺少完�
 
 第三方来源目前只读。Subsonic 兼容源按专辑目录读取，最多 10,000 首，不保证未归入专辑的曲目；原始播放需要服务支持 HTTP Range。真实部署兼容性、实体媒体键、系统媒体卡片完整图形操作，以及全部编码、DPI、触摸、设备热插拔和长期压力组合尚未覆盖。
 
-任意 HTTP/JSON 源映射、第三方服务端写入、转码、完整队列恢复、自定义快捷键、FN Connect/OAuth、自动更新和本轮完整安装器留待后续。只读信息接口需第三方按协议接入，不承诺自动兼容。
+自定义 HTTP/JSON 首版最多 10000 首，字段方案仅访问对象成员；媒体必须同源且无查询参数，不跟随重定向，不支持账号认证、Cookie、自定义请求头、脚本转换和跨域 CDN。认证式自定义源、第三方服务端写入、转码、完整队列恢复、自定义快捷键、FN Connect/OAuth、自动更新和本轮完整安装器留待后续。只读信息接口需第三方按协议接入，不承诺自动兼容。
 
-遇到问题可提交 [Issue](https://github.com/JuuWaii/fnmusic_pc/issues)，注明版本、复现步骤、预期与实际结果。附截图或日志前，请隐去密码、令牌、服务地址和私人路径；集中验证项目见 [rc.3 用户验证单](docs/RC3_USER_VALIDATION.md)（公开 rc.1 使用[原验证单](docs/RC1_USER_VALIDATION.md)）。
+遇到问题可提交 [Issue](https://github.com/JuuWaii/fnmusic_pc/issues)，注明版本、复现步骤、预期与实际结果。附截图或日志前，请隐去密码、令牌、服务地址和私人路径；集中验证项目见 [rc.4 用户验证单](docs/RC4_USER_VALIDATION.md)（公开 rc.1 使用[原验证单](docs/RC1_USER_VALIDATION.md)）。
 
 ## 从源码构建
 
@@ -90,8 +91,8 @@ MP3 远距离首次定位可能读取较多数据；素材库重关联缺少完�
 构建发行包：
 
 ```powershell
-./scripts/package-preview.ps1 -Version 0.2.0-rc.3 -Name FnMusic-0.2.0-rc.3-win-x64
-./scripts/package-windows.ps1 -Payload 'dist/FnMusic-0.2.0-rc.3-win-x64' -Name FnMusic-0.2.0-rc.3-win-x64-portable -PortableOnly
+./scripts/package-preview.ps1 -Version 0.2.0-rc.4 -Name FnMusic-0.2.0-rc.4-win-x64
+./scripts/package-windows.ps1 -Payload 'dist/FnMusic-0.2.0-rc.4-win-x64' -Name FnMusic-0.2.0-rc.4-win-x64-portable -PortableOnly
 ```
 
 脚本拒绝覆盖同名输出；已有产物时使用新名称，并用 `-Payload` 指向对应应用目录。辅助检查无需安装 npm 依赖：
@@ -101,7 +102,7 @@ node --test tests/*.test.cjs
 node scripts/check-privacy.js
 ```
 
-[GitHub Actions](https://github.com/JuuWaii/fnmusic_pc/actions/workflows/windows-packages.yml) 的候选构建流程准备生成 rc.3 ZIP 与便携 EXE，并检查版本、隐私、摘要和图标；只上传构建产物，不自动创建 Release。本轮没有运行远端流程；公开发布另行安排，历史标签保留当时的发布配置。
+[GitHub Actions](https://github.com/JuuWaii/fnmusic_pc/actions/workflows/windows-packages.yml) 的候选构建流程生成 ZIP 与便携 EXE，并检查版本、隐私、摘要和图标；只上传构建产物，不自动创建 Release。本轮没有运行远端流程；公开发布另行安排，历史标签保留当时的发布配置。
 
 ## 许可与项目资料
 

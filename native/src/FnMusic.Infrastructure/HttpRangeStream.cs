@@ -48,7 +48,7 @@ public sealed class HttpRangeStream : Stream
 
     private static void CheckResponse(HttpResponseMessage response, long from, long to, long? expectedLength = null, EntityTagHeaderValue? expectedVersion = null)
     {
-        if (response.StatusCode == HttpStatusCode.Unauthorized) throw new MusicApiException(MusicFailure.Unauthorized);
+        if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden) throw new MusicApiException(MusicFailure.Unauthorized);
         if ((int)response.StatusCode is >= 300 and < 400) throw new MusicApiException(MusicFailure.RedirectRejected);
         var range = response.Content.Headers.ContentRange;
         if (response.StatusCode != HttpStatusCode.PartialContent || range?.Unit != "bytes" || range.From != from || range.To != to ||

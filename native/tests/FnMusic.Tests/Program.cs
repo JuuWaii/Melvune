@@ -7,6 +7,7 @@ using FnMusic.Infrastructure;
 using FnMusic.Windows;
 
 if (args.Contains("--verify-playback-resume")) { await PlaybackResumeVerification.RunAsync(); Console.WriteLine("Playback resume storage checks passed."); return; }
+if (args.Contains("--verify-http-json")) { await HttpJsonVerification.RunAsync(); await HttpJsonConnectionVerification.RunAsync(); Console.WriteLine("HTTP/JSON protocol and connection checks passed."); return; }
 
 if (args.Contains("--verify-emby")) { await EmbyVerification.RunAsync(); await EmbyConnectionVerification.RunAsync(); Console.WriteLine("Emby protocol and connection checks passed."); return; }
 
@@ -1312,9 +1313,9 @@ await Test("range stream seeks across cache blocks and reaches EOF", async () =>
 });
 await Test("range stream rejects redirects and servers ignoring Range", async () =>
 {
-    foreach (var status in new[] { HttpStatusCode.Redirect, HttpStatusCode.OK, HttpStatusCode.Unauthorized })
+    foreach (var status in new[] { HttpStatusCode.Redirect, HttpStatusCode.OK, HttpStatusCode.Unauthorized, HttpStatusCode.Forbidden })
     {
-        var failure = status == HttpStatusCode.Redirect ? MusicFailure.RedirectRejected : status == HttpStatusCode.Unauthorized ? MusicFailure.Unauthorized : MusicFailure.InvalidResponse;
+        var failure = status == HttpStatusCode.Redirect ? MusicFailure.RedirectRejected : status is HttpStatusCode.Unauthorized or HttpStatusCode.Forbidden ? MusicFailure.Unauthorized : MusicFailure.InvalidResponse;
         await Fails(failure, async () => { using var stream = await HttpRangeStream.OpenAsync(new HttpClient(new FakeHandler(_ => new HttpResponseMessage(status))), endpoint.MusicUri, default); });
     }
 });
