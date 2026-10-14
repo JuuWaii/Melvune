@@ -6,11 +6,11 @@
 
 一个使用 C#、WinUI 3 和 FFmpeg 构建的非官方桌面音乐播放器，支持飞牛音乐、本地音乐，以及 Navidrome、Emby、Subsonic 兼容和匿名 HTTP/JSON 只读音乐源。黑白界面，统一音乐库、歌单、播放队列和应用内歌词。
 
-**当前开发目标：0.2.0-rc.5；当前本地交付：0.2.0-rc.4；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
+**当前本地交付：0.2.0-rc.5；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
 
-rc.5 开发重点为完整队列、当前歌曲与进度、播放模式、显式下一曲及有界历史恢复；实现已接入，正在集中验证。完整安装器和远端发布另行安排。开发状态、最终下载入口及校验值统一见 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)；本批证据见 [rc.5 验收记录](docs/RC5_ACCEPTANCE.md)。
+rc.5 开发重点为完整队列、当前歌曲与进度、播放模式、显式下一曲及有界历史恢复；实现、集中回归及最终本地交付已完成。完整安装器和远端发布另行安排。开发状态、最终下载入口及校验值统一见 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)；本批证据见 [rc.5 验收记录](docs/RC5_ACCEPTANCE.md)。
 
-本地下载：[rc.4 ZIP](dist/FnMusic-0.2.0-rc.4-win-x64.zip)，或 [rc.4 便携 EXE](dist/FnMusic-0.2.0-rc.4-win-x64-portable/FnMusic-0.2.0-rc.4-win-x64-portable.exe)。摘要和实际运行记录见 [rc.4 验收](docs/RC4_ACCEPTANCE.md)。旧 ZIP 和安装器保留用于回退，真实第三方服务仍需按 [用户验证单](docs/RC4_USER_VALIDATION.md) 验收。
+本地下载：[rc.5 ZIP](dist/FnMusic-0.2.0-rc.5-win-x64.zip)，或 [rc.5 便携 EXE](dist/FnMusic-0.2.0-rc.5-win-x64-portable/FnMusic-0.2.0-rc.5-win-x64-portable.exe)。摘要和实际运行记录见 [rc.5 验收](docs/RC5_ACCEPTANCE.md)。旧 ZIP 和安装器保留用于回退，真实第三方服务仍需按 [用户验证单](docs/RC4_USER_VALIDATION.md) 验收。
 
 本项目与飞牛官方无关联或背书。当前为候选版，发行文件尚未进行代码签名。
 
@@ -18,7 +18,7 @@ rc.5 开发重点为完整队列、当前歌曲与进度、播放模式、显式
 
 本地交付入口及状态见 [开发清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)：ZIP 解压后运行 `Start-FnMusic.cmd`；便携 EXE 放在可写目录双击启动。运行库与解码依赖随包提供，无需另装 .NET 或 FFmpeg。ZIP 与便携 EXE 选择一种即可。
 
-以下为已公开的 [0.2.0-rc.1 Release](https://github.com/JuuWaii/fnmusic_pc/releases/tag/v0.2.0-rc.1)，功能早于本轮 rc.4，不包含其新增能力：
+以下为已公开的 [0.2.0-rc.1 Release](https://github.com/JuuWaii/fnmusic_pc/releases/tag/v0.2.0-rc.1)，功能早于本轮 rc.5，不包含其新增能力：
 
 | 版本 | 下载 | 使用方式 |
 | --- | --- | --- |
