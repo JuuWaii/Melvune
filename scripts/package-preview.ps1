@@ -1,7 +1,15 @@
-param([string]$Name = ('FnMusic-0.2.0-rc.2-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss')))
+param(
+    [string]$Version = '0.2.0-rc.3',
+    [string]$Name = ('FnMusic-' + $Version + '-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+)
 $ErrorActionPreference = 'Stop'
 if ($Name -notmatch '^[a-zA-Z0-9._-]+$' -or $Name -in @('.', '..')) { throw 'Invalid package name' }
 $repo = Split-Path $PSScriptRoot -Parent
+if ($Version -notin @('0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3')) { throw 'Unsupported release version' }
+$appProject = Join-Path $repo 'native/src/FnMusic.App/FnMusic.App.csproj'
+[xml]$appDefinition = Get-Content -LiteralPath $appProject -Raw
+$declaredVersions = @($appDefinition.Project.PropertyGroup.Version | Where-Object { $_ })
+if ($declaredVersions.Count -ne 1 -or [string]$declaredVersions[0] -ne $Version) { throw 'Application declaration differs from requested package version' }
 $destination = Join-Path $repo ('dist/' + $Name)
 $archivePath = $destination + '.zip'
 $checksumPath = $destination + '.SHA256SUMS.txt'
@@ -24,12 +32,14 @@ Copy-Item -LiteralPath (Join-Path $repo 'native/examples/FnMusic.InfoClient/READ
 foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Assets/FnMusic.ico', 'Assets/FnMusic.png')) {
     if (-not (Test-Path -LiteralPath (Join-Path $destination $required))) { throw "Missing preview file: $required" }
 }
-Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'THIRD_PARTY_NOTICES.md'), (Join-Path $repo 'docs/USER_GUIDE.md'), (Join-Path $repo 'docs/RC2_USER_VALIDATION.md'), (Join-Path $repo 'docs/releases/0.2.0-rc.2.md'), (Join-Path $repo 'docs/BUILDING_SOURCES.md'), (Join-Path $repo 'docs/PLAYBACK_INFORMATION_PROTOCOL.md'), (Join-Path $repo 'docs/DESKTOP_INTEGRATION.md') -Destination $destination
+$candidateNumber = $Version.Split('.')[-1].Split('-')[-1]
+Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'THIRD_PARTY_NOTICES.md'), (Join-Path $repo 'docs/USER_GUIDE.md'), (Join-Path $repo ('docs/RC' + $candidateNumber + '_USER_VALIDATION.md')), (Join-Path $repo ('docs/releases/' + $Version + '.md')), (Join-Path $repo 'docs/BUILDING_SOURCES.md'), (Join-Path $repo 'docs/PLAYBACK_INFORMATION_PROTOCOL.md'), (Join-Path $repo 'docs/DESKTOP_INTEGRATION.md') -Destination $destination
 $decoderLicenses = Join-Path $destination 'licenses'
 Copy-Item -LiteralPath (Join-Path $repo 'docs/NAVIDROME_ACCEPTANCE.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'docs/PLAYBACK_RESUME_ACCEPTANCE.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'docs/EMBY_ACCEPTANCE.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'docs/SUBSONIC_ACCEPTANCE.md') -Destination $destination
+if ($Version -eq '0.2.0-rc.3') { Copy-Item -LiteralPath (Join-Path $repo 'docs/RC3_ACCEPTANCE.md') -Destination $destination }
 New-Item -ItemType Directory -Path $decoderLicenses | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'licenses/FFmpegInteropX-Apache-2.0.txt') -Destination $decoderLicenses
 $decoderBuildMaterials = Join-Path $decoderLicenses 'FFmpegInteropX-build'
@@ -45,7 +55,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Corresponding source preparation failed' }
 Copy-Item -LiteralPath (Join-Path $repo 'native/src/FnMusic.App/packages.lock.json') -Destination (Join-Path $decoderLicenses 'packages.lock.json')
 $revision = & git -c ('safe.directory=' + $repo.Replace('\', '/')) -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source revision unavailable' }
-@{ version = '0.2.0-rc.2'; sourceCommit = $revision.Trim(); architecture = 'win-x64' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'release.json') -Encoding utf8
+@{ version = $Version; sourceCommit = $revision.Trim(); architecture = 'win-x64' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'release.json') -Encoding utf8
 @'
 @echo off
 cd /d "%~dp0"
@@ -58,7 +68,7 @@ $manifest = $files | Sort-Object FullName | ForEach-Object {
     [ordered]@{ path = [IO.Path]::GetRelativePath($destination, $_.FullName); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
 }
 ConvertTo-Json -InputObject @($manifest) -Depth 3 | Set-Content -LiteralPath (Join-Path $destination 'SHA256.json') -Encoding utf8
-& (Join-Path $PSScriptRoot 'check-preview.ps1') -Path $destination -ExpectedVersion '0.2.0-rc.2'
+& (Join-Path $PSScriptRoot 'check-preview.ps1') -Path $destination -ExpectedVersion $Version
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::CreateFromDirectory($destination, $archivePath, [IO.Compression.CompressionLevel]::Optimal, $true)
 $archiveDigest = (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash

@@ -67,13 +67,6 @@ public sealed partial class MainWindow
             allMusicLoads++;
             if (scope is BrowseScope.All or BrowseScope.Navidrome or BrowseScope.Subsonic) await RefreshNavidromeAsync(ct, force: rescan);
             if (scope is BrowseScope.All or BrowseScope.Emby) await RefreshEmbyAsync(ct, force: rescan);
-            long embyVersion = embyRevision;
-            var embyRows = scope is BrowseScope.All or BrowseScope.Emby ? embyTracks.Values.SelectMany(tracks => tracks)
-                .Where(track => track.Title.Contains(query, StringComparison.OrdinalIgnoreCase) || track.Artist.Contains(query, StringComparison.OrdinalIgnoreCase) || track.Album.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray() : [];
-            long navRevision = navidromeRevision;
-            var navTracks = scope is BrowseScope.All or BrowseScope.Navidrome or BrowseScope.Subsonic ? navidromeTracks
-                .Where(pair => scope == BrowseScope.All || IsSubsonicSource(pair.Key) == (scope == BrowseScope.Subsonic)).SelectMany(pair => pair.Value)
-                .Where(track => track.Title.Contains(query, StringComparison.OrdinalIgnoreCase) || track.Artist.Contains(query, StringComparison.OrdinalIgnoreCase) || track.Album.Contains(query, StringComparison.OrdinalIgnoreCase)).ToArray() : [];
             var catalog = await localLibraryStore.LoadAsync(ct);
             var definitions = catalog.Libraries.Where(item => (selectedLocalGroup is null || item.Group == selectedLocalGroup)
                 && (selectedLocalLibrary is null || item.SourceId == selectedLocalLibrary)).ToArray();
@@ -150,7 +143,7 @@ public sealed partial class MainWindow
                 }
             }
             ct.ThrowIfCancellationRequested();
-            if (closed || !allMusicView || !ReferenceEquals(api, AllMusicClient) || navRevision != navidromeRevision || embyVersion != embyRevision) return;
+            if (closed || !allMusicView || !ReferenceEquals(api, AllMusicClient)) return;
             if ((await localLibraryStore.LoadAsync(ct)).Revision != catalog.Revision) throw new LocalLibraryConflictException();
 #if DEBUG
             if (allMusicBeforeCommit is { } beforeCommit) await beforeCommit();
@@ -165,7 +158,13 @@ public sealed partial class MainWindow
             if (closed || !allMusicView || !ReferenceEquals(api, AllMusicClient)) return;
             foreach (var id in failed) unavailableLibraries.Add(id);
             RenderLocalFilters();
-            if (navRevision != navidromeRevision || embyVersion != embyRevision) return;
+            // Third-party sources can be revoked while another source is awaited. Publish their
+            // current complete catalogs after the final await, rather than leaving an obsolete view busy.
+            bool Matches(MusicTrack track) => track.Title.Contains(query, StringComparison.OrdinalIgnoreCase)
+                || track.Artist.Contains(query, StringComparison.OrdinalIgnoreCase) || track.Album.Contains(query, StringComparison.OrdinalIgnoreCase);
+            var embyRows = scope is BrowseScope.All or BrowseScope.Emby ? embyTracks.Values.SelectMany(tracks => tracks).Where(Matches).ToArray() : [];
+            var navTracks = scope is BrowseScope.All or BrowseScope.Navidrome or BrowseScope.Subsonic ? navidromeTracks
+                .Where(pair => scope == BrowseScope.All || IsSubsonicSource(pair.Key) == (scope == BrowseScope.Subsonic)).SelectMany(pair => pair.Value).Where(Matches).ToArray() : [];
             total = checked(remoteTotal + localTracks.Length + navTracks.Length + embyRows.Length);
             page = 1;
             var rows = remoteTracks.Concat(localTracks).Concat(navTracks).Concat(embyRows).ToArray();

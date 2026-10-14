@@ -133,7 +133,12 @@ public sealed partial class MainWindow
         MusicTrack[] rows;
         if (allMusicView)
         {
-            var remote = current.Where(track => !localCatalog.Libraries.Any(item => item.SourceId == track.SourceInstanceId)).ToArray();
+            var remote = current.Where(track => !localCatalog.Libraries.Any(item => item.SourceId == track.SourceInstanceId)
+                && (ViewModel.PlaybackRouter.Supports(track.SourceInstanceId, MusicSourceCapabilities.Browse)
+#if DEBUG
+                    || IsSyntheticPreview && track.SourceInstanceId == Guid.Empty
+#endif
+                )).ToArray();
             rows = remote.Concat(local).ToArray(); total = rows.Length; page = 1;
             string scope = browseScope == BrowseScope.All ? "所有音乐" : browseScope == BrowseScope.Local ? "本地音乐" : browseScope == BrowseScope.Navidrome ? "Navidrome" : browseScope == BrowseScope.Emby ? "Emby" : browseScope == BrowseScope.Subsonic ? "Subsonic 兼容源" : "飞牛音乐";
             int subsonicCount = remote.Count(track => IsSubsonicSource(track.SourceInstanceId));

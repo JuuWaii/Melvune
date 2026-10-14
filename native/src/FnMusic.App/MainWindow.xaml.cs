@@ -19,7 +19,7 @@ public sealed partial class MainWindow : Window
         ConfigureSongList(TrackList);
         QueueModeButton.Flyout.Opening += PlayerMenu_Opening;
         OutputDeviceButton.Flyout.Opening += PlayerOutput_Opening;
-        Title = "飞牛音乐 · 0.2.0-rc.2";
+        Title = "飞牛音乐 · 0.2.0-rc.3";
         AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1360, 900));
         InitializePlayback();
         InitializePresentation();
@@ -34,6 +34,8 @@ public sealed partial class MainWindow : Window
     {
         Root.Loaded -= Root_Loaded;
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-catalog-revocation-window") && IsSyntheticPreview)
+        { await VerifyCatalogRevocationWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-subsonic-window") && IsSyntheticPreview)
         { await RunSubsonicWindowVerificationAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-playback-resume-window") && IsSyntheticPreview)

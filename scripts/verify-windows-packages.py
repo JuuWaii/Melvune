@@ -1,11 +1,10 @@
 """Verify package payloads after WiX extraction; never installs a product."""
 import argparse
 import hashlib
+import importlib.util
 import json
 import pathlib
-import struct
 import xml.etree.ElementTree as ET
-import zipfile
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--packages', type=pathlib.Path, required=True)
@@ -22,27 +21,11 @@ root = pathlib.Path(__file__).resolve().parent.parent
 def digest(file):
     with file.open('rb') as stream: return hashlib.file_digest(stream, 'sha256').hexdigest().upper()
 expected = {p.relative_to(args.payload).as_posix(): digest(p) for p in args.payload.rglob('*') if p.is_file()}
-with (args.packages / f'FnMusic-{args.version}-win-x64-portable.exe').open('rb') as stream:
-    stream.seek(-57, 2)
-    assert stream.read(17) == b'FNMUSIC-PAYLOAD-1', 'Portable trailer magic mismatch'
-    payload_hash = stream.read(32).hex().upper()
-    payload_length = struct.unpack('<q', stream.read(8))[0]
-    assert payload_length == pathlib.Path(str(args.payload) + '.zip').stat().st_size
-    stream.seek(-57 - payload_length, 2)
-    computed = hashlib.sha256()
-    for _ in range((payload_length + 1048575) // 1048576):
-        data = stream.read(min(1048576, payload_length))
-        computed.update(data); payload_length -= len(data)
-    assert computed.hexdigest().upper() == payload_hash == digest(pathlib.Path(str(args.payload) + '.zip'))
-with zipfile.ZipFile(args.packages / f'FnMusic-{args.version}-win-x64-portable.exe') as archive:
-    assert archive.testzip() is None, 'Portable ZIP CRC failed'
-    actual = {}
-    for entry in archive.infolist():
-        if entry.is_dir(): continue
-        relative = entry.filename.split('/', 1)[1]
-        assert relative not in actual, 'Duplicate portable ZIP entry'
-        with archive.open(entry) as stream: actual[relative] = hashlib.file_digest(stream, 'sha256').hexdigest().upper()
-    assert actual == expected, 'Portable ZIP differs from verified app directory'
+portable_spec = importlib.util.spec_from_file_location('portable_verification', pathlib.Path(__file__).with_name('verify-portable-package.py'))
+portable_verification = importlib.util.module_from_spec(portable_spec)
+portable_spec.loader.exec_module(portable_verification)
+portable_record = portable_verification.verify_portable(args.packages, args.payload, args.version)
+payload_hash = portable_record['payloadZipSha256']
 for name in ['WIX_NOTICE.md', 'WIX_LICENSE.txt']:
     expected['licenses/installer/' + name] = digest(root / 'packaging' / name)
 ns = {'w': 'http://wixtoolset.org/schemas/v4/wxs'}
@@ -93,7 +76,7 @@ for line in (args.packages / 'SHA256SUMS.txt').read_text().splitlines():
     checksum, name = line.split('  ', 1)
     assert pathlib.PurePath(name).name == name, 'Invalid checksum filename'
     assert digest(args.packages / name) == checksum, 'Distribution checksum mismatch'
-record = dict(portableFiles=len(actual), msiFiles=len(expected), msiScope=package.get('Scope'),
+record = dict(portableFiles=portable_record['portableFiles'], msiFiles=len(expected), msiScope=package.get('Scope'),
               uiCustomActions=len(actions), executeCustomActions=0, directorySelection=True,
               embeddedMsiMatches=True, payloadZipSha256=payload_hash,
               portableSha256=digest(args.packages / f'FnMusic-{args.version}-win-x64-portable.exe'),
