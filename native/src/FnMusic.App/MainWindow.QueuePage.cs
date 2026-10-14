@@ -54,7 +54,7 @@ public sealed partial class MainWindow
             if (list.SelectedItem is not MusicTrack track) return;
             if (queue.Current?.Reference == track.Reference)
             { Stop_Click(this, new RoutedEventArgs()); ForgetPlaybackResume(); }
-            queue.Remove(track.Reference); UpdateQueueStatus();
+            MarkQueueSessionEdited(); queue.Remove(track.Reference); if (queue.Count == 0) queueSessionExplicitlyCleared = true; UpdateQueueStatus();
         };
         clear.Click += (_, _) => { Stop_Click(this, new RoutedEventArgs()); ForgetPlaybackResume(); queue.Clear(); UpdateQueueStatus(); };
         view.SourceChanged = UpdateButtons;
@@ -122,8 +122,10 @@ public sealed partial class MainWindow
         view.PlayButton.IsEnabled = view.List.SelectedItem is MusicTrack track && ContextPlayable(track);
         if (queueRemoveButton is { } remove) remove.IsEnabled = view.List.SelectedItem is MusicTrack;
         if (queueClearButton is { } clear) clear.IsEnabled = queue.Count > 0;
+        int unavailable = queue.Tracks.Count(track => !ContextPlayable(track));
         view.Status.Text = queue.Count == 0 ? "队列为空，开始播放后在此查看歌曲。" : queue.Current is null
             ? $"共 {queue.Count} 首 · 尚未开始播放" : $"共 {queue.Count} 首 · 当前第 {queue.Index + 1} 首";
+        if (unavailable > 0) view.Status.Text += $" · {unavailable} 首来源待连接，条目保留";
     }
     private void QueueItem_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
     {

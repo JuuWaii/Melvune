@@ -14,7 +14,8 @@ public sealed partial class MainWindow
     private bool LocalIndexEnabled => !IsSyntheticPreview
 #if DEBUG
         || Environment.GetCommandLineArgs().Contains("--verify-local-cache-window")
-    || Environment.GetCommandLineArgs().Contains("--verify-playback-resume-window")
+        || Environment.GetCommandLineArgs().Contains("--verify-playback-resume-window")
+        || Environment.GetCommandLineArgs().Contains("--verify-queue-session-window")
 #endif
         ;
 

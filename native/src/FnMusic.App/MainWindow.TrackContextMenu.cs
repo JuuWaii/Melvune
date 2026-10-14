@@ -87,7 +87,7 @@ public sealed partial class MainWindow
         menu.Items.Add(Command("下一首播放", "next", ContextPlayable(track) && queue.Current?.Reference != track.Reference, () =>
         {
             if (!ContextPlayable(track)) { PlaybackStatus.Text = "歌曲来源未连接或曲目不可用。"; return Task.CompletedTask; }
-            if (queue.InsertNext(track))
+            if (TryInsertPlaybackNext(track))
             {
                 if (queue.Count == 1) queueOrigin = "歌曲菜单";
                 UpdateQueueStatus(); PlaybackStatus.Text = "已加入下一首播放，当前播放保持。";
@@ -145,7 +145,7 @@ public sealed partial class MainWindow
         if (ReferenceEquals(list, queuePage?.List))
         { if (queue.Select(track.Reference) is { } selected) await PlayTrackAsync(selected); return; }
         var tracks = list.Items.Cast<object>().Select(ContextTrack).OfType<MusicTrack>().Where(ContextPlayable).ToArray();
-        if (!queue.Replace(tracks, track.Reference)) return;
+        if (!TryReplacePlaybackQueue(tracks, track.Reference)) return;
         queueOrigin = ReferenceEquals(list, TrackList) ? allMusicView ? "所有音乐当前列表" : localView ? "本地音乐当前页" : "飞牛歌曲当前页" : "歌单页面";
         await PlayTrackAsync(track);
     }

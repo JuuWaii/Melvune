@@ -248,7 +248,7 @@ public sealed partial class MainWindow
     private async Task StartQueueAsync(MusicTrack track)
     {
         if (track.IsCue) { PlaybackStatus.Text = "CUE 分轨播放将在转码适配阶段接入。"; return; }
-        if (TrackList.ItemsSource is not IEnumerable<MusicTrack> tracks || !queue.Replace(tracks, track.Reference)) return;
+        if (TrackList.ItemsSource is not IEnumerable<MusicTrack> tracks || !TryReplacePlaybackQueue(tracks, track.Reference)) return;
         queueOrigin = allMusicView ? "所有音乐当前列表" : localView ? "本地音乐当前页" : favoritesView ? "收藏当前页" : collectionKind is not null ? $"{CollectionLabel}详情当前页" : searchQuery.Length == 0 ? "曲库当前页" : "搜索结果当前页";
         await PlayTrackAsync(track);
     }
@@ -259,7 +259,7 @@ public sealed partial class MainWindow
     private void QueueMode_Click(object sender, RoutedEventArgs e)
     {
         if (sender is ToggleMenuFlyoutItem { Tag: string value } && Enum.TryParse<QueueMode>(value, out var mode) && Enum.IsDefined(mode))
-        { queue.Mode = mode; UpdateQueueModeControl(); }
+        { queueStartupModeOverride = mode; queueSessionExplicitlyCleared = false; queue.Mode = mode; UpdateQueueModeControl(); }
     }
     private void UpdateQueueModeControl()
     {
@@ -290,7 +290,12 @@ public sealed partial class MainWindow
         ClearDecoderLyrics();
         UpdateQueueStatus();
         if (!IsSyntheticPreview && !ViewModel.PlaybackRouter.CanPlay(track.Reference))
-        { playbackResumeOpening = false; ClearPresentation(); NowPlaying.Text = ""; PlaybackStatus.Text = "歌曲来源未连接或不支持播放。"; return; }
+        {
+            playbackResumeOpening = false; ClearPresentation(); NowPlaying.Text = "";
+            pendingPlaybackResume = lastPlaybackResume;
+            ApplyPendingResumePresentation(); UpdateProgress();
+            PlaybackStatus.Text = "歌曲来源未连接或不支持播放；队列与当前歌曲记录保留，恢复来源后点击播放。"; return;
+        }
         BeginLinkedPlayback(track);
         var embedded = new TaskCompletionSource<Lyrics>(TaskCreationOptions.RunContinuationsAsynchronously);
         decoderLyrics = embedded; decoderLyricsReference = track.Reference;
@@ -447,8 +452,10 @@ public sealed partial class MainWindow
         // 只移除旧飞牛来源；混合队列中的本地条目及正在播放的本地流仍可保留。
         bool preserveLocalQueue = queue.Current is { } current && IndependentSource(current.SourceInstanceId)
             && ViewModel.PlaybackRouter.CanPlay(current.Reference);
-        foreach (var track in queue.Tracks.Where(track => !IndependentSource(track.SourceInstanceId)
-            || !ViewModel.PlaybackRouter.CanPlay(track.Reference)).ToArray()) queue.Remove(track.Reference);
+        Guid? revokedSource = ViewModel.AuthenticatedClient?.SourceInstanceId;
+        foreach (var track in queue.Tracks.Where(track =>
+            (!restoredQueueReferences.Contains(track.Reference) || track.SourceInstanceId == revokedSource)
+            && (!IndependentSource(track.SourceInstanceId) || !ViewModel.PlaybackRouter.CanPlay(track.Reference))).ToArray()) queue.Remove(track.Reference);
         if (!preserveLocalQueue)
         {
             ClearDecoderLyrics(); ClearPresentation(); CancelWork(); StopLinkedPlayback(); mediaReady = false;

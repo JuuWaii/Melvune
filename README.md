@@ -6,9 +6,9 @@
 
 一个使用 C#、WinUI 3 和 FFmpeg 构建的非官方桌面音乐播放器，支持飞牛音乐、本地音乐，以及 Navidrome、Emby、Subsonic 兼容和匿名 HTTP/JSON 只读音乐源。黑白界面，统一音乐库、歌单、播放队列和应用内歌词。
 
-**当前本地交付：0.2.0-rc.4；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
+**当前开发目标：0.2.0-rc.5；当前本地交付：0.2.0-rc.4；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
 
-rc.4 在统一候选版本上新增声明式 HTTP/JSON 来源，接入目录、原始播放、封面、歌词和跨库歌单。本轮实现、集中回归及最终 ZIP/便携 EXE 验收已完成，完整安装器和远端发布另行安排。开发状态、最终下载入口及校验值统一见 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)；本批证据见 [rc.4 验收记录](docs/RC4_ACCEPTANCE.md)。
+rc.5 开发重点为完整队列、当前歌曲与进度、播放模式、显式下一曲及有界历史恢复；实现已接入，正在集中验证。完整安装器和远端发布另行安排。开发状态、最终下载入口及校验值统一见 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)；本批证据见 [rc.5 验收记录](docs/RC5_ACCEPTANCE.md)。
 
 本地下载：[rc.4 ZIP](dist/FnMusic-0.2.0-rc.4-win-x64.zip)，或 [rc.4 便携 EXE](dist/FnMusic-0.2.0-rc.4-win-x64-portable/FnMusic-0.2.0-rc.4-win-x64-portable.exe)。摘要和实际运行记录见 [rc.4 验收](docs/RC4_ACCEPTANCE.md)。旧 ZIP 和安装器保留用于回退，真实第三方服务仍需按 [用户验证单](docs/RC4_USER_VALIDATION.md) 验收。
 
@@ -41,7 +41,7 @@ Release 同时提供 SHA-256 校验文件与构建来源信息。请下载 Relea
 - **自定义 HTTP/JSON 来源（rc.4）**：声明式字段方案与受控分页接入匿名同源目录，支持原始 Range 音频、封面、UTF-8 LRC/纯文本歌词和跨库本地歌单；配置示例见 [来源说明](docs/HTTP_JSON_SOURCES.md)。
 - **两类歌单**：跨音乐库的本地歌单，以及当前飞牛账号的专属歌单管理。
 - **播放与队列**：播放/暂停/停止、进度拖动、音量、输出设备、双击切歌和四种播放模式；队列从右侧打开。
-- **关闭后续播**：正常退出保存当前一首及实际位置，重启保持暂停，点击播放继续；来源暂时离线时保留记录。
+- **完整队列恢复（rc.5）**：正常退出保存队列顺序、当前歌曲及位置、模式、下一曲安排和最近历史；重启保持暂停，离线引用保留。详细规则见 [队列恢复](docs/QUEUE_SESSION.md)。
 - **封面与歌词**：飞牛封面、支持的内嵌封面，以及飞牛歌词、同名 LRC 和支持的内嵌歌词。
 - **界面与主题**：黑白界面、浅色/深色主题和跟随系统，统一顶部导航与右键菜单。
 - **飞牛管理入口**：管理员可管理支持的素材库与设置，查看后台任务；任务消失或身份变化时保留未确认状态。
@@ -75,7 +75,7 @@ MP3 远距离首次定位可能读取较多数据；素材库重关联缺少完�
 
 自定义 HTTP/JSON 首版最多 10000 首，字段方案仅访问对象成员；媒体必须同源且无查询参数，不跟随重定向，不支持账号认证、Cookie、自定义请求头、脚本转换和跨域 CDN。认证式自定义源、第三方服务端写入、转码、完整队列恢复、自定义快捷键、FN Connect/OAuth、自动更新和本轮完整安装器留待后续。只读信息接口需第三方按协议接入，不承诺自动兼容。
 
-遇到问题可提交 [Issue](https://github.com/JuuWaii/fnmusic_pc/issues)，注明版本、复现步骤、预期与实际结果。附截图或日志前，请隐去密码、令牌、服务地址和私人路径；集中验证项目见 [rc.4 用户验证单](docs/RC4_USER_VALIDATION.md)（公开 rc.1 使用[原验证单](docs/RC1_USER_VALIDATION.md)）。
+遇到问题可提交 [Issue](https://github.com/JuuWaii/fnmusic_pc/issues)，注明版本、复现步骤、预期与实际结果。附截图或日志前，请隐去密码、令牌、服务地址和私人路径；集中验证项目见 [rc.5 用户验证单](docs/RC5_USER_VALIDATION.md)（公开 rc.1 使用[原验证单](docs/RC1_USER_VALIDATION.md)）。
 
 ## 从源码构建
 
@@ -91,8 +91,8 @@ MP3 远距离首次定位可能读取较多数据；素材库重关联缺少完�
 构建发行包：
 
 ```powershell
-./scripts/package-preview.ps1 -Version 0.2.0-rc.4 -Name FnMusic-0.2.0-rc.4-win-x64
-./scripts/package-windows.ps1 -Payload 'dist/FnMusic-0.2.0-rc.4-win-x64' -Name FnMusic-0.2.0-rc.4-win-x64-portable -PortableOnly
+./scripts/package-preview.ps1 -Version 0.2.0-rc.5 -Name FnMusic-0.2.0-rc.5-win-x64
+./scripts/package-windows.ps1 -Payload 'dist/FnMusic-0.2.0-rc.5-win-x64' -Name FnMusic-0.2.0-rc.5-win-x64-portable -PortableOnly
 ```
 
 脚本拒绝覆盖同名输出；已有产物时使用新名称，并用 `-Payload` 指向对应应用目录。辅助检查无需安装 npm 依赖：

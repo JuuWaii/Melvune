@@ -203,7 +203,7 @@ public sealed partial class MainWindow
     private async Task PlayLocalPlaylistAsync(LocalPlaylist chosen, LocalPlaylistEntry start)
     {
         var playable = chosen.Entries.Where(PlaylistTrackAvailable).Select(entry => entry.ToTrack()).ToArray();
-        if (queue.Replace(playable, start.Track))
+        if (TryReplacePlaybackQueue(playable, start.Track))
         {
             queueOrigin = "本地歌单 · " + chosen.Name;
             await PlayTrackAsync(start.ToTrack());

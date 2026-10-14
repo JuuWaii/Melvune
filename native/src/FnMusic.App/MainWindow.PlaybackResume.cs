@@ -9,21 +9,55 @@ public sealed partial class MainWindow
     private readonly PlaybackResumeStore playbackResumeStore = new(ThemeSettingsDirectory());
     private PlaybackResumeState? pendingPlaybackResume, lastPlaybackResume;
     private bool resumeStartupAbandoned, playbackResumeOpening;
+    private readonly HashSet<TrackReference> restoredQueueReferences = [];
+    private long queueSessionEditRevision;
+    private bool queueSessionExplicitlyCleared;
+    private QueueMode? queueStartupModeOverride;
+#if DEBUG
+    private Action? queueSessionAfterRead;
+#endif
+    private void MarkQueueSessionEdited() { resumeStartupAbandoned = true; ++queueSessionEditRevision; }
+    private bool TryReplacePlaybackQueue(IEnumerable<MusicTrack> tracks, TrackReference selected)
+    {
+        if (!queue.Replace(tracks, selected))
+        { PlaybackStatus.Text = "无法创建播放队列：最多支持 10000 首，请先筛选来源或选择较小歌单。当前队列保持。"; return false; }
+        MarkQueueSessionEdited(); queueSessionExplicitlyCleared = false; restoredQueueReferences.Clear(); return true;
+    }
+    private bool TryInsertPlaybackNext(MusicTrack track)
+    {
+        if (!queue.InsertNext(track))
+        { PlaybackStatus.Text = queue.Count >= PlaybackQueue.MaximumTracks ? "队列已达 10000 首，请先移除歌曲再添加。当前队列保持。" : "该歌曲无法加入下一首播放。"; return false; }
+        MarkQueueSessionEdited(); queueSessionExplicitlyCleared = false;
+        if (pendingPlaybackResume is { } saved && queue.Current is { } current && saved.Track.Reference != current.Reference)
+        { pendingPlaybackResume = null; lastPlaybackResume = new(current, 0); }
+        return true;
+    }
 
     private async Task RestorePlaybackResumeAsync()
     {
         if (closed || resumeStartupAbandoned) return;
         try
         {
-            var restored = await playbackResumeStore.LoadAsync(localLifetime.Token);
-            if (closed || resumeStartupAbandoned || restored is null) return;
-            pendingPlaybackResume = lastPlaybackResume = restored;
-            queue.Replace([restored.Track], restored.Track.Reference); queueOrigin = "上次播放的歌曲";
-            PlaybackStatus.Text = "已恢复上次播放记录，点击播放从 " + TimeSpan.FromSeconds(restored.PositionSeconds).ToString(@"mm\:ss") + " 继续。";
-            UpdateQueueStatus(); ApplyPendingResumePresentation(); UpdateProgress();
+            long revision = queueSessionEditRevision;
+            var restored = await playbackResumeStore.LoadSessionAsync(localLifetime.Token);
+#if DEBUG
+            queueSessionAfterRead?.Invoke();
+#endif
+            if (closed || resumeStartupAbandoned || revision != queueSessionEditRevision || restored is null) return;
+            var snapshot = queueStartupModeOverride is { } chosenMode ? restored.Queue with { Mode = chosenMode } : restored.Queue;
+            if (!queue.Restore(snapshot)) return;
+            restoredQueueReferences.Clear();
+            foreach (var item in queue.Tracks) restoredQueueReferences.Add(item.Reference);
+            queueOrigin = restored.Origin;
+            pendingPlaybackResume = lastPlaybackResume = queue.Current is { } current
+                ? new(current, restored.PositionSeconds) : null;
+            PlaybackStatus.Text = pendingPlaybackResume is { } saved
+                ? "已恢复播放队列（" + queue.Count + " 首），点击播放从 " + TimeSpan.FromSeconds(saved.PositionSeconds).ToString(@"mm\:ss") + " 继续。"
+                : queue.Count > 0 ? "已恢复播放队列，双击其中歌曲开始播放。" : "播放队列为空。";
+            UpdateQueueModeControl(); UpdateQueueStatus(); ApplyPendingResumePresentation(); UpdateProgress();
         }
         catch (OperationCanceledException) { }
-        catch (Exception) { if (!closed) ShowMetadataNotice("上次播放记录无法读取，可直接选择歌曲播放。"); }
+        catch (Exception) { if (!closed) ShowMetadataNotice("上次播放队列无法读取，可直接选择歌曲播放。"); }
     }
 
     private void ApplyPendingResumePresentation()
@@ -57,7 +91,11 @@ public sealed partial class MainWindow
             var track = ResolveResumeTrack(saved.Track);
             if (track is null)
             { PlaybackStatus.Text = "上次歌曲来源未连接或歌曲不可用，请恢复对应音乐库或登录后再次点击播放。保存的进度保留。"; return; }
-            if (queue.Current?.Reference != track.Reference) queue.Replace([track], track.Reference);
+            if (queue.Current?.Reference != track.Reference)
+            {
+                if (!queue.Tracks.Any(item => item.Reference == track.Reference)) queue.InsertNext(track);
+                queue.Select(track.Reference);
+            }
             await PlayTrackAsync(track, saved.PositionSeconds); return;
         }
         if (queue.Current is { } current) await PlayTrackAsync(current);
@@ -85,15 +123,35 @@ public sealed partial class MainWindow
 
     private void ForgetPlaybackResume()
     {
-        resumeStartupAbandoned = true;
+        resumeStartupAbandoned = true; MarkQueueSessionEdited(); queueSessionExplicitlyCleared = true;
         pendingPlaybackResume = lastPlaybackResume = null;
+    }
+
+    private PlaybackSessionState CapturePlaybackSession()
+    {
+        var snapshot = queue.CaptureSnapshot();
+        var saved = CapturePlaybackResume();
+        if (saved is not null)
+        {
+            // A source may have been revoked after preserving its position. Keep that
+            // unavailable current reference alongside the remaining queue, never replace it.
+            var tracks = snapshot.Tracks.Select(item => item.Reference == saved.Track.Reference ? saved.Track : item).ToList();
+            if (!tracks.Any(item => item.Reference == saved.Track.Reference)) tracks.Insert(0, saved.Track);
+            snapshot = snapshot with
+            {
+                Tracks = tracks.AsReadOnly(), Current = saved.Track.Reference,
+                RequestedNext = Array.AsReadOnly(snapshot.RequestedNext.Where(reference => reference != saved.Track.Reference).ToArray())
+            };
+        }
+        return new(snapshot, saved?.PositionSeconds ?? 0, queueOrigin);
     }
 
     private void SavePlaybackResumeAtExit()
     {
         try
         {
-            if (CapturePlaybackResume() is { } saved) playbackResumeStore.Save(saved);
+            var session = CapturePlaybackSession();
+            if (session.Queue.Tracks.Count > 0 || (!queueSessionExplicitlyCleared && queue.Mode != QueueMode.Sequential)) playbackResumeStore.SaveSession(session);
             else if (resumeStartupAbandoned) playbackResumeStore.Clear();
         }
         catch (Exception) { /* A failed optional record must not prevent closing the player. */ }

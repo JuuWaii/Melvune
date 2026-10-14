@@ -19,7 +19,7 @@ public sealed partial class MainWindow : Window
         ConfigureSongList(TrackList);
         QueueModeButton.Flyout.Opening += PlayerMenu_Opening;
         OutputDeviceButton.Flyout.Opening += PlayerOutput_Opening;
-        Title = "飞牛音乐 · 0.2.0-rc.4";
+        Title = "飞牛音乐 · 0.2.0-rc.5";
         AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1360, 900));
         InitializePlayback();
         InitializePresentation();
@@ -34,6 +34,10 @@ public sealed partial class MainWindow : Window
     {
         Root.Loaded -= Root_Loaded;
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-queue-startup-window") && IsSyntheticPreview)
+        { await VerifyQueueStartupWindowAsync(Environment.GetCommandLineArgs().FirstOrDefault(arg => arg.StartsWith("--queue-startup-phase=", StringComparison.Ordinal))?.Split('=', 2)[1] ?? "mode-save"); Close(); return; }
+        if (Environment.GetCommandLineArgs().Contains("--verify-queue-session-window") && IsSyntheticPreview)
+        { await VerifyQueueSessionWindowAsync(Environment.GetCommandLineArgs().FirstOrDefault(arg => arg.StartsWith("--queue-session-phase=", StringComparison.Ordinal))?.Split('=', 2)[1] ?? "save"); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-httpjson-window") && IsSyntheticPreview)
         { await VerifyHttpJsonWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-catalog-revocation-window") && IsSyntheticPreview)

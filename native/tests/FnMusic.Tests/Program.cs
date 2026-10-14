@@ -6,6 +6,7 @@ using FnMusic.Core;
 using FnMusic.Infrastructure;
 using FnMusic.Windows;
 
+if (args.Contains("--verify-queue-session")) { await PlaybackQueueSnapshotVerification.RunAsync(); await PlaybackSessionVerification.RunAsync(); Console.WriteLine("Queue snapshot and session storage checks passed."); return; }
 if (args.Contains("--verify-playback-resume")) { await PlaybackResumeVerification.RunAsync(); Console.WriteLine("Playback resume storage checks passed."); return; }
 if (args.Contains("--verify-http-json")) { await HttpJsonVerification.RunAsync(); await HttpJsonConnectionVerification.RunAsync(); Console.WriteLine("HTTP/JSON protocol and connection checks passed."); return; }
 

@@ -132,7 +132,7 @@ public sealed partial class MainWindow
         view.PlayButton.Click += async (_, _) =>
         {
             if (ct.IsCancellationRequested || closed || !IsCurrentPlaylistClient(api) || snapshot is not { } selected || list.SelectedItem is not MusicTrack { IsCue: false } start) return;
-            if (queue.Replace(selected.Tracks, start.Reference))
+            if (TryReplacePlaybackQueue(selected.Tracks, start.Reference))
             { queueOrigin = "飞牛歌单 · " + selected.Playlist.Name; await PlayTrackAsync(start); }
         };
         if (!await MountPlaylistPageAsync(view)) return;
