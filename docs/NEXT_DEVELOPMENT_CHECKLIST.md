@@ -8,9 +8,11 @@
 | S02 | 已完成 | 通用 Subsonic 只读连接，使用标准专辑目录分页读取；保留既有 Navidrome 行为，地址/账号/类型变更须新建来源 |
 | S03 | 已完成 | 旧连接记录无类型字段时兼容 Navidrome；加密凭据与来源 UUID 保持；编辑器、管理卡片、来源筛选和混合本地歌单接入 |
 | S04 | 已通过（真实服务待验收） | 核心 120/120，窗口 310/310，Navidrome/Subsonic 八组和 Emby 十组协议/存储及续播专项通过 |
-| S05 | 打包中 | 独立 Windows x64 ZIP、来源修订、文件哈希、隐私扫描和使用/验收文档；不覆盖旧包 |
+| S05 | 已交付 | 独立 Windows x64 ZIP、来源修订、597 项文件哈希与 598 个 ZIP 文件 CRC、隐私扫描和使用/验收文档通过 |
 
-集中验证通过；本批独立 ZIP 正在打包。此前 [Emby 首版 ZIP](../dist/FnMusic-0.2.0-rc.2-win-x64-emby-20261013.zip) 继续保留。细节及边界见 [本批验收](SUBSONIC_ACCEPTANCE.md)。
+当前推荐：[Subsonic 兼容源 Windows x64 ZIP](../dist/FnMusic-0.2.0-rc.2-win-x64-subsonic-20261014.zip)。包含此前 Emby、Navidrome、续播和桌面功能。细节及边界见 [本批验收](SUBSONIC_ACCEPTANCE.md)。旧包及用户改动保留；本批本地交付，未上传发布。
+
+ZIP SHA-256：`8689AE91D740813F884DDB6AE0E6F0524044F2388B5E71FC2D502FEABCF31C04`。包和程序集来源修订：`a063c11e656a628df624aeb56f8b70101aca486f`。
 
 通用源首版明确指兼容 Subsonic API 的服务，按服务器专辑目录读取；不是任意 REST 接口映射，也不承诺读取未归入专辑的曲目。支持原始播放、封面、服务端按歌曲 ID 的结构化歌词（需支持扩展）及内嵌歌词回退，服务端收藏/歌单写入后置。真实第三方服务版本、权限、反向代理及 Range 需单独验收。
 
