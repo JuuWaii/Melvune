@@ -339,16 +339,24 @@ public sealed partial class MainWindow
         try
         {
             Lyrics result;
+            MusicApiException? serviceLyricsFailure = null;
 #if DEBUG
             if (IsSyntheticPreview && track.SourceInstanceId == Guid.Empty)
                 result = Lyrics.Parse("[00:00.00]合成歌词验证\n[00:10.00]播放进度同步\n[00:20.00]点击歌词可跳转");
             else
 #endif
             if (source is not null) result = await source.GetLyricsAsync(track.Reference, ct);
-            else if (nav is not null) result = await nav.GetLyricsAsync(track, ct);
+            else if (nav is not null)
+            {
+                try { result = await nav.GetLyricsAsync(track, ct); }
+                catch (MusicApiException ex) when (ex.Failure != MusicFailure.Unauthorized)
+                { serviceLyricsFailure = ex; result = Lyrics.Empty; }
+            }
             else if (api is not null && api.SourceInstanceId == track.SourceInstanceId) result = await ReadRemoteLyricsAsync(api, track.Reference, ct);
             else result = Lyrics.Empty;
             if (source is null && result.Lines.Count == 0) result = await ReadDecoderLyricsAsync(track, ct);
+            // A service failure need not hide already-decoded lyrics, but remains retryable if none exist.
+            if (result.Lines.Count == 0 && serviceLyricsFailure is not null) throw serviceLyricsFailure;
 #if DEBUG
             if (lyricsBeforeCommit is { } beforeCommit) await beforeCommit();
 #endif

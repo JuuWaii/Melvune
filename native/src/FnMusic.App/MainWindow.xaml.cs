@@ -34,6 +34,8 @@ public sealed partial class MainWindow : Window
     {
         Root.Loaded -= Root_Loaded;
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-subsonic-window") && IsSyntheticPreview)
+        { await RunSubsonicWindowVerificationAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-playback-resume-window") && IsSyntheticPreview)
         { await VerifyPlaybackResumeWindowAsync(Environment.GetCommandLineArgs().FirstOrDefault(arg => arg.StartsWith("--resume-phase=", StringComparison.Ordinal))?.Split('=', 2)[1] ?? "save"); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-emby-window") && IsSyntheticPreview)

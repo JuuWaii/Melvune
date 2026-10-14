@@ -5,7 +5,11 @@ using FnMusic.Core;
 
 namespace FnMusic.Infrastructure;
 
-public sealed record NavidromeConnection(Guid SourceId, string Name, string ServerAddress, string Username);
+public sealed record NavidromeConnection(Guid SourceId, string Name, string ServerAddress, string Username)
+{
+    // Missing provider fields in existing version 1 indexes retain their Navidrome identity.
+    public string Provider { get; init; } = "navidrome";
+}
 
 /// <summary>
 /// Stores connection descriptions separately from credentials delegated to the session vault.
@@ -49,8 +53,9 @@ public sealed class NavidromeConnectionStore(string directory, ISessionVault vau
         using var writer = await LockAsync(timeout.Token);
         var entries = (await LoadEntriesAsync(ct)).ToList();
         var previous = entries.SingleOrDefault(item => item.Connection.SourceId == connection.SourceId);
-        if (previous is not null && !SameAccount(previous.Connection, connection))
-            throw new InvalidOperationException("A different server or account requires a new source identity.");
+        if (previous is not null && (!SameAccount(previous.Connection, connection) ||
+            previous.Connection.Provider != connection.Provider))
+            throw new InvalidOperationException("A different server, account or provider requires a new source identity.");
         if (entries.Any(item => item.Connection.SourceId != connection.SourceId && SameAccount(item.Connection, connection)))
             throw new InvalidOperationException("This account already has a connection.");
         if (previous is null && entries.Count >= MaximumConnections)
@@ -96,19 +101,22 @@ public sealed class NavidromeConnectionStore(string directory, ISessionVault vau
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps) ||
             string.IsNullOrEmpty(uri.Host) || !string.IsNullOrEmpty(uri.UserInfo) ||
             !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment))
-            throw new ArgumentException("Invalid Navidrome server address", nameof(address));
+            throw new ArgumentException("Invalid music server address", nameof(address));
         return uri.AbsoluteUri.TrimEnd('/') + "/";
     }
 
-    private static NavidromeConnection NormalizeConnection(NavidromeConnection connection)
+    public static NavidromeConnection NormalizeConnection(NavidromeConnection connection)
     {
         if (connection is null || connection.SourceId == Guid.Empty ||
             string.IsNullOrWhiteSpace(connection.Name) || connection.Name.Length > 120 || connection.Name.Any(char.IsControl) ||
             string.IsNullOrWhiteSpace(connection.Username) || connection.Username.Length > 256 || connection.Username.Any(char.IsControl))
             throw new ArgumentException("Invalid music connection", nameof(connection));
         return connection with { Name = connection.Name.Trim(), ServerAddress = NormalizeServerAddress(connection.ServerAddress),
-            Username = connection.Username.Trim() };
+            Username = connection.Username.Trim(), Provider = NormalizeProvider(connection.Provider) };
     }
+
+    internal static string NormalizeProvider(string provider) => provider is "navidrome" or "subsonic"
+        ? provider : throw new ArgumentException("Invalid music provider", nameof(provider));
 
     private static void ValidateCredentials(NavidromeConnection connection, NavidromeCredentials credentials)
     {

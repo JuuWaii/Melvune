@@ -10,7 +10,7 @@ if (args.Contains("--verify-playback-resume")) { await PlaybackResumeVerificatio
 
 if (args.Contains("--verify-emby")) { await EmbyVerification.RunAsync(); await EmbyConnectionVerification.RunAsync(); Console.WriteLine("Emby protocol and connection checks passed."); return; }
 
-if (args.Contains("--verify-navidrome")) { await NavidromeVerification.RunAsync(); Console.WriteLine("Navidrome专项通过。"); return; }
+if (args.Contains("--verify-navidrome")) { await NavidromeVerification.RunAsync(); Console.WriteLine("Navidrome / Subsonic专项通过。"); return; }
 
 int passed = 0;
 void Check(bool value) { if (!value) throw new Exception("Assertion failed"); }

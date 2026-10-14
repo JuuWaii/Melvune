@@ -74,13 +74,28 @@ public sealed partial class MainWindow
         long revision = (await localLibraryStore.LoadAsync()).Revision;
         await WithLibraryEditorAsync(view, () => ((IInvokeProvider)new ButtonAutomationPeer(FindFullPageButton(view, "新建音乐库")).GetPattern(PatternInterface.Invoke)).Invoke(), editor =>
         {
-            verify("library_create_dialog_local_defaults_and_theme", editor.Kind.Items.Count == 4 && editor.Kind.SelectedIndex == 0
+            verify("library_create_dialog_local_defaults_and_theme", editor.Kind.Items.Count == 5 && editor.Kind.SelectedIndex == 0
                 && editor.LocalFields.Visibility == Visibility.Visible && editor.NasFields.Visibility == Visibility.Collapsed
                 && editor.Dialog.ActualTheme == Root.ActualTheme && !editor.Dialog.IsPrimaryButtonEnabled);
             editor.LocalPath.Text = selected.Directory; editor.Name.Text = "未保存名称";
             editor.Kind.SelectedIndex = 2;
-            verify("library_other_provider_is_explicit_future_option", editor.OtherFields.Visibility == Visibility.Visible
+            verify("library_navidrome_provider_fields_are_explicit", editor.OtherFields.Visibility == Visibility.Visible
                 && editor.LocalFields.Visibility == Visibility.Collapsed && !editor.Dialog.IsPrimaryButtonEnabled);
+            editor.Kind.SelectedIndex = 4;
+            verify("library_subsonic_provider_fields_are_explicit", editor.OtherFields.Visibility == Visibility.Visible
+                && editor.LocalFields.Visibility == Visibility.Collapsed && editor.ServiceType.SelectedIndex == 2
+                && Equals(editor.Server.Header, "Subsonic 兼容服务地址") && editor.OtherDescription.Text.Contains("Subsonic API")
+                && !editor.Dialog.IsPrimaryButtonEnabled);
+            editor.NavName.Text = "通用音乐测试库"; editor.Server.Text = "https://music.example.invalid/airsonic/";
+            editor.Username.Text = "fixture-user";
+            verify("library_subsonic_new_account_requires_credentials", !editor.Dialog.IsPrimaryButtonEnabled);
+            editor.Password.Password = string.Concat("fixture-", "input");
+            var subsonicRequest = editor.Read();
+            verify("library_subsonic_request_retains_service_subpath_and_identity", editor.Dialog.IsPrimaryButtonEnabled
+                && subsonicRequest.Kind == 4 && subsonicRequest.Name == "通用音乐测试库"
+                && subsonicRequest.Server == "https://music.example.invalid/airsonic/" && subsonicRequest.Username == "fixture-user"
+                && subsonicRequest.Password.Length > 0);
+            editor.Password.Password = "";
             editor.Kind.SelectedIndex = 1;
             verify("library_disconnected_nas_fields_are_read_only", editor.NasFields.Visibility == Visibility.Visible
                 && editor.LocalFields.Visibility == Visibility.Collapsed && !editor.NasPath.IsEnabled && !editor.Dialog.IsPrimaryButtonEnabled);

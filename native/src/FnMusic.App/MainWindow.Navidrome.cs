@@ -16,12 +16,13 @@ public sealed partial class MainWindow
     private long navidromeRevision;
 #if DEBUG
     private Func<NavidromeConnection, NavidromeCredentials, NavidromeClient>? navidromeTestFactory;
+    private Action? navidromeAfterCommit;
 #endif
     private NavidromeClient CreateNavidrome(NavidromeConnection connection, NavidromeCredentials credentials) =>
 #if DEBUG
         navidromeTestFactory?.Invoke(connection, credentials) ??
 #endif
-        new(connection.SourceId, connection.Name, connection.ServerAddress, credentials);
+        new(connection.SourceId, connection.Name, connection.ServerAddress, credentials, provider: connection.Provider);
 
     private bool IndependentSource(Guid id) => localSources.ContainsKey(id) || navidromeSources.ContainsKey(id) || embySources.ContainsKey(id);
     private bool CurrentNavidrome(NavidromeClient client) => !closed && ReferenceEquals(navidromeSources.GetValueOrDefault(client.Source.Id), client);
@@ -94,8 +95,14 @@ public sealed partial class MainWindow
         try
         {
             var existing = selected?.Navidrome;
-            var connection = new NavidromeConnection(existing?.SourceId ?? Guid.NewGuid(), request.Name,
-                NavidromeClient.NormalizeServerAddress(request.Server), request.Username);
+            string provider = request.Kind == 4 ? "subsonic" : "navidrome";
+            string server = NavidromeClient.NormalizeServerAddress(request.Server);
+            string username = request.Username.Trim();
+            // Reject account changes before an existing credential can reach another endpoint.
+            if (existing is not null && (existing.Provider != provider || existing.ServerAddress != server || existing.Username != username))
+                throw new InvalidOperationException("更换服务、账号或类型需新建音乐库。");
+            var connection = NavidromeConnectionStore.NormalizeConnection(new NavidromeConnection(existing?.SourceId ?? Guid.NewGuid(), request.Name,
+                server, username) { Provider = provider });
             var credentials = request.Password.Length > 0 ? NavidromeClient.CreateCredentials(request.Username, request.Password)
                 : existing is not null ? await navidromeStore.LoadCredentialsAsync(existing.SourceId, ct) : null;
             if (credentials is null) throw new MusicApiException(MusicFailure.Unauthorized);
@@ -103,16 +110,30 @@ public sealed partial class MainWindow
             await candidate.CheckConnectionAsync(ct);
             var tracks = await candidate.LoadTracksAsync(ct);
             await navidromeStore.SaveAsync(connection, credentials, ct);
+#if DEBUG
+            navidromeAfterCommit?.Invoke();
+#endif
             // The persisted connection is committed; mirror it even if cancellation arrived after commit.
-            if (!closed) { RegisterNavidrome(connection, candidate, tracks); candidate = null; navidromeConnections = await navidromeStore.LoadAsync(localLifetime.Token); navidromeLoaded = true; }
+            navidromeConnections = navidromeConnections.Where(item => item.SourceId != connection.SourceId).Append(connection).ToArray();
+            if (!closed) { RegisterNavidrome(connection, candidate, tracks); candidate = null; navidromeLoaded = true; }
         }
         finally { candidate?.Dispose(); navidromeGate.Release(); }
     }
 
     private async Task DeleteNavidromeAsync(Guid id, CancellationToken ct)
     {
+        using var lifetime = CancellationTokenSource.CreateLinkedTokenSource(ct, localLifetime.Token);
+        ct = lifetime.Token;
         await navidromeGate.WaitAsync(ct);
-        try { await navidromeStore.RemoveAsync(id, ct); RemoveNavidromeSource(id); navidromeStatus.Remove(id); navidromeConnections = await navidromeStore.LoadAsync(localLifetime.Token); }
+        try
+        {
+            await navidromeStore.RemoveAsync(id, ct);
+#if DEBUG
+            navidromeAfterCommit?.Invoke();
+#endif
+            navidromeConnections = navidromeConnections.Where(item => item.SourceId != id).ToArray();
+            if (!closed) { RemoveNavidromeSource(id); navidromeStatus.Remove(id); }
+        }
         finally { navidromeGate.Release(); }
     }
 
@@ -120,7 +141,7 @@ public sealed partial class MainWindow
     {
         try { await RefreshNavidromeAsync(localLifetime.Token); if (!closed && allMusicView) await LoadPageAsync(1); }
         catch (OperationCanceledException) { }
-        catch (Exception) { if (!closed) ShowMetadataNotice("Navidrome 配置读取失败，可在音乐库管理中重试。"); }
+        catch (Exception) { if (!closed) ShowMetadataNotice("Navidrome / Subsonic 配置读取失败，可在音乐库管理中重试。"); }
     }
 
     private void CloseNavidrome()

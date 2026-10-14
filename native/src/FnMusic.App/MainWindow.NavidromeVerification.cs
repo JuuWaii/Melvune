@@ -14,12 +14,16 @@ using Microsoft.UI.Xaml.Automation.Provider;
 namespace FnMusic.App;
 public sealed partial class MainWindow
 {
-    private sealed class NavidromeWindowHandler(byte[] wave, byte[] cover) : HttpMessageHandler
+    private sealed class NavidromeWindowHandler(byte[] wave, byte[] cover, string title = "Nav 受控曲目", Action? requestSeen = null,
+        HttpStatusCode? lyricsStatus = null) : HttpMessageHandler
     {
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
             ct.ThrowIfCancellationRequested();
+            requestSeen?.Invoke();
             string method = Path.GetFileNameWithoutExtension(request.RequestUri!.AbsolutePath);
+            if (method == "getLyricsBySongId" && lyricsStatus is { } failure)
+                return Task.FromResult(new HttpResponseMessage(failure) { Content = new StringContent("fixture lyrics failure") });
             if (method == "stream")
             {
                 var range = request.Headers.Range!.Ranges.Single(); long from = range.From!.Value, to = Math.Min(range.To!.Value, wave.Length - 1);
@@ -31,7 +35,17 @@ public sealed partial class MainWindow
             string json = method switch
             {
                 "ping" => "{\"subsonic-response\":{\"status\":\"ok\"}}",
-                "search3" => "{\"subsonic-response\":{\"status\":\"ok\",\"searchResult3\":{\"song\":[{\"id\":\"same\",\"title\":\"Nav 受控曲目\",\"artist\":\"验证歌手\",\"album\":\"验证专辑\",\"duration\":60,\"coverArt\":\"cover\"}]}}}",
+                "getAlbumList2" => "{\"subsonic-response\":{\"status\":\"ok\",\"albumList2\":{\"album\":[{\"id\":\"album-one\"}]}}}",
+                "getAlbum" => JsonSerializer.Serialize(new Dictionary<string, object>
+                {
+                    ["subsonic-response"] = new { status = "ok", album = new { id = "album-one",
+                        song = new[] { new { id = "same", title, artist = "验证歌手", album = "验证专辑", albumId = "album-one", duration = 60, coverArt = "cover" } } } }
+                }),
+                "search3" => JsonSerializer.Serialize(new Dictionary<string, object>
+                {
+                    ["subsonic-response"] = new { status = "ok", searchResult3 = new
+                    { song = new[] { new { id = "same", title, artist = "验证歌手", album = "验证专辑", duration = 60, coverArt = "cover" } } } }
+                }),
                 "getLyricsBySongId" => "{\"subsonic-response\":{\"status\":\"ok\",\"lyricsList\":{\"structuredLyrics\":[{\"synced\":true,\"line\":[{\"start\":0,\"value\":\"第一行\"},{\"start\":10000,\"value\":\"第二行\"}]}]}}}",
                 _ => throw new InvalidOperationException("Unexpected fixture route")
             };

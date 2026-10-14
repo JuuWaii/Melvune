@@ -154,26 +154,40 @@ public sealed partial class MainWindow
             view.Status.Text = rows.Count == 0 ? "暂无音乐库，点击右上方新建音乐库。" : $"{rows.Count} 个音乐库 · 使用卡片右侧的图标编辑或删除。";
             if (warning.Length > 0) view.Status.Text += " " + warning;
         }
+        async Task ShowCommittedThirdPartyAsync(string message, string? key = null)
+        {
+            if (closed || view.IsDisposed) return;
+            // The store has already committed. Use that known state rather than a fallible reread.
+            rows = rows.Where(row => row.Navidrome is null && row.Emby is null).ToList();
+            rows.AddRange(navidromeConnections.Select(connection => new LibraryManagerRow(null, null, true)
+            { Navidrome = connection, ConnectionStatus = navidromeStatus.GetValueOrDefault(connection.SourceId) ?? (navidromeTracks.TryGetValue(connection.SourceId, out var tracks) ? tracks.Count + " 首" : "未连接") }));
+            rows.AddRange(embyConnections.Select(connection => new LibraryManagerRow(null, null, true)
+            { Emby = connection, ConnectionStatus = embyStatus.GetValueOrDefault(connection.SourceId) ?? (embyTracks.TryGetValue(connection.SourceId, out var tracks) ? tracks.Count + " 首" : "未连接") }));
+            Render(key); view.Status.Text = message;
+            try { await RefreshVisibleLocalCatalogAsync(); }
+            catch (Exception)
+            {
+                if (!closed && !view.IsDisposed) view.Status.Text = message + " 音乐列表刷新失败，请手动刷新。";
+            }
+        }
         async Task Edit(LibraryManagerRow? selected)
         {
             if (busy || localImportBusy || !loaded || ct.IsCancellationRequested || themedDialogOpen || (selected is not null && !rows.Any(row => row.Key == selected.Key))) return;
             var expected = catalog; var expectedApi = api;
             var request = await EditLibraryDialogAsync(selected, api, CurrentRemote(true), authorizedPaths, ct);
             if (request is null || ct.IsCancellationRequested || !ReferenceEquals(fullPageView, view)) return;
-            thirdPartyOperation = request.Kind is 2 or 3; thirdPartyName = request.Kind == 3 ? "Emby" : "Navidrome";
+            thirdPartyOperation = request.Kind is 2 or 3 or 4; thirdPartyName = request.Kind == 3 ? "Emby" : request.Kind == 4 ? "Subsonic 兼容源" : "Navidrome";
             await Run(async operationCt =>
             {
                 if (request.Kind == 3)
                 {
                     await SaveEmbyAsync(selected, request, operationCt);
-                    await Refresh(); view.Status.Text = "Emby 已连接。打开所有音乐即可浏览、搜索并播放。";
-                    await RefreshVisibleLocalCatalogAsync(); return;
+                    await ShowCommittedThirdPartyAsync("Emby 已连接。打开所有音乐即可浏览、搜索并播放。", selected?.Key); return;
                 }
-                if (request.Kind == 2)
+                if (request.Kind is 2 or 4)
                 {
                     await SaveNavidromeAsync(selected, request, operationCt);
-                    await Refresh(); view.Status.Text = "Navidrome 已连接。打开所有音乐即可浏览、搜索并播放。";
-                    await RefreshVisibleLocalCatalogAsync(); return;
+                    await ShowCommittedThirdPartyAsync(thirdPartyName + " 已连接。打开所有音乐即可浏览、搜索并播放。", selected?.Key); return;
                 }
                 if (request.Kind == 1)
                 {
@@ -224,18 +238,18 @@ public sealed partial class MainWindow
             if (busy || localImportBusy || !loaded || ct.IsCancellationRequested || themedDialogOpen || !rows.Any(row => row.Key == selected.Key) || !selected.CanDelete) return;
             var expected = catalog; var expectedApi = api;
             if (!await ConfirmLibraryDeleteAsync(selected, ct) || ct.IsCancellationRequested || !ReferenceEquals(fullPageView, view)) return;
-            thirdPartyOperation = selected.Navidrome is not null || selected.Emby is not null; thirdPartyName = selected.Emby is not null ? "Emby" : "Navidrome";
+            thirdPartyOperation = selected.Navidrome is not null || selected.Emby is not null; thirdPartyName = selected.Emby is not null ? "Emby" : selected.Navidrome?.Provider == "subsonic" ? "Subsonic 兼容源" : "Navidrome";
             await Run(async _ =>
             {
                 if (selected.Emby is { } emby)
                 {
-                    await DeleteEmbyAsync(emby.SourceId, ct); await Refresh();
-                    view.Status.Text = "已移除 Emby 连接，服务端音乐及本地歌单引用保留。"; return;
+                    await DeleteEmbyAsync(emby.SourceId, ct);
+                    await ShowCommittedThirdPartyAsync("已移除 Emby 连接，服务端音乐及本地歌单引用保留。"); return;
                 }
                 if (selected.Navidrome is { } nav)
                 {
-                    await DeleteNavidromeAsync(nav.SourceId, ct); await Refresh();
-                    view.Status.Text = "已移除 Navidrome 连接，服务端音乐及本地歌单引用保留。"; return;
+                    await DeleteNavidromeAsync(nav.SourceId, ct);
+                    await ShowCommittedThirdPartyAsync("已移除 " + thirdPartyName + " 连接，服务端音乐及本地歌单引用保留。"); return;
                 }
                 if (selected.Remote is { } remote)
                 {

@@ -18,6 +18,8 @@ public sealed class NavidromeClient : IMusicPlaybackSource, IDisposable
 {
     private const int PageSize = 250;
     private const int MaximumTracks = 100000;
+    private const int MaximumAlbums = 10000;
+    private const int MaximumAlbumTracks = 10000;
     private readonly Uri server;
     private readonly NavidromeCredentials credentials;
     private readonly Func<HttpMessageHandler> handlerFactory;
@@ -28,17 +30,18 @@ public sealed class NavidromeClient : IMusicPlaybackSource, IDisposable
     public MusicSource Source { get; }
 
     public NavidromeClient(Guid sourceId, string name, string serverAddress, NavidromeCredentials credentials,
-        Func<HttpMessageHandler>? handlerFactory = null)
+        Func<HttpMessageHandler>? handlerFactory = null, string provider = "navidrome")
     {
         if (sourceId == Guid.Empty || string.IsNullOrWhiteSpace(name) || name.Length > 120 || name.Any(char.IsControl))
             throw new ArgumentException("Invalid music source");
         ValidateCredentials(credentials);
+        provider = NavidromeConnectionStore.NormalizeProvider(provider);
         server = new Uri(NormalizeServerAddress(serverAddress));
         this.credentials = credentials;
         this.handlerFactory = handlerFactory ?? (() => new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
         http = CreateClient();
         lifetimeToken = lifetime.Token;
-        Source = new(sourceId, name.Trim(), "navidrome", MusicSourceCapabilities.Browse | MusicSourceCapabilities.Playback |
+        Source = new(sourceId, name.Trim(), provider, MusicSourceCapabilities.Browse | MusicSourceCapabilities.Playback |
             MusicSourceCapabilities.Search | MusicSourceCapabilities.Artwork | MusicSourceCapabilities.Lyrics);
     }
 
@@ -70,6 +73,7 @@ public sealed class NavidromeClient : IMusicPlaybackSource, IDisposable
 
     public async Task<IReadOnlyList<MusicTrack>> LoadTracksAsync(CancellationToken ct = default)
     {
+        if (Source.Provider == "subsonic") return await LoadAlbumTracksAsync(ct).ConfigureAwait(false);
         List<MusicTrack> tracks = [];
         HashSet<string> identities = new(StringComparer.Ordinal);
         for (int offset = 0; ; offset += PageSize)
@@ -89,6 +93,61 @@ public sealed class NavidromeClient : IMusicPlaybackSource, IDisposable
             }
             if (songs.GetArrayLength() < PageSize) return tracks.ToArray();
         }
+    }
+
+    private async Task<IReadOnlyList<MusicTrack>> LoadAlbumTracksAsync(CancellationToken ct)
+    {
+        // Standard Subsonic does not promise that an empty search3 query lists every song.
+        // Enumerate the ID3 album catalog with its documented pagination instead.
+        List<MusicTrack> tracks = [];
+        HashSet<string> albums = new(StringComparer.Ordinal), identities = new(StringComparer.Ordinal);
+        for (int offset = 0; ; offset += PageSize)
+        {
+            using var document = await RequestJsonAsync("getAlbumList2", [("type", "alphabeticalByName"),
+                ("size", PageSize.ToString(CultureInfo.InvariantCulture)),
+                ("offset", offset.ToString(CultureInfo.InvariantCulture))], false, ct).ConfigureAwait(false);
+            var body = document!.RootElement.GetProperty("subsonic-response");
+            if (!body.TryGetProperty("albumList2", out var list)) throw InvalidResponse();
+            if (list.ValueKind != JsonValueKind.Object) throw InvalidResponse();
+            if (!list.TryGetProperty("album", out var page)) return tracks.ToArray();
+            if (page.ValueKind != JsonValueKind.Array || page.GetArrayLength() > PageSize) throw InvalidResponse();
+            foreach (var album in page.EnumerateArray())
+            {
+                if (album.ValueKind != JsonValueKind.Object) throw InvalidResponse();
+                string albumId = ReadIdentifier(album, "id") ?? throw InvalidResponse();
+                int? listedCount = ReadSongCount(album);
+                if (!albums.Add(albumId) || albums.Count > MaximumAlbums) throw InvalidResponse();
+                using var detail = await RequestJsonAsync("getAlbum", [("id", albumId)], false, ct).ConfigureAwait(false);
+                var detailBody = detail!.RootElement.GetProperty("subsonic-response");
+                if (!detailBody.TryGetProperty("album", out var contents) || contents.ValueKind != JsonValueKind.Object ||
+                    ReadIdentifier(contents, "id") != albumId) throw InvalidResponse();
+                int? detailCount = ReadSongCount(contents);
+                if (listedCount.HasValue && detailCount.HasValue && listedCount != detailCount) throw InvalidResponse();
+                if (!contents.TryGetProperty("song", out var songs))
+                {
+                    if (listedCount > 0 || detailCount > 0) throw InvalidResponse();
+                    continue;
+                }
+                if (songs.ValueKind != JsonValueKind.Array || songs.GetArrayLength() > MaximumAlbumTracks ||
+                    (listedCount.HasValue && listedCount.Value != songs.GetArrayLength()) ||
+                    (detailCount.HasValue && detailCount.Value != songs.GetArrayLength())) throw InvalidResponse();
+                foreach (var song in songs.EnumerateArray())
+                {
+                    var track = ParseTrack(song);
+                    if (!identities.Add(track.Id) || tracks.Count >= MaximumAlbumTracks) throw InvalidResponse();
+                    tracks.Add(track);
+                }
+            }
+            if (page.GetArrayLength() < PageSize) return tracks.ToArray();
+        }
+    }
+
+    private static int? ReadSongCount(JsonElement album)
+    {
+        if (!album.TryGetProperty("songCount", out var value)) return null;
+        if (value.ValueKind != JsonValueKind.Number || !value.TryGetInt32(out int count) ||
+            count < 0 || count > MaximumAlbumTracks) throw InvalidResponse();
+        return count;
     }
 
     private MusicTrack ParseTrack(JsonElement song)

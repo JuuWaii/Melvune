@@ -12,18 +12,18 @@ public sealed partial class MainWindow
         public NavidromeConnection? Navidrome { get; init; }
         public EmbyConnection? Emby { get; init; }
         public string ConnectionStatus { get; init; } = "";
-        public string Key => Local is { } local ? "local:" + local.SourceId : Navidrome is { } nav ? "nav:" + nav.SourceId : Emby is { } emby ? "emby:" + emby.SourceId : "nas:" + Remote!.Library.Id;
+        public string Key => Local is { } local ? "local:" + local.SourceId : Navidrome is { } nav ? (nav.Provider == "subsonic" ? "subsonic:" : "nav:") + nav.SourceId : Emby is { } emby ? "emby:" + emby.SourceId : "nas:" + Remote!.Library.Id;
         public string Name => Local?.Name ?? Navidrome?.Name ?? Emby?.Name ?? (string.IsNullOrWhiteSpace(Remote!.Library.Name) ? Path.GetFileName(Remote.Path.TrimEnd('/')) : Remote.Library.Name);
         public string Directory => Local?.Directory ?? Navidrome?.ServerAddress ?? Emby?.ServerAddress ?? Remote!.Path;
-        public string Group => Local is { } local ? "本地音乐" + (local.Group.Length == 0 ? "" : " · " + local.Group) : Navidrome is not null || Emby is not null ? (Emby is not null ? "Emby" : "Navidrome") + (ConnectionStatus.Length > 0 ? " · " + ConnectionStatus : "") : "飞牛音乐";
+        public string Group => Local is { } local ? "本地音乐" + (local.Group.Length == 0 ? "" : " · " + local.Group) : Navidrome is not null || Emby is not null ? (Emby is not null ? "Emby" : Navidrome?.Provider == "subsonic" ? "Subsonic 兼容源" : "Navidrome") + (ConnectionStatus.Length > 0 ? " · " + ConnectionStatus : "") : "飞牛音乐";
     }
     private sealed record LibraryEditRequest(int Kind, string Name, string Group, string Path, string Metadata, bool Lyric)
     { public string Server { get; init; } = ""; public string Username { get; init; } = ""; public string Password { get; init; } = ""; }
     private sealed class LibraryEditorView
     {
         public ContentDialog Dialog { get; }
-        public ComboBox Kind { get; } = new() { Header = "音乐来源", ItemsSource = new[] { "本地音乐", "飞牛音乐", "其他音乐 · Navidrome", "其他音乐 · Emby" }, HorizontalAlignment = HorizontalAlignment.Stretch };
-        public ComboBox ServiceType { get; } = new() { Header = "服务类型", ItemsSource = new[] { "Navidrome", "Emby" }, SelectedIndex = 0, IsEnabled = false };
+        public ComboBox Kind { get; } = new() { Header = "音乐来源", ItemsSource = new[] { "本地音乐", "飞牛音乐", "其他音乐 · Navidrome", "其他音乐 · Emby", "其他音乐 · Subsonic" }, HorizontalAlignment = HorizontalAlignment.Stretch };
+        public ComboBox ServiceType { get; } = new() { Header = "服务类型", ItemsSource = new[] { "Navidrome", "Emby", "Subsonic 兼容源" }, SelectedIndex = 0, IsEnabled = false };
         public TextBox NavName { get; } = new() { Header = "库名称", MaxLength = 120 };
         public TextBox Server { get; } = new() { Header = "Navidrome 服务地址", MaxLength = 2048, PlaceholderText = "https://music.example.com/" };
         public TextBox Username { get; } = new() { Header = "账号", MaxLength = 256 };
@@ -46,7 +46,7 @@ public sealed partial class MainWindow
         public LibraryEditRequest Read() => new(Kind.SelectedIndex, Name.Text.Trim(), Group.Text.Trim(),
             (Kind.SelectedIndex == 0 ? LocalPath.Text : NasPath.Text).Trim(),
             Metadata.SelectedIndex switch { 0 => "cloud_preferred", 2 => "local_only", _ => "local_preferred" }, Lyric.IsChecked == true)
-        { Name = Kind.SelectedIndex is 2 or 3 ? NavName.Text.Trim() : Name.Text.Trim(), Server = Server.Text.Trim(), Username = Username.Text.Trim(), Password = Password.Password };
+        { Name = Kind.SelectedIndex is 2 or 3 or 4 ? NavName.Text.Trim() : Name.Text.Trim(), Server = Server.Text.Trim(), Username = Username.Text.Trim(), Password = Password.Password };
     }
 #if DEBUG
     private Action<LibraryEditorView>? libraryEditorOpened;
@@ -83,17 +83,19 @@ public sealed partial class MainWindow
         void Update()
         {
             bool local = editor.Kind.SelectedIndex == 0, nas = editor.Kind.SelectedIndex == 1;
-            bool emby = editor.Kind.SelectedIndex == 3, other = editor.Kind.SelectedIndex is 2 or 3;
+            bool emby = editor.Kind.SelectedIndex == 3, subsonic = editor.Kind.SelectedIndex == 4, other = editor.Kind.SelectedIndex is 2 or 3 or 4;
             editor.LocalFields.Visibility = local ? Visibility.Visible : Visibility.Collapsed;
             editor.NasFields.Visibility = nas ? Visibility.Visible : Visibility.Collapsed;
             editor.OtherFields.Visibility = other ? Visibility.Visible : Visibility.Collapsed;
-            editor.ServiceType.SelectedIndex = emby ? 1 : 0;
-            editor.Server.Header = emby ? "Emby 服务地址" : "Navidrome 服务地址";
+            editor.ServiceType.SelectedIndex = emby ? 1 : subsonic ? 2 : 0;
+            editor.Server.Header = emby ? "Emby 服务地址" : subsonic ? "Subsonic 兼容服务地址" : "Navidrome 服务地址";
             editor.Server.PlaceholderText = emby ? "http://emby.example.com:8096/" : "https://music.example.com/";
             editor.Password.Header = emby ? "密码（编辑时留空保留登录令牌）" : "密码（编辑时留空保留已保存凭据）";
             editor.OtherDescription.Text = emby
                 ? "保存前验证连接并读取歌曲。登录令牌由 Windows 加密保存，不保存原始密码；支持播放、封面及加入本地歌单，歌词当前支持音频内嵌歌词。服务端歌单写入将在后续支持。修改服务或账号请新建音乐库。"
-                : "保存前验证连接并读取歌曲。凭据由 Windows 加密保存；支持播放、封面、歌词及加入本地歌单。自定义源及服务端歌单写入将在后续支持。修改服务或账号请新建音乐库。";
+                : subsonic
+                    ? "填写兼容 Subsonic API 的服务根地址，包含服务器的部署子路径。保存前验证连接，并按服务端专辑目录读取歌曲；凭据由 Windows 加密保存。支持播放、封面及加入本地歌单，服务歌词取决于接口支持，也可读取音频内嵌歌词。当前不修改服务端歌单。修改来源类型、服务或账号请新建音乐库。"
+                    : "保存前验证连接并读取歌曲。凭据由 Windows 加密保存；支持播放、封面、歌词及加入本地歌单。服务端歌单写入将在后续支持。修改来源类型、服务或账号请新建音乐库。";
             bool current = api is not null && IsCurrentSettingsClient(api)
                 && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.ReadSettings | MusicSourceCapabilities.WriteSettings);
             bool writable = remoteWritable && current;
@@ -112,7 +114,7 @@ public sealed partial class MainWindow
         editor.NavName.TextChanged += (_, _) => Update(); editor.Server.TextChanged += (_, _) => Update(); editor.Username.TextChanged += (_, _) => Update(); editor.Password.PasswordChanged += (_, _) => Update();
         authorized.SelectionChanged += (_, _) => { if (authorized.SelectedItem is string path) editor.NasPath.Text = path; };
         browse.Click += async (_, _) => await PickLocalFolderAsync(editor.LocalPath, browse);
-        editor.Kind.SelectedIndex = row?.Emby is not null ? 3 : row?.Navidrome is not null ? 2 : row?.Remote is null ? 0 : 1; Update();
+        editor.Kind.SelectedIndex = row?.Emby is not null ? 3 : row?.Navidrome is { } connection ? connection.Provider == "subsonic" ? 4 : 2 : row?.Remote is null ? 0 : 1; Update();
         using var canceled = ct.Register(() => DispatcherQueue.TryEnqueue(() => editor.Dialog.Hide()));
 #if DEBUG
         editor.Dialog.Opened += (_, _) => libraryEditorOpened?.Invoke(editor);

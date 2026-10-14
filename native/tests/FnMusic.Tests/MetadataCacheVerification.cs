@@ -6,7 +6,7 @@ using FnMusic.Infrastructure;
 
 internal static class MetadataCacheVerification
 {
-    private static void Require(bool value) { if (!value) throw new Exception("Metadata cache assertion failed."); }
+    private static void Require(bool value, string? diagnostic = null) { if (!value) throw new Exception("Metadata cache assertion failed." + (diagnostic is null ? "" : " " + diagnostic)); }
     private static string FixtureDirectory() => Path.Combine(Path.GetTempPath(), "fnmusic-metadata-fixture", Guid.NewGuid().ToString("N"));
     private sealed class Handler : HttpMessageHandler
     {
@@ -15,7 +15,7 @@ internal static class MetadataCacheVerification
         internal CancellationTokenSource? CancelOnCollection;
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
-            Calls++; if (request.Method != HttpMethod.Get) Writes++;
+            Interlocked.Increment(ref Calls); if (request.Method != HttpMethod.Get) Interlocked.Increment(ref Writes);
             var route = request.RequestUri!.AbsolutePath;
             var query = request.RequestUri.Query.TrimStart('?').Split('&', StringSplitOptions.RemoveEmptyEntries)
                 .Select(part => part.Split('=', 2)).ToDictionary(parts => parts[0], parts => Uri.UnescapeDataString(parts[1]));
@@ -25,12 +25,12 @@ internal static class MetadataCacheVerification
             object data;
             if (route.EndsWith("static/cover"))
             {
-                Covers++; var content = new ByteArrayContent([1, 2, 3, 4]); content.Headers.ContentType = new("image/png");
+                Interlocked.Increment(ref Covers); var content = new ByteArrayContent([1, 2, 3, 4]); content.Headers.ContentType = new("image/png");
                 return Task.FromResult(new HttpResponseMessage(FailAssets ? HttpStatusCode.ServiceUnavailable : HttpStatusCode.OK) { Content = content });
             }
             if (route.EndsWith("lyric/list"))
             {
-                LyricCalls++;
+                Interlocked.Increment(ref LyricCalls);
                 if (FailAssets) return Task.FromResult(new HttpResponseMessage(HttpStatusCode.ServiceUnavailable));
                 data = new { list = new[] { new { guid = "lyric", content = "[00:00]cached\n[00:01]second", offset = 250 } } };
             }
@@ -64,7 +64,8 @@ internal static class MetadataCacheVerification
         Require(result.FailedAssets == 0 && result.Snapshot.Tracks.Count == 55 && result.Snapshot.Albums.Single().Tracks.Count == 55
             && result.Snapshot.Artists.Single().Tracks.Count == 55 && result.Snapshot.Playlists.Single().Tracks.Count == 1
             && result.Snapshot.Favorites.Single().Id == "track-0" && result.Snapshot.Tracks[0].IsFavorite && !result.Snapshot.Tracks[1].IsFavorite
-            && handler.LyricCalls == 55 && handler.Covers == 1 && handler.Writes == 0);
+            && handler.LyricCalls == 55 && handler.Covers == 1 && handler.Writes == 0,
+            $"assets={result.FailedAssets}, tracks={result.Snapshot.Tracks.Count}, albums={result.Snapshot.Albums.Single().Tracks.Count}, artists={result.Snapshot.Artists.Single().Tracks.Count}, playlists={result.Snapshot.Playlists.Single().Tracks.Count}, favorite0={result.Snapshot.Tracks[0].IsFavorite}, favorite1={result.Snapshot.Tracks[1].IsFavorite}, lyrics={handler.LyricCalls}, covers={handler.Covers}, writes={handler.Writes}");
         var restarted = new NasMetadataCache(directory);
         var loaded = await restarted.LoadAsync(source, default);
         Require(loaded is not null && loaded.Tracks.Select(t => t.Reference).SequenceEqual(result.Snapshot.Tracks.Select(t => t.Reference))
