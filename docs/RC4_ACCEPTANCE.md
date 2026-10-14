@@ -1,6 +1,6 @@
 # rc.4 自定义音乐源交付与验收
 
-日期：2026-10-15。目标为 `0.2.0-rc.4` Windows x64 完整 ZIP 与便携 EXE。当前 HTTP/JSON 来源实现和文档已接入，集中回归已通过，最终打包与实际运行结果待填；尚未将本批测试或真实服务声明为通过。唯一进度见 [当前开发清单](NEXT_DEVELOPMENT_CHECKLIST.md)。rc.3 历史保留在 [此前验收](RC3_ACCEPTANCE.md)。
+日期：2026-10-15。目标为 `0.2.0-rc.4` Windows x64 完整 ZIP 与便携 EXE。本轮来源实现、集中回归、最终打包与隔离实际运行已完成；真实第三方服务兼容性仍按用户验证单验收。唯一进度见 [当前开发清单](NEXT_DEVELOPMENT_CHECKLIST.md)。rc.3 历史保留在 [此前验收](RC3_ACCEPTANCE.md)。
 
 新增来源使用匿名 GET 和已知 JSON 字段方案，提供受控完整分页、最多 10000 首目录、同源原始 Range 音频、封面和 UTF-8 文本歌词。名称、根地址和方案保存为独立来源，歌曲媒体 URL 仅在内存中保存。音乐库动态字段、来源分类/搜索、跨库本地歌单和正常退出单曲续播沿用已有界面。更换地址或映射必须新建来源；删除仅移除客户端连接，保留服务端音乐和歌单引用。
 
@@ -8,9 +8,13 @@
 
 | 产物 | 当前状态 | 来源修订 | 字节 | SHA-256 |
 | --- | --- | --- | ---: | --- |
-| `dist/FnMusic-0.2.0-rc.4-win-x64.zip` | 待构建与校验 | 待填 | 待填 | 待填 |
-| `dist/FnMusic-0.2.0-rc.4-win-x64-portable/FnMusic-0.2.0-rc.4-win-x64-portable.exe` | 待构建与校验 | 待填 | 待填 | 待填 |
+| [rc.4 ZIP](../dist/FnMusic-0.2.0-rc.4-win-x64.zip) | 已交付并校验 | 835c8db00a34402d0efbc0b7e62eeabefc944932 | 239851340 | 7D14B4F975EEED81DCFD2168D274DB9DD2E8BD93947B2366E55D56101D605E7D |
+| [便携 EXE](../dist/FnMusic-0.2.0-rc.4-win-x64-portable/FnMusic-0.2.0-rc.4-win-x64-portable.exe) | 已交付并校验 | 835c8db00a34402d0efbc0b7e62eeabefc944932 | 277620674 | 2542AA349518F8CC74F313613AA42737DBC7076420886250C2436066E1FA88B7 |
 
-后续需核对来源和程序集版本、ZIP CRC、逐文件摘要、便携嵌入包、许可与对应解码器源码，并在独立配置下实际启动/关闭，检查既有数据保留。包内文档为打包时快照，最终摘要与状态以本仓库和独立校验文件为准。
+最终包来源与 EXE/DLL 版本一致；599 项摘要/600 个实际文件、ZIP CRC、便携尾部/嵌入包/逐文件摘要与来源匹配，应用与便携入口的七档图标均通过。便携 EXE 实际 extract-only 退出码 0，600 文件与 ZIP 完全一致。运行后原 ZIP 展开目录再次逐文件校验通过。
+
+实际 Release 使用仅监听回环地址的受控匿名 HTTP 服务和独立配置：已观察目录、原始 Range/FFmpeg 播放、封面与应用内同步歌词。第一次正常关闭保存 40.3796217 秒；重启显示同一歌曲、同一进度并保持暂停，点击播放后观察到「正在播放（已恢复进度）」和 44.6983506 秒，第二次正常关闭保存 56.7647245 秒。此处证明实际继续播放，首个 Playing 事件精确定位另由受控窗口专项在 15 秒验证。便携入口实际启动和正常关闭通过；ZIP 与便携既有连接配置和哨兵文件内容保持。正式个人配置未使用，受控音频为静音 PCM，不计为实际听音验收。
+
+最终证据在 `.review-audit/httpjson-20261014/` 的 delivery-summary.json、passing-report-summary.json、collection-report.json、portable-extraction.json 和 smoke/；便携独立报告在 `.tools/installers/FnMusic-0.2.0-rc.4-win-x64-portable/portable-verification.json`。包内文档为打包时快照，最终摘要与状态以本仓库和独立校验文件为准。
 
 旧包及用户改动保留。本轮不进行推送、打标签、远端构建或 Release 上传；完整安装器、签名、认证式自定义来源、脚本和跨域 CDN、第三方远端写入、转码、完整队列持久化及自动更新后置。真实验收按 [rc.4 用户验证单](RC4_USER_VALIDATION.md) 进行。
