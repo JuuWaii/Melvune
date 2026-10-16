@@ -20,6 +20,11 @@ public sealed record LocalMusicIndex(LocalMusicSettings Settings, IReadOnlyList<
 public sealed class LocalMusicSource : IMusicPlaybackSource
 {
     private const int CurrentMetadataRevision = 1;
+    // Shell-property and decoder probes own their resources per file. Bound parallel I/O,
+    // including network shares, instead of scheduling one task per song.
+    public const int MaximumMetadataConcurrency = 4;
+    private sealed record ScanResult(string Id, string File, MusicTrack Track,
+        (long Size, long Modified, LocalMusicMetadata Metadata)? Cached);
     private sealed record Snapshot(Dictionary<string, string> Files, IReadOnlyList<MusicTrack> Tracks,
         Dictionary<string, (long Size, long Modified, LocalMusicMetadata Metadata)> Metadata, int MetadataRevision);
     private Snapshot snapshot;
@@ -93,6 +98,8 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
         return result;
     }
 
+    // readMetadata must own per-file resources: up to MaximumMetadataConcurrency callbacks
+    // may run concurrently. Progress reports remain serialized and monotonically increasing.
     public static Task<LocalMusicSource> ScanAsync(LocalMusicSettings settings, CancellationToken ct,
         Func<string, CancellationToken, Task<LocalMusicMetadata>>? readMetadata = null, IProgress<int>? progress = null,
         LocalMusicSource? previous = null) => Task.Run(async () =>
@@ -101,24 +108,34 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
         string root = Path.GetFullPath(settings.Directory);
         if (!Directory.Exists(root)) throw new DirectoryNotFoundException();
         EnsureRegularPath(root);
-        var files = new Dictionary<string, string>();
-        var tracks = new List<MusicTrack>();
-        var cache = new Dictionary<string, (long Size, long Modified, LocalMusicMetadata Metadata)>();
         var previousSnapshot = previous is null ? null : Volatile.Read(ref previous.snapshot);
         bool reuse = previousSnapshot?.MetadataRevision == CurrentMetadataRevision && previous is not null && previous.Source.Id == settings.SourceId && string.Equals(
             LocalLibraryStore.NormalizePath(previous.Settings.Directory), LocalLibraryStore.NormalizePath(root), StringComparison.OrdinalIgnoreCase);
         var previousMetadata = previousSnapshot?.Metadata;
         progress?.Report(0);
+        // Complete the bounded enumeration first, so overflow or directory failure never
+        // starts metadata probes or yields a partially populated replacement snapshot.
+        var candidates = new List<string>();
         var options = new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.ReparsePoint };
         foreach (string file in Directory.EnumerateFiles(root, "*", options))
         {
             ct.ThrowIfCancellationRequested();
             if (!extensions.Contains(Path.GetExtension(file))) continue;
-            if (tracks.Count >= 10000) throw new InvalidDataException("Local library limit reached");
+            if (candidates.Count >= 10000) throw new InvalidDataException("Local library limit reached");
+            candidates.Add(file);
+        }
+        ct.ThrowIfCancellationRequested();
+        var results = new ScanResult[candidates.Count];
+        var progressGate = new object(); int completed = 0;
+        await Parallel.ForEachAsync(Enumerable.Range(0, candidates.Count), new ParallelOptions
+        { CancellationToken = ct, MaxDegreeOfParallelism = MaximumMetadataConcurrency }, async (index, workerCancellation) =>
+        {
+            string file = candidates[index];
+            workerCancellation.ThrowIfCancellationRequested();
             string id = Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(Path.GetRelativePath(root, file))));
-            files.Add(id, file);
             string title = Path.GetFileNameWithoutExtension(file), artist = "本地文件", album = "";
             double duration = 0;
+            (long Size, long Modified, LocalMusicMetadata Metadata)? stamp = null;
             if (readMetadata is not null)
             {
                 try
@@ -127,26 +144,43 @@ public sealed class LocalMusicSource : IMusicPlaybackSource
                     var info = new FileInfo(file);
                     long size = info.Length, modified = info.LastWriteTimeUtc.Ticks;
                     var metadata = reuse && previousMetadata!.TryGetValue(id, out var cached) && cached.Size == size && cached.Modified == modified
-                        ? cached.Metadata : await readMetadata(file, ct).ConfigureAwait(false);
+                        ? cached.Metadata : await readMetadata(file, workerCancellation).ConfigureAwait(false);
                     if (!string.IsNullOrWhiteSpace(metadata.Title)) title = metadata.Title;
                     if (!string.IsNullOrWhiteSpace(metadata.Artist)) artist = metadata.Artist;
                     album = metadata.Album;
                     if (double.IsFinite(metadata.DurationSeconds) && metadata.DurationSeconds > 0) duration = Math.Min(metadata.DurationSeconds, 864000);
                     info.Refresh();
-                    if (info.Exists && info.Length == size && info.LastWriteTimeUtc.Ticks == modified) cache[id] = (size, modified, metadata);
+                    if (info.Exists && info.Length == size && info.LastWriteTimeUtc.Ticks == modified) stamp = (size, modified, metadata);
                 }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+                catch (OperationCanceledException) when (workerCancellation.IsCancellationRequested) { throw; }
                 catch (Exception) { /* 不支持的标签不能阻止文件被浏览和播放。 */ }
             }
-            tracks.Add(new(id, title, artist, duration, false) { SourceInstanceId = settings.SourceId, Album = album, LibraryIds = [settings.SourceId.ToString("N")] });
-            ct.ThrowIfCancellationRequested();
-            if (tracks.Count % 25 == 0) progress?.Report(tracks.Count);
-        }
+            workerCancellation.ThrowIfCancellationRequested();
+            // Each worker owns one array slot. Dictionaries and the published snapshot
+            // are only constructed after all workers have completed successfully.
+            results[index] = new(id, file, new(id, title, artist, duration, false)
+                { SourceInstanceId = settings.SourceId, Album = album, LibraryIds = [settings.SourceId.ToString("N")] }, stamp);
+            lock (progressGate)
+            {
+                completed++;
+                if (completed % 25 == 0) progress?.Report(completed);
+            }
+        }).ConfigureAwait(false);
         ct.ThrowIfCancellationRequested();
+        var files = new Dictionary<string, string>(); var tracks = new List<MusicTrack>();
+        var cache = new Dictionary<string, (long Size, long Modified, LocalMusicMetadata Metadata)>();
+        foreach (var row in results)
+        {
+            ct.ThrowIfCancellationRequested();
+            files.Add(row.Id, row.File); tracks.Add(row.Track);
+            if (row.Cached is { } cached) cache.Add(row.Id, cached);
+        }
         progress?.Report(tracks.Count);
+        ct.ThrowIfCancellationRequested();
         tracks.Sort((a, b) => { int title = StringComparer.OrdinalIgnoreCase.Compare(a.Title, b.Title); return title != 0 ? title : StringComparer.Ordinal.Compare(a.Id, b.Id); });
         var result = new LocalMusicSource(settings with { Directory = root }, files, tracks);
         foreach (var entry in cache) result.metadataCache.Add(entry.Key, entry.Value);
+        ct.ThrowIfCancellationRequested();
         return result;
     }, ct);
 

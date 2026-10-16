@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [string]$ExpectedVersion = '0.2.0-rc.6'
+    [string]$ExpectedVersion = '0.2.0-rc.7'
 )
 $ErrorActionPreference = 'Stop'
 $previewRoot = (Get-Item -LiteralPath $Path).FullName
@@ -35,21 +35,21 @@ $requiredFiles = @('FnMusic.App.exe', 'FnMusic.App.dll', 'FnMusic.App.pri', 'App
     'LICENSE', 'THIRD_PARTY_NOTICES.md', 'NATIVE_DECODER_DEPENDENCIES.md', 'native-decoder-build.json',
     'licenses/FFmpegInteropX-Apache-2.0.txt', 'licenses/FFmpegInteropX-build/mp3-preroll.patch',
     'licenses/FFmpegInteropX-build/toolchain-lock.json', 'licenses/FFmpegInteropX-build/build-native-decoder.py')
-if ($ExpectedVersion -in @('0.2.0-rc.1','0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6')) {
+if ($ExpectedVersion -in @('0.2.0-rc.1','0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) {
     $candidateNumber = $ExpectedVersion.Split('.')[-1].Split('-')[-1]
     $requiredFiles += @('USER_GUIDE.md', ('RC' + $candidateNumber + '_USER_VALIDATION.md'), ($ExpectedVersion + '.md'), 'BUILDING_SOURCES.md', 'release.json',
         'licenses/corresponding-source/decoder-corresponding-source.zip', 'licenses/corresponding-source/decoder-distribution.json',
         'licenses/corresponding-source/runtime-license-index.json', 'licenses/packages.lock.json')
 } else { $requiredFiles += 'PREVIEW_VALIDATION.md' }
-if ($ExpectedVersion -in @('0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6')) {
+if ($ExpectedVersion -in @('0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) {
     $requiredFiles += @('DESKTOP_INTEGRATION.md', 'PLAYBACK_INFORMATION_PROTOCOL.md', 'examples/InfoClient/FnMusic.InfoClient.exe', 'examples/InfoClient/README.md')
 }
-if ($ExpectedVersion -in @('0.2.0-rc.3', '0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6')) {
+if ($ExpectedVersion -in @('0.2.0-rc.3', '0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) {
     $requiredFiles += @('NAVIDROME_ACCEPTANCE.md', 'PLAYBACK_RESUME_ACCEPTANCE.md', 'EMBY_ACCEPTANCE.md', 'SUBSONIC_ACCEPTANCE.md', ('RC' + $candidateNumber + '_ACCEPTANCE.md'))
 }
-if ($ExpectedVersion -in @('0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6')) { $requiredFiles += 'HTTP_JSON_SOURCES.md' }
-if ($ExpectedVersion -in @('0.2.0-rc.5', '0.2.0-rc.6')) { $requiredFiles += 'QUEUE_SESSION.md' }
-if ($ExpectedVersion -eq '0.2.0-rc.6') { $requiredFiles += 'Assets/FnOsMusic.png' }
+if ($ExpectedVersion -in @('0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) { $requiredFiles += 'HTTP_JSON_SOURCES.md' }
+if ($ExpectedVersion -in @('0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) { $requiredFiles += 'QUEUE_SESSION.md' }
+if ($ExpectedVersion -in @('0.2.0-rc.6', '0.2.0-rc.7')) { $requiredFiles += 'Assets/FnOsMusic.png' }
 foreach ($required in $requiredFiles) {
     if (-not $known.Contains([IO.Path]::GetFullPath((Join-Path $previewRoot $required)))) { throw "Required file missing: $required" }
 }
@@ -66,7 +66,7 @@ foreach ($binding in @(
     if ($binding[1] -notmatch '^[0-9A-Fa-f]{64}$' -or
         (Get-FileHash -LiteralPath (Join-Path $previewRoot $binding[0]) -Algorithm SHA256).Hash -ne $binding[1]) { throw 'Decoder material does not match provenance' }
 }
-if ($ExpectedVersion -in @('0.2.0-rc.1','0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6')) {
+if ($ExpectedVersion -in @('0.2.0-rc.1','0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) {
     $distribution = Get-Content -LiteralPath (Join-Path $previewRoot 'licenses/corresponding-source/decoder-distribution.json') -Raw | ConvertFrom-Json
     if ((Get-FileHash -LiteralPath (Join-Path $previewRoot 'licenses/corresponding-source/decoder-corresponding-source.zip') -Algorithm SHA256).Hash -ne $distribution.sourceArchiveSha256) { throw 'Corresponding source archive mismatch' }
     foreach ($binary in $distribution.binarySha256.PSObject.Properties) {

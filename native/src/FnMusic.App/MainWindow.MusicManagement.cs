@@ -54,8 +54,8 @@ public sealed partial class MainWindow
         itemStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0))); list.ItemContainerStyle = itemStyle;
         global::Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(list, "全部歌单管理列表");
         var search = new TextBox { PlaceholderText = "筛选歌单名称", MaxLength = 120, Header = "查找歌单" };
-        var visibility = new ToggleSwitch { Header = "在侧栏显示飞牛歌单", IsOn = showNasPlaylistsInSidebar };
-        ToolTipService.SetToolTip(visibility, "默认隐藏；打开后，飞牛歌单与本地歌单显示在同一个歌单列表中。");
+        var visibility = new ToggleSwitch { Header = "飞牛歌单单独分组", IsOn = separateNasPlaylistsInSidebar };
+        ToolTipService.SetToolTip(visibility, "开启后侧栏分为飞牛歌单和其他歌单；关闭时全部合并显示。两种模式均保留飞牛歌单。");
         var fields = new StackPanel { Spacing = 10 };
         fields.Children.Add(visibility);
         fields.Children.Add(new TextBlock { Text = "集中管理本机与当前飞牛账号的歌单。飞牛歌单修改会同步到服务器；删除歌单保留音乐文件。", TextWrapping = TextWrapping.Wrap });
@@ -287,7 +287,7 @@ public sealed partial class MainWindow
                 }
             }
         }
-        visibility.Toggled += (_, _) => { if (Current()) SetNasPlaylistSidebarVisibility(visibility.IsOn); };
+        visibility.Toggled += (_, _) => { if (Current()) SetNasPlaylistSidebarGrouping(visibility.IsOn); };
         list.SelectionChanged += (_, _) => { if (list.SelectedItem is PlaylistManagerRow row) selection = row.Key; };
         list.AddHandler(UIElement.DoubleTappedEvent, new DoubleTappedEventHandler(async (_, args) =>
         {

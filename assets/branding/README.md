@@ -23,3 +23,5 @@ and crisp edges. Must be original, do not copy the official fnOS or any existing
 ## 飞牛来源标志
 
 `fnos-music-source.png` 为用户 NAS 飞牛音乐公开静态资源 `/music/static/assets/img/logo.png`（2026-10-16，未使用登录凭据）。只用于标识飞牛同步歌单，原图未改绘，使用 20/30px 图标、圆角衬底与统一边距融入 WinUI。标志归原权利人所有，不作为本客户端应用图标，不表示官方关联或背书。
+
+rc.7 保留此官方原图，在应用中后台解码并按亮度转换为中性灰，精确保留原图透明度；共享转换后的图像源，以低透明度放在歌单名称背景，不替代本客户端应用图标。未采用图像生成的轮廓变形版本。

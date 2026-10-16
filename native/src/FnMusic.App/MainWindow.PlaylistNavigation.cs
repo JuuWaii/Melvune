@@ -14,7 +14,9 @@ public sealed partial class MainWindow
     private long localNavigationRevision = -1;
     private int nasNavigationVersion;
 
-    private bool showNasPlaylistsInSidebar;
+    private bool separateNasPlaylistsInSidebar;
+    private string? sidebarSelectedPlaylistKey;
+    private bool updatingPlaylistGroupingControls = true;
     private sealed record SidebarPlaylistRow(object Value)
     {
         public override string ToString() => Name;
@@ -23,28 +25,45 @@ public sealed partial class MainWindow
         public Visibility NasVisibility => Value is NasPlaylist ? Visibility.Visible : Visibility.Collapsed;
         public Visibility LocalVisibility => Value is LocalPlaylist ? Visibility.Visible : Visibility.Collapsed;
     }
-    private sealed record PlaylistNavigationPreferences(bool ShowNasPlaylists = false);
+    private sealed record PlaylistNavigationPreferences(bool SeparateNasPlaylists = false, int Version = 2);
+    private static PlaylistNavigationPreferences ReadPlaylistNavigationPreferences(string json)
+    {
+        using var doc = JsonDocument.Parse(json);
+        var root = doc.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw new JsonException();
+        if (root.TryGetProperty("Version", out var version) && version.GetInt32() is not 1 and not 2) throw new JsonException();
+        // Preserve the old toggle's on/off choice, while both new modes now include FN playlists.
+        bool separate = root.TryGetProperty("SeparateNasPlaylists", out var current) ? current.GetBoolean()
+            : root.TryGetProperty("ShowNasPlaylists", out var legacy) && legacy.GetBoolean();
+        return new(separate);
+    }
     private string PlaylistNavigationPreferencesFile => Path.Combine(AppDataDirectory.Resolve(), "playlist-navigation.json");
     private void InitializePlaylistNavigationPreferences()
     {
         try
         {
             if (File.Exists(PlaylistNavigationPreferencesFile) && new FileInfo(PlaylistNavigationPreferencesFile).Length <= 4096)
-                showNasPlaylistsInSidebar = JsonSerializer.Deserialize<PlaylistNavigationPreferences>(File.ReadAllText(PlaylistNavigationPreferencesFile))?.ShowNasPlaylists == true;
+                separateNasPlaylistsInSidebar = ReadPlaylistNavigationPreferences(File.ReadAllText(PlaylistNavigationPreferencesFile)).SeparateNasPlaylists;
         }
-        catch (Exception) { showNasPlaylistsInSidebar = false; }
+        catch (Exception) { separateNasPlaylistsInSidebar = false; }
+        SeparateNasPlaylistsToggle.IsOn = separateNasPlaylistsInSidebar;
+        updatingPlaylistGroupingControls = false;
         RenderUnifiedPlaylistNavigation();
     }
-    private void SetNasPlaylistSidebarVisibility(bool show)
+    private void PlaylistGrouping_Toggled(object sender, RoutedEventArgs args)
+    { if (!updatingPlaylistGroupingControls && !closed) SetNasPlaylistSidebarGrouping(SeparateNasPlaylistsToggle.IsOn); }
+    private void SetNasPlaylistSidebarGrouping(bool separate)
     {
         if (closed) return;
-        showNasPlaylistsInSidebar = show;
+        separateNasPlaylistsInSidebar = separate;
+        updatingPlaylistGroupingControls = true;
+        try { SeparateNasPlaylistsToggle.IsOn = separate; } finally { updatingPlaylistGroupingControls = false; }
         RenderUnifiedPlaylistNavigation();
         string pending = PlaylistNavigationPreferencesFile + "." + Guid.NewGuid().ToString("N") + ".tmp";
         try
         {
             Directory.CreateDirectory(Path.GetDirectoryName(pending)!);
-            File.WriteAllText(pending, JsonSerializer.Serialize(new PlaylistNavigationPreferences(show)));
+            File.WriteAllText(pending, JsonSerializer.Serialize(new PlaylistNavigationPreferences(separate)));
             File.Move(pending, PlaylistNavigationPreferencesFile, true);
         }
         catch (Exception) { UnifiedPlaylistStatus.Text = "歌单显示偏好未能保存，本次运行仍生效。"; }
@@ -53,18 +72,30 @@ public sealed partial class MainWindow
     private void RenderUnifiedPlaylistNavigation()
     {
         if (closed) return;
-        var selected = (UnifiedPlaylistNavigation.SelectedItem as SidebarPlaylistRow)?.Key;
         var api = ContextClient;
-        bool includeNas = showNasPlaylistsInSidebar && api is not null && IsCurrentPlaylistClient(api)
+        bool includeNas = api is not null && IsCurrentPlaylistClient(api)
             && ViewModel.PlaybackRouter.Supports(api.SourceInstanceId, MusicSourceCapabilities.ReadPlaylists);
         var rows = (LocalPlaylistNavigation.ItemsSource as IEnumerable<LocalPlaylist> ?? []).Select(item => new SidebarPlaylistRow(item))
             .Concat(includeNas ? (NasPlaylistNavigation.ItemsSource as IEnumerable<NasPlaylist> ?? []).Where(item => item.Reference.SourceInstanceId == api!.SourceInstanceId).Select(item => new SidebarPlaylistRow(item)) : [])
             .OrderBy(item => item.Name, StringComparer.CurrentCultureIgnoreCase).ThenBy(item => item.Key, StringComparer.Ordinal).ToArray();
-        var previous = (UnifiedPlaylistNavigation.ItemsSource as IEnumerable<SidebarPlaylistRow> ?? []).ToArray();
-        if (!previous.SequenceEqual(rows)) UnifiedPlaylistNavigation.ItemsSource = rows;
-        UnifiedPlaylistNavigation.SelectedItem = rows.FirstOrDefault(item => item.Key == selected);
+        void RenderList(ListView list, SidebarPlaylistRow[] items)
+        {
+            var previous = (list.ItemsSource as IEnumerable<SidebarPlaylistRow> ?? []).ToArray();
+            if (!previous.SequenceEqual(items)) list.ItemsSource = items;
+            list.SelectedItem = items.FirstOrDefault(item => item.Key == sidebarSelectedPlaylistKey);
+        }
+        var remote = rows.Where(row => row.Value is NasPlaylist).ToArray();
+        var other = rows.Where(row => row.Value is LocalPlaylist).ToArray();
+        RenderList(UnifiedPlaylistNavigation, rows);
+        RenderList(GroupedNasPlaylistNavigation, remote);
+        RenderList(GroupedOtherPlaylistNavigation, other);
+        SidebarGroupedPlaylists.Visibility = separateNasPlaylistsInSidebar ? Visibility.Visible : Visibility.Collapsed;
+        MergedPlaylistHeader.Visibility = UnifiedPlaylistNavigation.Visibility = UnifiedPlaylistStatus.Visibility = separateNasPlaylistsInSidebar ? Visibility.Collapsed : Visibility.Visible;
         UnifiedPlaylistStatus.Text = rows.Length == 0 ? "暂无歌单，点击 + 新建。" : "";
+        GroupedNasPlaylistStatus.Text = remote.Length > 0 ? "" : includeNas ? "暂无飞牛歌单。" : "连接飞牛并登录后显示同步歌单。";
+        GroupedOtherPlaylistStatus.Text = other.Length == 0 ? "暂无其他歌单，点击 + 新建。" : "";
     }
+
     private async void ManageMusic_Click(object sender, RoutedEventArgs args)
     { try { await ShowMusicManagementAsync(); } catch (Exception) { if (!closed) PlaybackStatus.Text = "音乐管理暂不可用，请重试。"; } }
     private async void MusicPlaylists_Click(object sender, RoutedEventArgs args)
@@ -72,6 +103,8 @@ public sealed partial class MainWindow
     private async void UnifiedPlaylist_ItemClick(object sender, ItemClickEventArgs args)
     {
         if (closed || args.ClickedItem is not SidebarPlaylistRow row) return;
+        sidebarSelectedPlaylistKey = row.Key;
+        RenderUnifiedPlaylistNavigation();
         try
         {
             if (row.Value is LocalPlaylist local)
@@ -88,6 +121,8 @@ public sealed partial class MainWindow
         bool pointer = args.TryGetPosition(list, out var point);
         var origin = pointer ? args.OriginalSource as DependencyObject : FocusManager.GetFocusedElement(Root.XamlRoot) as DependencyObject;
         if (ResolveContextItem(list, origin, !pointer) is not SidebarPlaylistRow row) return;
+        sidebarSelectedPlaylistKey = row.Key;
+        RenderUnifiedPlaylistNavigation();
         list.SelectedItem = row;
         ShowContextMenu(CreatePlaylistNavigationMenu(row.Value), list, pointer ? point : null);
         args.Handled = true;
@@ -98,6 +133,7 @@ public sealed partial class MainWindow
         if (closed) return;
         if (background && catalog.Revision < localNavigationRevision) return;
         localNavigationRevision = catalog.Revision;
+        if (selected is { } id) sidebarSelectedPlaylistKey = "local:" + id;
         LocalPlaylistNavigation.ItemsSource = catalog.Playlists;
         LocalPlaylistNavigation.SelectedItem = catalog.Playlists.FirstOrDefault(item => item.Id == selected);
         LocalPlaylistNavigationStatus.Text = catalog.Playlists.Count == 0 ? "暂无本地歌单，点击 + 新建。" : "";
@@ -107,6 +143,7 @@ public sealed partial class MainWindow
     {
         if (closed || !IsCurrentPlaylistClient(api)) return;
         if (!background) ++nasNavigationVersion;
+        if (selected is { } reference) sidebarSelectedPlaylistKey = "nas:" + reference;
         NasPlaylistNavigation.ItemsSource = playlists;
         NasPlaylistNavigation.SelectedItem = playlists.FirstOrDefault(item => item.Reference == selected);
         NasPlaylistNavigationStatus.Text = playlists.Count == 0 ? "暂无飞牛歌单。" : "";

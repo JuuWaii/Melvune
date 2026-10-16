@@ -12,7 +12,7 @@ internal static class LocalIndexVerification
         var settings = new LocalMusicSettings(Guid.NewGuid(), music); var store = new LocalMusicIndexStore(state);
         int reads = 0;
         async Task<LocalMusicMetadata> Read(string file, CancellationToken ct)
-        { reads++; return new(await File.ReadAllTextAsync(file, ct), "歌手", 60) { Album = "专辑" }; }
+        { Interlocked.Increment(ref reads); return new(await File.ReadAllTextAsync(file, ct), "歌手", 60) { Album = "专辑" }; }
         try
         {
             await File.WriteAllTextAsync(first, "first"); await File.WriteAllTextAsync(second, "second");

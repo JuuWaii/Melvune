@@ -23,7 +23,7 @@ public sealed partial class MainWindow
         async Task Wait(Func<bool> predicate)
         { for (int i = 0; i < 150 && !predicate(); i++) await Task.Delay(40); if (!predicate()) throw new TimeoutException(stage); }
         void Invoke(Button button) => ((IInvokeProvider)new ButtonAutomationPeer(button).GetPattern(PatternInterface.Invoke)).Invoke();
-        var original = await playlistStore.LoadAsync(); bool originalShow = showNasPlaylistsInSidebar;
+        var original = await playlistStore.LoadAsync(); bool originalShow = separateNasPlaylistsInSidebar;
         var audio = music.Player.Source; var queued = queue.Current?.Reference;
         var first = new LocalPlaylist(Guid.NewGuid(), "相同名字", []);
         var second = new LocalPlaylist(Guid.NewGuid(), "另一首歌单", []);
@@ -31,14 +31,15 @@ public sealed partial class MainWindow
         try
         {
             await ShowHomeAsync(); motionPreferenceOverride = false;
-            Check("sidebar_default_hides_nas", !showNasPlaylistsInSidebar);
+            Check("sidebar_default_merges_all_sources", !separateNasPlaylistsInSidebar);
             playlistTestClient = api; remoteCapabilityTestSource = api.SourceInstanceId; ViewModel.PlaybackRouter.Register(new NasPlaybackSource(api));
             NasPlaylistNavigation.IsEnabled = true;
             var catalog = await playlistStore.SaveAsync(original with { Playlists = [first, second] });
             RenderLocalPlaylistNavigation(catalog); RenderNasPlaylistNavigation(api, await api.ListPlaylistsAsync(default));
-            Check("sidebar_one_list_default_local_only", UnifiedPlaylistNavigation.Items.Count == 2
-                && UnifiedPlaylistNavigation.Items.Cast<SidebarPlaylistRow>().All(row => row.Value is LocalPlaylist));
-            Check("sidebar_no_redundant_controls", RemotePlaylistsNavigation.ActualHeight == 0 && NewNasPlaylist.ActualHeight == 0
+            Check("sidebar_default_includes_nas_without_toggle", UnifiedPlaylistNavigation.Items.Count == 3
+                && UnifiedPlaylistNavigation.Items.Cast<SidebarPlaylistRow>().Count(row => row.Value is NasPlaylist) == 1);
+            await VerifyPlaylistGroupingLayoutAsync(Check);
+            Check("sidebar_no_redundant_controls", RemotePlaylistsNavigation.ActualHeight == 0 && SidebarGroupedPlaylists.Visibility == Visibility.Collapsed
                 && FindSongVisual<Button>(SidebarHost, button => Equals(button.Content, "导入文件夹") || Equals(button.Content, "设置")) is null);
             int openedPages = 0; musicManagementPageOpened = (_, _) => openedPages++;
             Invoke(MusicManagementNavigation); await Wait(() => fullPageView is { Editor.IsEnabled: true });
@@ -52,10 +53,15 @@ public sealed partial class MainWindow
             Check("management_unified_playlist_tab", view.TitleText.Text == "音乐管理" && view.List.Items.Count == 3 && library.IsDisposed
                 && view.Fields.Children.OfType<SelectorBar>().Single().SelectedItem!.Text == "歌单");
             var visibility = view.Fields.Children.OfType<ToggleSwitch>().Single(); visibility.IsOn = true; await Task.Delay(60);
-            Check("sidebar_toggle_merges_sources", UnifiedPlaylistNavigation.Items.Count == 3 && showNasPlaylistsInSidebar);
-            Check("sidebar_preference_persisted", JsonSerializer.Deserialize<PlaylistNavigationPreferences>(File.ReadAllText(PlaylistNavigationPreferencesFile))!.ShowNasPlaylists);
+            Check("sidebar_toggle_separates_sources", UnifiedPlaylistNavigation.Items.Count == 3 && separateNasPlaylistsInSidebar
+                && UnifiedPlaylistNavigation.Visibility == Visibility.Collapsed && GroupedNasPlaylistNavigation.Items.Count == 1
+                && GroupedOtherPlaylistNavigation.Items.Count == 2 && SeparateNasPlaylistsToggle.IsOn);
+            Check("sidebar_preference_persisted", JsonSerializer.Deserialize<PlaylistNavigationPreferences>(File.ReadAllText(PlaylistNavigationPreferencesFile))!.SeparateNasPlaylists);
             Check("sidebar_nas_badge_has_local_theme_container", UnifiedPlaylistNavigation.Items.Cast<SidebarPlaylistRow>().Single(row => row.Value is NasPlaylist).NasVisibility == Visibility.Visible
                 && File.Exists(Path.Combine(AppContext.BaseDirectory, "Assets", "FnOsMusic.png")));
+            visibility.IsOn = false; await Task.Delay(60);
+            Check("sidebar_toggle_off_keeps_remote_in_merged_list", UnifiedPlaylistNavigation.Visibility == Visibility.Visible
+                && UnifiedPlaylistNavigation.Items.Count == 3 && !SeparateNasPlaylistsToggle.IsOn);
             var remoteRow = view.List.Items.Cast<PlaylistManagerRow>().Single(row => row.Value is NasPlaylist);
             view.List.ScrollIntoView(remoteRow); Root.UpdateLayout(); await Task.Delay(70);
             var remoteContainer = view.List.ContainerFromItem(remoteRow) as ListViewItem;
@@ -99,12 +105,14 @@ public sealed partial class MainWindow
             Check("management_no_remote_create_when_disconnected", !view.HeadingActions!.Children.OfType<Button>().Single(button => Equals(button.Tag, "create-nas")).IsEnabled);
             Check("management_page_opened_hooks", openedPages >= 3);
             Check("management_navigation_preserves_audio_queue", ReferenceEquals(music.Player.Source, audio) && queue.Current?.Reference == queued);
+            await VerifyPlaylistWatermarkAsync(Check);
             CloseFullPage();
             Check("management_back_restores_original_home", HomePanel.Visibility == Visibility.Visible && activePlaylistPage is null && NormalContent.IsEnabled);
             await ShowSettingsPanelAsync(PlaybackCategory); Root.UpdateLayout();
             Check("settings_separate_control_and_readonly_purpose", SystemMediaEnabled.Header.ToString() == "SMTC 开关"
                 && InformationEnabled.Header.ToString() == "允许本机应用读取播放信息与歌词"
                 && FindSongVisual<TextBlock>(SettingsPlaybackSection, text => text.Text.Contains("与 Windows SMTC 媒体控制互相独立")) is not null);
+            await VerifyParallelNativeMetadataAsync(Check);
             stage = "complete";
         }
         catch (Exception ex) { error = ex.GetType().Name + ": " + ex.Message; }
@@ -112,7 +120,7 @@ public sealed partial class MainWindow
         {
             musicManagementPageOpened = null; CloseFullPage(force: true); ClosePlaylistPage(); playlistTestClient = null; remoteCapabilityTestSource = null; ViewModel.PlaybackRouter.Unregister(api.SourceInstanceId);
             var current = await playlistStore.LoadAsync(); await playlistStore.SaveAsync(current with { Playlists = original.Playlists });
-            SetNasPlaylistSidebarVisibility(originalShow); motionPreferenceOverride = null;
+            SetNasPlaylistSidebarGrouping(originalShow); motionPreferenceOverride = null;
         }
         Directory.CreateDirectory(AppDataDirectory.Resolve());
         await File.WriteAllTextAsync(Path.Combine(AppDataDirectory.Resolve(), "music-management-verification.json"), JsonSerializer.Serialize(new { stage, error, checks }));

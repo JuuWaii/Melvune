@@ -150,7 +150,7 @@ public sealed partial class MainWindow
             var oldItems = TrackList.ItemsSource;
             var oldSources = localSources.ToDictionary(item => item.Key, item => item.Value);
             var entered = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously); int scanned = 0;
-            localPageMetadataReader = async (_, ct) => { if (++scanned == 2) { entered.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); } return new("取消扫描", "夹具", 60); };
+            localPageMetadataReader = async (_, ct) => { if (Interlocked.Increment(ref scanned) == 2) { entered.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); } return new("取消扫描", "夹具", 60); };
             try
             {
                 var pending = LoadAllMusicPageAsync(1, true); await entered.Task.WaitAsync(TimeSpan.FromSeconds(5));

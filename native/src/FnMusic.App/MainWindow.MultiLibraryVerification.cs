@@ -54,7 +54,7 @@ public sealed partial class MainWindow
         int scannedFiles = 0;
         localPageMetadataReader = async (_, ct) =>
         {
-            if (++scannedFiles == 2)
+            if (Interlocked.Increment(ref scannedFiles) == 2)
             {
                 secondScanEntered.TrySetResult();
                 await Task.Delay(Timeout.Infinite, ct);
@@ -82,7 +82,7 @@ public sealed partial class MainWindow
             secondScanEntered = new(TaskCreationOptions.RunContinuationsAsynchronously);
             localPageMetadataReader = async (_, ct) =>
             {
-                if (++scannedFiles == 2)
+                if (Interlocked.Increment(ref scannedFiles) == 2)
                 { secondScanEntered.TrySetResult(); await Task.Delay(Timeout.Infinite, ct); }
                 return new("刷新夹具", "夹具", 60);
             };
