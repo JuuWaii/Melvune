@@ -6,13 +6,13 @@
 
 一个使用 C#、WinUI 3 和 FFmpeg 构建的多来源桌面音乐播放器，支持飞牛音乐、本地音乐，以及 Navidrome、Emby、Subsonic 兼容和匿名 HTTP/JSON 只读音乐源。黑白界面，统一音乐库、歌单、播放队列和应用内歌词。
 
-**当前本地交付：0.2.0-rc.7；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
+**当前源码：Melvune；最近本地交付：FnMusic 0.2.0-rc.7；已公开发布：0.2.0-rc.1** · Windows 10 2004（19041）及以上 · x64 · [MIT 许可](LICENSE)
 
 rc.7 已完成黑白歌单背景标志、可切换分类/合并、侧栏底部固定管理入口，以及最多四路后台标签读取；集中回归、实际包启动和重启数据验收已通过。开发状态见 [本轮清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)，证据见 [rc.7 验收](docs/RC7_ACCEPTANCE.md)。rc.6旧包保留，完整安装器和远端发布另行安排。
 
 本地下载：[rc.7 ZIP](dist/FnMusic-0.2.0-rc.7-win-x64.zip)，或 [rc.7 便携 EXE](dist/FnMusic-0.2.0-rc.7-win-x64-portable/FnMusic-0.2.0-rc.7-win-x64-portable.exe)。摘要和实际运行记录见 [rc.7 验收](docs/RC7_ACCEPTANCE.md)。旧包保留用于回退，真实服务/听音等边界见 [用户验证单](docs/RC7_USER_VALIDATION.md)。
 
-项目已由 FnMusic 更名为 **Melvune（合听）**。本地源码、应用标题、托盘和新构建入口已采用新名称；既有rc.7发布包和历史记录保留原名。技术兼容标识继续保留，以沿用已有账号、歌单和进度。详见 [改名与迁移说明](docs/MELVUNE_MIGRATION.md) 和 [GitHub改名方案](docs/GITHUB_RENAME_PLAN.md)。
+项目已由 FnMusic 更名为 **Melvune（合听）**，NAS为当前开发主副本。应用标题、托盘和新构建入口已采用新名称；既有rc.7发布包和历史记录保留原名。技术兼容标识继续保留，以沿用已有账号、歌单和进度。新名称开发构建已通过验收，可运行 `./scripts/native.ps1 run`；它不代表新版本已远端发布。详见 [改名与迁移说明](docs/MELVUNE_MIGRATION.md)、[迁移验收](docs/MELVUNE_ACCEPTANCE.md) 和 [GitHub改名方案](docs/GITHUB_RENAME_PLAN.md)。
 
 本项目与飞牛官方无关联或背书。当前为候选版，发行文件尚未进行代码签名。
 

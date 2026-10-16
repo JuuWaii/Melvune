@@ -12,7 +12,9 @@ NAS路径Debug构建以及独立信息客户端、便携启动器构建均零警
 
 第一次综合窗口验收在后台建库离开页面后出现InvalidOperationException；加上仅Debug的异常堆栈诊断后，同一663项套件完整复跑通过，未复现，未据此改动后台建库生产逻辑。保留首次摘要及隔离配置，后续若复现按具体堆栈追踪。独立动画检查发现诊断文件写盘打断短动画采样，已将写盘移到采样与关闭之后，并采用真实渲染帧采样，未修改生产动画时长。
 
-独立动画复核与最终Release构建完成后补充收据。检查证据位于 `.review-audit/melvune-migration-20261016/`。本轮不是新版本发布，既有rc.7包内容和名称不重写。
+独立动画22项复核通过，窗口合计954项通过。最终Debug及独立Release构建均零警告、零错误；独立信息客户端与便携启动器产品名均为Melvune。源码检查点为 `1e73718`，开发Release的完整版本为 `0.2.0-rc.7+1e737187b432debeb57dea7aa68ab92129f0b7ea`，已核对完整40位来源一致。入口为 `native/src/FnMusic.App/bin/Melvune/Release/net10.0-windows10.0.26100.0/win-x64/Melvune.App.exe`，同目录依赖不可拆散；可用 `scripts/native.ps1 run` 打开。
+
+检查证据位于 `.review-audit/melvune-migration-20261016/`：verification-summary.json、migration-verification.json、retained-artifacts.json、retained-reports.json、release-build.json及各套件报告。最终验收收据提交只更新文档，不改变源码检查点。本轮不是新版本发布，既有rc.7包内容和名称不重写。
 
 NAS中77项旧preview/rc.1–rc.5生成产物已获用户明确清理授权，但执行环境仍以“策略阻止”拒绝，尚未删除。精确清单和人工执行脚本放在私有迁移证据目录中；自动执行没有改用其他工具绕过。源码、Git历史、rc.6/rc.7及本机原件不在清理范围。
 
