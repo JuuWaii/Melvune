@@ -284,7 +284,7 @@ public sealed class NavidromeClient : IMusicPlaybackSource, IDisposable
     private Uri Endpoint(string method, (string, string)[] parameters)
     {
         var fields = new List<(string, string)> { ("u", credentials.Username), ("t", credentials.Token), ("s", credentials.Salt),
-            ("v", "1.16.1"), ("c", "FNMusic"), ("f", "json") };
+            ("v", "1.16.1"), ("c", "Melvune"), ("f", "json") };
         fields.AddRange(parameters);
         return new Uri(server, "rest/" + method + ".view?" + string.Join("&", fields.Select(field => Uri.EscapeDataString(field.Item1) + "=" + Uri.EscapeDataString(field.Item2))));
     }

@@ -13,7 +13,7 @@ public sealed partial class MainWindow
         try
         {
             await ShowHomeAsync(); Root.UpdateLayout();
-            verify("top_brand_replaces_sidebar_brand", TitleBrandName.IsLoaded && TitleBrandName.FontSize == 20 && TitleBrandIcon.Width == 28 && TitleBrandIcon.Height == 28
+            verify("top_brand_replaces_sidebar_brand", TitleBrandName.IsLoaded && TitleBrandName.Text == "Melvune" && Title.StartsWith("Melvune", StringComparison.Ordinal) && TitleBrandName.FontSize == 20 && TitleBrandIcon.Width == 28 && TitleBrandIcon.Height == 28
                 && FindSongVisual<TextBlock>(SidebarHost, text => text.Text == "飞牛音乐") is null);
             verify("top_home_search_available_without_remote_and_back_disabled", !TopBack.IsEnabled && SearchAction.IsEnabled && SearchInput.IsEnabled);
             verify("welcome_copy_only_on_home", FindSongVisual<TextBlock>(HomePanel, text => text.Text == "音乐，陪伴每一个时刻") is not null

@@ -1,7 +1,7 @@
 param([Parameter(Mandatory=$true)][string]$Executable)
 $ErrorActionPreference = 'Stop'
 $exe = (Resolve-Path -LiteralPath $Executable).Path
-if ([IO.Path]::GetFileName($exe) -ne 'FnMusic.App.exe') { throw 'Choose a Debug FnMusic.App.exe built from this repository.' }
+if ([IO.Path]::GetFileName($exe) -notin @('Melvune.App.exe','FnMusic.App.exe')) { throw 'Choose a Debug Melvune.App.exe built from this repository.' }
 $passwordA = $null
 $passwordB = $null
 $startInfo = $null

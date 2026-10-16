@@ -1,6 +1,11 @@
-param([ValidateSet('bootstrap','build','test','run')][string]$Action = 'build')
+param(
+    [ValidateSet('bootstrap','build','test','run')][string]$Action = 'build',
+    [string]$TestDataDirectory
+)
 $ErrorActionPreference = 'Stop'
 $nativeRepoRoot = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'build-environment.ps1')
+Initialize-MelvuneGitEnvironment $nativeRepoRoot
 $nativeTools = Join-Path $nativeRepoRoot '.tools'
 $nativeSdk = Join-Path $nativeTools 'dotnet/dotnet.exe'
 $env:DOTNET_CLI_HOME = Join-Path $nativeTools 'dotnet-home'
@@ -30,7 +35,7 @@ if (-not (Test-Path -LiteralPath $nativeSdk)) {
 Push-Location (Join-Path $nativeRepoRoot 'native')
 try {
     if ($Action -in @('build','test')) {
-        & $nativeSdk restore FnMusic.sln --configfile NuGet.Config --locked-mode --nologo
+        & $nativeSdk restore Melvune.sln --configfile NuGet.Config --locked-mode --nologo
         if ($LASTEXITCODE -ne 0) { throw 'Dependency restore failed.' }
     }
     if ($Action -eq 'build') {
@@ -39,11 +44,17 @@ try {
         & $nativeSdk build src/FnMusic.App/FnMusic.App.csproj -c Release --no-restore --nologo
         if ($LASTEXITCODE -ne 0) { throw 'Native build failed.' }
     } elseif ($Action -eq 'test') {
-        & $nativeSdk run --project tests/FnMusic.Tests/FnMusic.Tests.csproj --no-restore -- (Join-Path $nativeRepoRoot '.review-audit/native-tests')
+        # Keep 10000-file synthetic fixtures off SMB by default; source and builds remain in the NAS checkout.
+        $nativeTestData = if ($TestDataDirectory) { [IO.Path]::GetFullPath($TestDataDirectory) }
+            else { Join-Path ([IO.Path]::GetTempPath()) ('melvune-tests-' + [Guid]::NewGuid().ToString('N')) }
+        & $nativeSdk run --project tests/FnMusic.Tests/FnMusic.Tests.csproj --no-restore -- $nativeTestData
         if ($LASTEXITCODE -ne 0) { throw 'Native checks failed.' }
     } elseif ($Action -eq 'run') {
-        $nativeExe = Join-Path (Get-Location).Path 'src/FnMusic.App/bin/Release/net10.0-windows10.0.26100.0/win-x64/FnMusic.App.exe'
+        $nativeExe = Join-Path (Get-Location).Path 'src/FnMusic.App/bin/Melvune/Release/net10.0-windows10.0.26100.0/win-x64/Melvune.App.exe'
         if (-not (Test-Path -LiteralPath $nativeExe)) { throw 'Run the build action first.' }
-        Start-Process -FilePath $nativeExe
+        $nativeStart = [Diagnostics.ProcessStartInfo]::new($nativeExe)
+        $nativeStart.UseShellExecute = $false
+        $nativeStart.WorkingDirectory = Split-Path $nativeExe
+        [void][Diagnostics.Process]::Start($nativeStart)
     }
 } finally { Pop-Location }

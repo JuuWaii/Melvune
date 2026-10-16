@@ -16,7 +16,7 @@ public sealed class EmbyClient : IMusicPlaybackSource, IDisposable
 {
     private const int PageSize = 250;
     private const int MaximumTracks = 10000;
-    private const string ClientIdentityHeader = "Emby Client=\"FNMusic\", Device=\"Windows\", DeviceId=\"FNMusic-desktop\", Version=\"0.2\"";
+    private const string ClientIdentityHeader = "Emby Client=\"Melvune\", Device=\"Windows\", DeviceId=\"FNMusic-desktop\", Version=\"0.2\"";
     private readonly Uri server;
     private readonly EmbyCredentials credentials;
     private readonly Func<HttpMessageHandler> handlerFactory;

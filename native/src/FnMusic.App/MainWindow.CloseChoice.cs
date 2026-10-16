@@ -92,7 +92,7 @@ public sealed partial class MainWindow
         content.Children.Add(remember);
         content.Children.Add(new TextBlock { Text = "不勾选时，本次运行采用此选择，下次启动后会再次询问。可随时在设置中更改关闭行为。",
             TextWrapping = TextWrapping.Wrap, Opacity = .7 });
-        var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "关闭飞牛音乐",
+        var dialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "关闭 Melvune",
             Content = content, PrimaryButtonText = "收起到托盘", SecondaryButtonText = "退出应用",
             CloseButtonText = "取消", DefaultButton = ContentDialogButton.Close };
         closeChoiceDialog = dialog;

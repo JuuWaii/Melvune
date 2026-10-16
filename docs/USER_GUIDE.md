@@ -1,8 +1,8 @@
-# FNMusic 0.2.0-rc.5 使用指南
+# Melvune 使用指南（兼容原FnMusic）
 
-Windows x64 候选版，支持 Windows 10 2004（19041）及以上的 x64 系统。本轮目标为统一 ZIP 和便携 EXE，集中验证与交付结果以当前清单为准，完整安装器与远端发布后置；最终产物与校验值见仓库 `docs/NEXT_DEVELOPMENT_CHECKLIST.md`。ZIP 版保持完整目录，双击 `Start-FnMusic.cmd` 或 `FnMusic.App.exe`。随包包含 .NET、Windows App SDK 与解码动态库，无需安装 FFmpeg。首次启动无账号也可使用本地音乐。候选版未签名，不提供自动更新或配置自动迁移。
+Windows x64 候选版，支持 Windows 10 2004（19041）及以上的 x64 系统。集中验证与交付结果以当前清单为准，完整安装器与远端发布后置；最终产物与校验值见仓库 `docs/NEXT_DEVELOPMENT_CHECKLIST.md`。ZIP版保持完整目录，新构建双击 `Start-Melvune.cmd` 或 `Melvune.App.exe`，历史FnMusic包使用其原有入口。随包包含 .NET、Windows App SDK 与解码动态库，无需安装 FFmpeg。首次启动无账号也可使用本地音乐。候选版未签名，不提供自动更新；品牌更名继续使用旧配置和来源身份，详见MELVUNE_MIGRATION.md。
 
-便携 EXE 放在可写目录启动，旁边创建 `FnMusic-portable`，配置位于其 `Data` 子目录；移动时一起复制 EXE 与该目录，换机器或 Windows 用户后需重新登录。更新前退出旧客户端并备份 `Data`；新 EXE 继续使用此目录，但不会清理旧的应用解包目录。ZIP 默认使用 `%LOCALAPPDATA%\FnMusic.Native`，与便携数据相互独立。
+便携EXE放在可写目录启动，新品牌默认创建 `Melvune-portable`，同级只有旧 `FnMusic-portable` 时继续使用旧目录。配置位于选中目录的 `Data` 子目录；移动时一起复制EXE与该目录，换机器或Windows用户后需重新登录。更新前退出旧客户端并备份Data；程序不会自动合并两份Data或清理旧应用解包目录。ZIP默认仍使用 `%LOCALAPPDATA%\FnMusic.Native`，与便携数据相互独立。
 
 历史 EXE/MSI 安装包仍保留，但不包含本轮新增自定义来源功能，不应将安装器版本视作本轮版本。历史安装器按当前用户安装，自选目录保存供维修/卸载恢复，卸载保留个人配置。
 

@@ -31,6 +31,18 @@ public sealed partial class MainWindow
         double Y(FrameworkElement element) => Transform(element)?.TranslateY ?? 0;
         bool Settled(FrameworkElement element) => Math.Abs(Y(element)) < .01 && element.Opacity == 1
             && Transform(element) is { ScaleX: 1, ScaleY: 1 } && !uiMotions.ContainsKey(element);
+        async Task WaitForFrameAsync(Func<bool> sample)
+        {
+            var observed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            void Rendering(object? sender, object args) { if (sample()) observed.TrySetResult(); }
+            CompositionTarget.Rendering += Rendering;
+            try
+            {
+                if (sample()) return;
+                await observed.Task.WaitAsync(TimeSpan.FromSeconds(2));
+            }
+            finally { CompositionTarget.Rendering -= Rendering; }
+        }
         try
         {
             motionPreferenceOverride = false;
@@ -52,7 +64,7 @@ public sealed partial class MainWindow
             samples["entry_start_y"] = Y(LyricsPanel);
             verify("motion_lyrics_starts_below_with_background_blocked", !enter.IsCompleted && Y(LyricsPanel) >= height - 1
                 && SettingsPanel.Visibility == Visibility.Visible && SidebarHost.Visibility == Visibility.Visible && !NormalContent.IsEnabled);
-            await Task.Delay(80);
+            await WaitForFrameAsync(() => Y(LyricsPanel) > 0 && Y(LyricsPanel) < height - 1);
             samples["entry_middle_y"] = Y(LyricsPanel);
             verify("motion_lyrics_moves_up_between_frames", Y(LyricsPanel) > 0 && Y(LyricsPanel) < height - 1);
             await enter;
@@ -63,7 +75,7 @@ public sealed partial class MainWindow
             var exit = CloseNowPlayingAsync();
             verify("motion_lyrics_exit_reveals_original_page_before_completion", !exit.IsCompleted
                 && SettingsPanel.Visibility == Visibility.Visible && !NormalContent.IsEnabled && LyricsPanel.Visibility == Visibility.Visible);
-            await Task.Delay(70);
+            await WaitForFrameAsync(() => Y(LyricsPanel) > 0 && Y(LyricsPanel) < height);
             samples["exit_middle_y"] = Y(LyricsPanel);
             verify("motion_lyrics_exit_moves_down_between_frames", Y(LyricsPanel) > 0 && Y(LyricsPanel) < height);
             await exit;
@@ -89,7 +101,8 @@ public sealed partial class MainWindow
             await CloseNowPlayingAsync();
 
             var pageMotion = AnimateUiAsync(SettingsPanel, -18, 0, 180, fade: true);
-            await Task.Delay(50);
+            await WaitForFrameAsync(() => Y(SettingsPanel) > -18 && Y(SettingsPanel) < 0
+                && SettingsPanel.Opacity > .25 && SettingsPanel.Opacity < 1);
             samples["page_middle_y"] = Y(SettingsPanel);
             samples["page_middle_opacity"] = SettingsPanel.Opacity;
             verify("motion_page_drops_and_fades_between_frames", Y(SettingsPanel) > -18 && Y(SettingsPanel) < 0
@@ -125,7 +138,9 @@ public sealed partial class MainWindow
             try
             {
                 await opened.Task.WaitAsync(TimeSpan.FromSeconds(5));
-                await Task.Delay(60);
+                await WaitForFrameAsync(() => (dialogSurface ??= FindDialogMotionSurface(dialog)) is { } frameSurface
+                    && Transform(frameSurface) is { ScaleX: > .94 } transform && transform.ScaleX != 1
+                    && Y(frameSurface) < 20 && frameSurface.Opacity > .25);
                 dialogSurface = FindDialogMotionSurface(dialog) ?? throw new InvalidOperationException();
                 var scale = Transform(dialogSurface)?.ScaleX ?? 1;
                 samples["dialog_middle_scale"] = scale;
@@ -133,7 +148,7 @@ public sealed partial class MainWindow
                 samples["dialog_middle_opacity"] = dialogSurface.Opacity;
                 verify("motion_dialog_bounces_from_smaller_size", scale > .94 && scale != 1
                     && Y(dialogSurface) < 20 && dialogSurface.Opacity > .25 && themedDialogOpen);
-                await Task.Delay(320);
+                await WaitForFrameAsync(() => Settled(dialogSurface));
                 verify("motion_dialog_settles_without_changing_theme", Settled(dialogSurface) && dialog.RequestedTheme == Root.ActualTheme);
             }
             finally { dialog.Hide(); await showing; }
@@ -143,6 +158,7 @@ public sealed partial class MainWindow
             quickDialog.Opened += (_, _) => opened.TrySetResult();
             showing = ShowThemedDialogAsync(quickDialog);
             FrameworkElement? quickSurface = null;
+            string? quickDiagnostic = null;
             try
             {
                 await opened.Task.WaitAsync(TimeSpan.FromSeconds(5));
@@ -152,16 +168,18 @@ public sealed partial class MainWindow
                     if (quickSurface is not null && uiMotions.ContainsKey(quickSurface)) break;
                     await Task.Delay(20);
                 }
-                await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "motion-quick-dialog-diagnostic.json"),
-                    JsonSerializer.Serialize(new { SurfaceFound = quickSurface is not null, Loaded = quickSurface?.IsLoaded,
+                // Keep network/disk I/O out of the short animation assertion and early-close window.
+                quickDiagnostic = JsonSerializer.Serialize(new { SurfaceFound = quickSurface is not null, Loaded = quickSurface?.IsLoaded,
                         Visibility = quickSurface?.Visibility.ToString(), Scale = quickSurface is null ? null : Transform(quickSurface)?.ScaleX,
                         Y = quickSurface is null ? 0 : Y(quickSurface), TransformType = quickSurface?.RenderTransform?.GetType().Name,
                         Enabled = UiMotionEnabled, Closed = closed, ShowingCompleted = showing.IsCompleted,
-                        Motions = uiMotions.Keys.Select(element => element.Name).ToArray() }));
+                        Motions = uiMotions.Keys.Select(element => element.Name).ToArray() });
                 verify("motion_quick_close_fixture_is_animating", quickSurface is not null && uiMotions.ContainsKey(quickSurface));
             }
             finally { quickDialog.Hide(); await showing; }
             verify("motion_early_dialog_close_cleans_up_animation", quickSurface is not null && Settled(quickSurface) && !themedDialogOpen);
+            if (quickDiagnostic is not null)
+                await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "motion-quick-dialog-diagnostic.json"), quickDiagnostic);
             motionPreferenceOverride = false;
             await ShowHomeAsync();
             var stillDialog = new ContentDialog { XamlRoot = Root.XamlRoot, Title = "无动画验证", CloseButtonText = "关闭" };

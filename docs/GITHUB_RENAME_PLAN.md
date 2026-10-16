@@ -1,0 +1,21 @@
+# GitHub 改名方案：FnMusic → Melvune
+
+本轮优先完成本地迁移和改名，远端仓库尚未更改。当前origin为 `git@github.com:JuuWaii/fnmusic_pc.git`，目标为 `git@github.com:JuuWaii/Melvune.git`。
+
+## 执行顺序
+
+1. 以仓库管理员账号检查 `JuuWaii/Melvune` 名称是否可用，记录仓库ID、默认分支、分支保护、标签、Release及附件清单。不要新建一个空仓库替代现有仓库。
+2. 在原仓库 Settings → General → Repository name 输入 `Melvune`，点击 Rename。也可在已登录GitHub CLI的环境运行 `gh repo rename Melvune --repo JuuWaii/fnmusic_pc --yes`。此命令为后续执行方案，本轮未运行。
+3. 在NAS主仓库执行 `git remote set-url origin git@github.com:JuuWaii/Melvune.git`，再核对 `git remote -v` 和 `git ls-remote origin HEAD`。其余工作副本也更新origin；远端未改名前不要提前改断现有连接。
+4. 将仓库描述改为“Melvune · 合听 — 多来源桌面音乐播放器，支持本地音乐、NAS、Navidrome、Emby与Subsonic兼容源”。更新README当前项目链接、徽章、关于页和外部引用；旧Release附件名称及历史标签保持不变。
+5. 修改 `.github/workflows/remove-superseded-releases.yml` 中的 `github.repository` 白名单为 `JuuWaii/Melvune`。该工作流会删除远端Release，改名不应触发清理。历史 `publish-verified-candidate.yml` 固定rc.1资产，保留其版本边界，不用于发布新品牌候选包。
+6. 本地 `windows-packages.yml` 已将新构建产物改为Melvune前缀；发布前选定新版本号并同步标签触发条件、版本声明、文档及校验器。不要覆盖已交付的FnMusic rc.7附件，不重打历史标签。
+7. 完成本地变更审阅后，单独推送改名提交。先运行只构建、不发布的工作流；核对新EXE、ZIP、SHA-256、来源、旧配置/便携Data兼容和GitHub下载。正式发布单独进行。
+
+## 重定向与验收
+
+GitHub说明：改名后原仓库的网页链接及clone/fetch/push地址会重定向，Issues、Wiki、Stars等信息继续保留；建议更新本地origin。GitHub Pages项目站点地址不在此重定向保证内，仓库托管Action的 `uses: owner/repository@ref` 调用也不会自动重定向。执行前检查是否使用这两项，不假定所有网址都自动迁移。
+
+不要在同一账号下重新创建名为 `fnmusic_pc` 的仓库，否则旧地址重定向会失效。验收应确认仓库ID、默认分支、Issues/PR、标签和既有Release附件没有变化，并检查旧地址跳转和新地址下载。
+
+官方依据：[GitHub仓库改名文档](https://docs.github.com/en/repositories/creating-and-managing-repositories/renaming-a-repository)。

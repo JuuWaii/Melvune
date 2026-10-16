@@ -1,10 +1,12 @@
 param(
     [string]$Version = '0.2.0-rc.7',
-    [string]$Name = ('FnMusic-' + $Version + '-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+    [string]$Name = ('Melvune-' + $Version + '-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 )
 $ErrorActionPreference = 'Stop'
 if ($Name -notmatch '^[a-zA-Z0-9._-]+$' -or $Name -in @('.', '..')) { throw 'Invalid package name' }
 $repo = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'build-environment.ps1')
+Initialize-MelvuneGitEnvironment $repo
 if ($Version -notin @('0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) { throw 'Unsupported release version' }
 $appProject = Join-Path $repo 'native/src/FnMusic.App/FnMusic.App.csproj'
 [xml]$appDefinition = Get-Content -LiteralPath $appProject -Raw
@@ -17,7 +19,7 @@ if ((Test-Path -LiteralPath $destination) -or (Test-Path -LiteralPath $archivePa
 $env:DOTNET_CLI_HOME = Join-Path $repo '.tools/dotnet-home'
 $env:NUGET_PACKAGES = Join-Path $repo '.tools/nuget'
 $sdk = Join-Path $repo '.tools/dotnet/dotnet.exe'
-& $sdk restore (Join-Path $repo 'native/FnMusic.sln') --configfile (Join-Path $repo 'native/NuGet.Config') --locked-mode --nologo
+& $sdk restore (Join-Path $repo 'native/Melvune.sln') --configfile (Join-Path $repo 'native/NuGet.Config') --locked-mode --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Restore failed' }
 . (Join-Path $PSScriptRoot 'ensure-native-decoder.ps1')
 Ensure-FnMusicNativeDecoder $repo
@@ -29,7 +31,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Independent consumer restore failed' }
 & $sdk publish $consumerProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugSymbols=false -p:DebugType=None --no-restore --nologo -o (Join-Path $destination 'examples/InfoClient')
 if ($LASTEXITCODE -ne 0) { throw 'Independent consumer publish failed' }
 Copy-Item -LiteralPath (Join-Path $repo 'native/examples/FnMusic.InfoClient/README.md') -Destination (Join-Path $destination 'examples/InfoClient')
-foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Assets/FnMusic.ico', 'Assets/FnMusic.png', 'Assets/FnOsMusic.png')) {
+foreach ($required in @('Melvune.App.exe', 'Melvune.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Assets/FnMusic.ico', 'Assets/FnMusic.png', 'Assets/FnOsMusic.png')) {
     if (-not (Test-Path -LiteralPath (Join-Path $destination $required))) { throw "Missing preview file: $required" }
 }
 $candidateNumber = $Version.Split('.')[-1].Split('-')[-1]
@@ -57,12 +59,13 @@ if ($LASTEXITCODE -ne 0) { throw 'Corresponding source preparation failed' }
 Copy-Item -LiteralPath (Join-Path $repo 'native/src/FnMusic.App/packages.lock.json') -Destination (Join-Path $decoderLicenses 'packages.lock.json')
 $revision = & git -c ('safe.directory=' + $repo.Replace('\', '/')) -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source revision unavailable' }
-@{ version = $Version; sourceCommit = $revision.Trim(); architecture = 'win-x64' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'release.json') -Encoding utf8
+@{ product = 'Melvune'; version = $Version; sourceCommit = $revision.Trim(); architecture = 'win-x64' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'release.json') -Encoding utf8
 @'
 @echo off
-cd /d "%~dp0"
-start "" "%~dp0FnMusic.App.exe"
-'@ | Set-Content -LiteralPath (Join-Path $destination 'Start-FnMusic.cmd') -Encoding ascii
+pushd "%~dp0"
+start "" "%~dp0Melvune.App.exe"
+popd
+'@ | Set-Content -LiteralPath (Join-Path $destination 'Start-Melvune.cmd') -Encoding ascii
 $files = Get-ChildItem -LiteralPath $destination -Recurse -File
 if ($files | Where-Object { [IO.Path]::GetRelativePath($destination, $_.FullName) -match '^(local-index|nas-metadata)[\\/]' }) { throw 'Personal music index found in preview' }
 if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|playback-resume|navidrome-connections|emby-connections|http-json-connections|appearance|playlist-navigation|desktop-integration)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Unexpected development or personal artifact in preview' }

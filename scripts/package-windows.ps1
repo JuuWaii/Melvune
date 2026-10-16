@@ -1,16 +1,21 @@
 param(
-    [string]$Payload = 'dist/FnMusic-0.2.0-rc.2-win-x64',
+    [string]$Payload = 'dist/Melvune-0.2.0-rc.7-win-x64',
     [string]$Name,
     [switch]$PortableOnly
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'build-environment.ps1')
+Initialize-MelvuneGitEnvironment $root
 $payloadPath = if ([IO.Path]::IsPathRooted($Payload)) { [IO.Path]::GetFullPath($Payload) } else { [IO.Path]::GetFullPath((Join-Path $root $Payload)) }
 $release = Get-Content -LiteralPath (Join-Path $payloadPath 'release.json') -Raw | ConvertFrom-Json
 $version = [string]$release.version
+$product = if ($release.product -eq 'Melvune') { 'Melvune' } else { 'FnMusic' }
+if ($release.product -and $release.product -notin @('Melvune','FnMusic')) { throw 'Unsupported product' }
+if ($product -eq 'Melvune' -and -not $PortableOnly) { throw 'Melvune currently supports -PortableOnly; historical installers remain unchanged.' }
 if ($version -notin @('0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) { throw 'Unsupported payload version.' }
 if (-not $PortableOnly -and $version -ne '0.2.0-rc.2') { throw 'The full installer is pinned to rc.2. Use -PortableOnly for this payload version.' }
-if ([string]::IsNullOrEmpty($Name)) { $Name = 'FnMusic-' + $version + '-win-x64-' + $(if ($PortableOnly) { 'portable-' } else { 'windows-' }) + (Get-Date -Format 'yyyyMMdd-HHmmss') }
+if ([string]::IsNullOrEmpty($Name)) { $Name = $product + '-' + $version + '-win-x64-' + $(if ($PortableOnly) { 'portable-' } else { 'windows-' }) + (Get-Date -Format 'yyyyMMdd-HHmmss') }
 if ($Name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]+$') { throw 'Unsafe output name.' }
 $archivePath = $payloadPath + '.zip'
 $output = Join-Path $root "dist/$Name"
@@ -46,10 +51,10 @@ if (-not $PortableOnly) {
     if ($LASTEXITCODE -ne 0) { throw 'Portable launcher restore failed.' }
     & $sdk publish $project -c Release --no-restore --nologo ('-p:Version=' + $version) -o (Join-Path $work 'launcher')
     if ($LASTEXITCODE -ne 0) { throw 'Portable launcher build failed.' }
-    $portable = Join-Path $output ('FnMusic-' + $version + '-win-x64-portable.exe')
+    $portable = Join-Path $output ($product + '-' + $version + '-win-x64-portable.exe')
     $target = [IO.File]::Create($portable)
     try {
-        foreach ($file in @((Join-Path $work 'launcher/FnMusic.Portable.exe'), $archivePath)) {
+        foreach ($file in @((Join-Path $work 'launcher/Melvune.Portable.exe'), $archivePath)) {
             $inputStream = [IO.File]::OpenRead($file)
             try { $inputStream.CopyTo($target) } finally { $inputStream.Dispose() }
         }
@@ -75,7 +80,7 @@ if (-not $PortableOnly) {
     }
     $packagingSource = & git -c "safe.directory=$($root.Replace('\','/'))" -C $root rev-parse HEAD
     if ($LASTEXITCODE -ne 0 -or $packagingSource -notmatch '^[a-f0-9]{40}$') { throw 'Packaging source revision unavailable.' }
-    $metadata = [ordered]@{ version=$version; architecture='win-x64'; packageKind=$(if ($PortableOnly) { 'portable-only' } else { 'windows-full' }); payloadSource=$release.sourceCommit; packagingSource=$packagingSource.Trim(); payloadZipSha256=$zipHash; signed=$false; artifacts=@([IO.Path]::GetFileName($portable)) }
+    $metadata = [ordered]@{ product=$product; version=$version; architecture='win-x64'; packageKind=$(if ($PortableOnly) { 'portable-only' } else { 'windows-full' }); payloadSource=$release.sourceCommit; packagingSource=$packagingSource.Trim(); payloadZipSha256=$zipHash; signed=$false; artifacts=@([IO.Path]::GetFileName($portable)) }
     if (-not $PortableOnly) {
         $metadata.msiVersion = '0.1.1002'
         $metadata.wixVersion = '4.0.6'

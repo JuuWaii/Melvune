@@ -46,6 +46,9 @@ class PortableVerificationTests(unittest.TestCase):
         metadata = dict(version=self.version, architecture='win-x64', packageKind='portable-only',
                         payloadSource=self.source, packagingSource='b' * 40, payloadZipSha256=checksum.hex().upper(),
                         signed=False, artifacts=[self.portable.name])
+        product = json.loads((self.payload / 'release.json').read_text()).get('product')
+        if product:
+            metadata['product'] = product
         (self.packages / 'release.json').write_text(json.dumps(metadata))
         self.write_checksums()
 
@@ -64,6 +67,31 @@ class PortableVerificationTests(unittest.TestCase):
         report = self.verify()
         self.assertEqual(report['portableFiles'], 3)
         self.assertTrue(report['crcVerified'] and report['sourceMatched'] and report['portableOnly'])
+
+    def melvune_fixture(self):
+        (self.payload / 'FnMusic.App.exe').rename(self.payload / 'Melvune.App.exe')
+        release = json.loads((self.payload / 'release.json').read_text())
+        release['product'] = 'Melvune'
+        (self.payload / 'release.json').write_text(json.dumps(release))
+        manifest = [dict(path=p.name, sha256=VERIFIER.digest(p))
+                    for p in self.payload.iterdir() if p.name != 'SHA256.json']
+        (self.payload / 'SHA256.json').write_text(json.dumps(manifest))
+        self.portable.unlink()
+        self.portable = self.packages / f'Melvune-{self.version}-win-x64-portable.exe'
+        self.create_package()
+
+    def test_melvune_payload_and_artifacts(self):
+        self.melvune_fixture()
+        self.assertTrue(self.verify()['sourceMatched'])
+
+    def test_mismatched_brand_is_rejected(self):
+        self.melvune_fixture()
+        metadata_path = self.packages / 'release.json'
+        metadata = json.loads(metadata_path.read_text())
+        metadata['product'] = 'FnMusic'
+        metadata_path.write_text(json.dumps(metadata))
+        self.write_checksums()
+        self.rejects()
 
     def test_truncated_executable(self):
         self.portable.write_bytes(b'MZ')

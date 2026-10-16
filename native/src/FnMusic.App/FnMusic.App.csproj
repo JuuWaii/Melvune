@@ -1,6 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <AssemblyName>Melvune.App</AssemblyName>
+    <OutputPath>bin/Melvune/$(Configuration)/</OutputPath>
+    <RootNamespace>FnMusic.App</RootNamespace>
+    <Title>Melvune</Title>
+    <Product>Melvune</Product>
+    <Description>Unified personal music libraries and playback</Description>
     <TargetFramework>net10.0-windows10.0.26100.0</TargetFramework>
     <TargetPlatformMinVersion>10.0.19041.0</TargetPlatformMinVersion>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

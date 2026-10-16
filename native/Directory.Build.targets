@@ -6,7 +6,7 @@
   <Import Project="$(FnMusicDecoderRoot)/decoder.props" Condition="'$(FnMusicUsesNativeDecoder)' == 'true' And Exists('$(FnMusicDecoderRoot)/decoder.props')" />
 
   <Target Name="VerifyFnMusicNativeDecoder" BeforeTargets="PrepareForBuild" Condition="'$(FnMusicUsesNativeDecoder)' == 'true' And '$(DesignTimeBuild)' != 'true'">
-    <Error Condition="'$(FnMusicDecoderDecoderSha256)' == '' Or !Exists('$(FnMusicDecoderRoot)/FFmpegInteropX.dll') Or !Exists('$(FnMusicDecoderRoot)/build-manifest.json')" Text="Pinned MP3 preroll decoder is missing. Restore native/FnMusic.sln, then run python scripts/build-native-decoder.py." />
+    <Error Condition="'$(FnMusicDecoderDecoderSha256)' == '' Or !Exists('$(FnMusicDecoderRoot)/FFmpegInteropX.dll') Or !Exists('$(FnMusicDecoderRoot)/build-manifest.json')" Text="Pinned MP3 preroll decoder is missing. Restore native/Melvune.sln, then run python scripts/build-native-decoder.py." />
     <GetFileHash Files="$(MSBuildThisFileDirectory)decoder/mp3-preroll.patch" Algorithm="SHA256"><Output TaskParameter="Items" ItemName="FnMusicPatchHash" /></GetFileHash>
     <GetFileHash Files="$(MSBuildThisFileDirectory)../scripts/build-native-decoder.py" Algorithm="SHA256"><Output TaskParameter="Items" ItemName="FnMusicScriptHash" /></GetFileHash>
     <GetFileHash Files="$(MSBuildThisFileDirectory)decoder/toolchain-lock.json" Algorithm="SHA256"><Output TaskParameter="Items" ItemName="FnMusicLockHash" /></GetFileHash>

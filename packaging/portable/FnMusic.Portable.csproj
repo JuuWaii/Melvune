@@ -1,6 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
+    <AssemblyName>Melvune.Portable</AssemblyName>
+    <Product>Melvune</Product>
     <ApplicationIcon>../../assets/branding/fnmusic.ico</ApplicationIcon>
     <TargetFramework>net10.0-windows</TargetFramework>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>

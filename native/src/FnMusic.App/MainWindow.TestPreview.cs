@@ -28,7 +28,7 @@ public sealed partial class MainWindow
     // 显式测试入口隔离真实账户与曲名；仍使用生产 XAML、事件和播放器。
     private async Task ShowSyntheticPreviewAsync()
     {
-        Title = Environment.GetCommandLineArgs().Contains("--preview-collections") ? "飞牛音乐 · 合成专辑歌手验证" : Environment.GetCommandLineArgs().Contains("--preview-search") ? "飞牛音乐 · 合成搜索交互验证" : "飞牛音乐 · 合成音频交互验证";
+        Title = Environment.GetCommandLineArgs().Contains("--preview-collections") ? "Melvune · 合成专辑歌手验证" : Environment.GetCommandLineArgs().Contains("--preview-search") ? "Melvune · 合成搜索交互验证" : "Melvune · 合成音频交互验证";
         SettingsPanel.Visibility = Visibility.Collapsed;
         LibraryPanel.Visibility = Visibility.Visible;
         if (Environment.GetCommandLineArgs().Contains("--preview-compact")) AppWindow.Resize(new global::Windows.Graphics.SizeInt32(820, 820));

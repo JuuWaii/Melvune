@@ -23,7 +23,11 @@ internal static class Program
             var expectedHash = reader.ReadBytes(32);
             var length = reader.ReadInt64();
             if (length <= 0 || length > source.Length - 57) throw new IOException("Invalid payload length.");
-            var root = Path.Combine(Path.GetDirectoryName(executable)!, "FnMusic-portable");
+            var parent = Path.GetDirectoryName(executable)!;
+            var root = Path.Combine(parent, "Melvune-portable");
+            var legacyRoot = Path.Combine(parent, "FnMusic-portable");
+            // Reuse existing portable Data without copying or overwriting credentials.
+            if (!Directory.Exists(root) && Directory.Exists(legacyRoot)) root = legacyRoot;
             var extractionOnly = args.Length == 1 && args[0].StartsWith("--extract-only=", StringComparison.Ordinal);
             if (args.Length != 0 && !extractionOnly) throw new ArgumentException("Usage: double-click, or --extract-only=<empty absolute directory>.");
             var destination = extractionOnly ? args[0][15..] : Path.Combine(root, "App-" + Convert.ToHexString(expectedHash)[..12]);
@@ -80,7 +84,9 @@ internal static class Program
             }
             if (extractionOnly) return 0;
             Directory.CreateDirectory(Path.Combine(root, "Data"));
-            var start = new ProcessStartInfo(Path.Combine(destination, "FnMusic.App.exe")) { WorkingDirectory = destination, UseShellExecute = false };
+            var application = Path.Combine(destination, "Melvune.App.exe");
+            if (!File.Exists(application)) application = Path.Combine(destination, "FnMusic.App.exe");
+            var start = new ProcessStartInfo(application) { WorkingDirectory = destination, UseShellExecute = false };
             start.ArgumentList.Add("--data-directory=" + Path.Combine(root, "Data"));
             _ = Process.Start(start) ?? throw new IOException("Application could not start.");
             return 0;
@@ -88,7 +94,7 @@ internal static class Program
         catch (Exception error)
         {
             if (args.Length > 0) Console.Error.WriteLine(error.GetType().Name + ": " + error.Message);
-            if (args.Length == 0) MessageBoxW(0, "FnMusic 便携版无法启动。请确认 EXE 所在目录可写且有足够空间。\n\n" + error.Message, "FnMusic", 0x10);
+            if (args.Length == 0) MessageBoxW(0, "Melvune 便携版无法启动。请确认 EXE 所在目录可写且有足够空间。\n\n" + error.Message, "Melvune", 0x10);
             return 1;
         }
     }

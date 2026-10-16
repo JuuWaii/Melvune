@@ -67,7 +67,7 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
         this.options = Normalize(options);
         transparentBackdrop = new TransparentLyricsBackdrop(WinRT.Interop.WindowNative.GetWindowHandle(this));
         transparentBackdrop.PrepareNativeHost();
-        Title = "飞牛音乐 · 桌面歌词";
+        Title = "Melvune · 桌面歌词";
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "FnMusic.ico"));
         root.Resources.MergedDictionaries.Add(new ResourceDictionary
             { Source = new Uri("ms-appx:///MonochromeResources.xaml") });

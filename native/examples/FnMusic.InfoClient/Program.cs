@@ -84,7 +84,7 @@ try
         }
         return 0;
     }
-    Console.Error.WriteLine("No available playback information instance. Enable the interface in FNMusic settings.");
+    Console.Error.WriteLine("No available playback information instance. Enable the interface in Melvune settings.");
     return 2;
 }
 catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or OperationCanceledException

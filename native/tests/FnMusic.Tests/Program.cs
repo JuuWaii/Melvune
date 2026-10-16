@@ -1063,7 +1063,7 @@ await Test("local incremental scans read changed metadata and retain unchanged i
         var settings = new LocalMusicSettings(Guid.NewGuid(), root);
         int reads = 0;
         Task<LocalMusicMetadata> Read(string path, CancellationToken ct)
-        { reads++; return Task.FromResult(new LocalMusicMetadata(Path.GetFileNameWithoutExtension(path), "artist", 10)); }
+        { Interlocked.Increment(ref reads); return Task.FromResult(new LocalMusicMetadata(Path.GetFileNameWithoutExtension(path), "artist", 10)); }
         var initial = await LocalMusicSource.ScanAsync(settings, default, Read);
         Check(reads == 2);
         var unchanged = await LocalMusicSource.ScanAsync(settings, default, Read, previous: initial);
@@ -1107,7 +1107,7 @@ await Test("local library at 10000 files retains its snapshot across overflow an
         }
         int reads = 0;
         Task<LocalMusicMetadata> Read(string path, CancellationToken ct)
-        { reads++; return Task.FromResult(new LocalMusicMetadata(Path.GetFileNameWithoutExtension(path), "fixture", 1)); }
+        { Interlocked.Increment(ref reads); return Task.FromResult(new LocalMusicMetadata(Path.GetFileNameWithoutExtension(path), "fixture", 1)); }
         var settings = new LocalMusicSettings(Guid.NewGuid(), root);
         var progress = new List<int>();
         var initial = await LocalMusicSource.ScanAsync(settings, default, Read, new InlineProgress<int>(progress.Add));

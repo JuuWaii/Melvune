@@ -30,8 +30,10 @@ $files = @($contents | Where-Object { -not $_.PSIsContainer -and $_.FullName -ne
 if ($files | Where-Object { [IO.Path]::GetRelativePath($previewRoot, $_.FullName) -match '^(local-index|nas-metadata|playback-information)[\\/]' }) { throw 'Personal music index found in preview' }
 if ($files.Count -ne $manifest.Count -or @($files | Where-Object { -not $known.Contains($_.FullName) }).Count -gt 0) { throw 'Manifest does not describe every package file' }
 if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|playback-resume|navidrome-connections|emby-connections|http-json-connections|appearance|playlist-navigation|desktop-integration)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Development or personal artifact found' }
-$requiredFiles = @('FnMusic.App.exe', 'FnMusic.App.dll', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf',
-    'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Start-FnMusic.cmd',
+$product = if (Test-Path -LiteralPath (Join-Path $previewRoot 'Melvune.App.exe')) { 'Melvune' } else { 'FnMusic' }
+if ($product -eq 'Melvune' -and (Test-Path -LiteralPath (Join-Path $previewRoot 'FnMusic.App.exe'))) { throw 'Mixed product executables' }
+$requiredFiles = @("$product.App.exe", "$product.App.dll", "$product.App.pri", 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf',
+    'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', "Start-$product.cmd",
     'LICENSE', 'THIRD_PARTY_NOTICES.md', 'NATIVE_DECODER_DEPENDENCIES.md', 'native-decoder-build.json',
     'licenses/FFmpegInteropX-Apache-2.0.txt', 'licenses/FFmpegInteropX-build/mp3-preroll.patch',
     'licenses/FFmpegInteropX-build/toolchain-lock.json', 'licenses/FFmpegInteropX-build/build-native-decoder.py')
@@ -42,7 +44,7 @@ if ($ExpectedVersion -in @('0.2.0-rc.1','0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', 
         'licenses/corresponding-source/runtime-license-index.json', 'licenses/packages.lock.json')
 } else { $requiredFiles += 'PREVIEW_VALIDATION.md' }
 if ($ExpectedVersion -in @('0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) {
-    $requiredFiles += @('DESKTOP_INTEGRATION.md', 'PLAYBACK_INFORMATION_PROTOCOL.md', 'examples/InfoClient/FnMusic.InfoClient.exe', 'examples/InfoClient/README.md')
+    $requiredFiles += @('DESKTOP_INTEGRATION.md', 'PLAYBACK_INFORMATION_PROTOCOL.md', "examples/InfoClient/$product.InfoClient.exe", 'examples/InfoClient/README.md')
 }
 if ($ExpectedVersion -in @('0.2.0-rc.3', '0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) {
     $requiredFiles += @('NAVIDROME_ACCEPTANCE.md', 'PLAYBACK_RESUME_ACCEPTANCE.md', 'EMBY_ACCEPTANCE.md', 'SUBSONIC_ACCEPTANCE.md', ('RC' + $candidateNumber + '_ACCEPTANCE.md'))
@@ -53,7 +55,7 @@ if ($ExpectedVersion -in @('0.2.0-rc.6', '0.2.0-rc.7')) { $requiredFiles += 'Ass
 foreach ($required in $requiredFiles) {
     if (-not $known.Contains([IO.Path]::GetFullPath((Join-Path $previewRoot $required)))) { throw "Required file missing: $required" }
 }
-$version = (Get-Item -LiteralPath (Join-Path $previewRoot 'FnMusic.App.exe')).VersionInfo.ProductVersion
+$version = (Get-Item -LiteralPath (Join-Path $previewRoot "$product.App.exe")).VersionInfo.ProductVersion
 if ($version -ne $ExpectedVersion -and -not $version.StartsWith($ExpectedVersion + '+', [StringComparison]::Ordinal)) { throw 'Unexpected application version' }
 $decoder = Get-Content -LiteralPath (Join-Path $previewRoot 'native-decoder-build.json') -Raw | ConvertFrom-Json
 if ($decoder.sourceCommit -ne '841fc8e79346a235906f1dbd45be53034b2e2f52' -or
@@ -74,7 +76,8 @@ if ($ExpectedVersion -in @('0.2.0-rc.1','0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', 
     }
     $release = Get-Content -LiteralPath (Join-Path $previewRoot 'release.json') -Raw | ConvertFrom-Json
     if ($release.version -ne $ExpectedVersion -or $release.sourceCommit -notmatch '^[a-f0-9]{40}$' -or $release.architecture -ne 'win-x64') { throw 'Release identity mismatch' }
-    foreach ($applicationFile in @('FnMusic.App.exe', 'FnMusic.App.dll')) {
+    if (($product -eq 'Melvune' -and $release.product -ne 'Melvune') -or ($product -eq 'FnMusic' -and $release.product -and $release.product -ne 'FnMusic')) { throw 'Release product differs from payload' }
+    foreach ($applicationFile in @("$product.App.exe", "$product.App.dll")) {
         $productVersion = (Get-Item -LiteralPath (Join-Path $previewRoot $applicationFile)).VersionInfo.ProductVersion
         if ($productVersion -ne ($ExpectedVersion + '+' + $release.sourceCommit)) { throw "Application source commit differs from release metadata: $applicationFile" }
     }

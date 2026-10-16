@@ -1,4 +1,4 @@
-# 飞牛音乐 WinUI 3 原生预览
+# Melvune WinUI 3 原生客户端
 
 阶段 4 的原生预览工程。已实现登录、加密会话恢复、分页曲库、FFmpeg 播放及队列管理；NAS OAuth 和 FN Connect 仍待适配。旧 Electron 已归档，见 ../docs/ELECTRON_ARCHIVE.md。
 
@@ -19,7 +19,7 @@ bootstrap 从微软下载已固定版本 SDK，校验 SHA-512 后解压至 `.too
 
 当前 App/SeekProbe 使用固定源码的 MP3 预滚补丁库。首次 build 还需要 Python 3.11+ 和 Git，自动下载经哈希校验的微软 C++ 构建工具到 `.tools/native-decoder`；后续复用缓存，不安装系统开发工具。直接调用 dotnet build 前先还原依赖并运行 `python scripts/build-native-decoder.py`，见 [预滚构建与验证](../docs/NATIVE_MP3_PREROLL.md)。
 
-当前生成路径：`src/FnMusic.App/bin/Release/net10.0-windows10.0.26100.0/win-x64/FnMusic.App.exe`。运行需保留同目录依赖文件，不可只复制 exe。它不是最终安装包。
+当前生成路径：`src/FnMusic.App/bin/Melvune/Release/net10.0-windows10.0.26100.0/win-x64/Melvune.App.exe`。Melvune使用独立输出目录，不覆盖旧FnMusic构建缓存。运行需保留同目录依赖文件，不可只复制exe。它不是最终安装包。
 
 ## 项目边界
 

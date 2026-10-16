@@ -75,7 +75,7 @@ internal sealed class SystemTrayService : IDisposable
     {
         Size = (uint)Marshal.SizeOf<NotifyIconData>(), Window = owner, Id = IconId,
         Flags = NifMessage | NifIcon | NifTip | NifShowTip, Callback = CallbackMessage, Icon = icon,
-        Tip = "飞牛音乐" + (state.IsPlaying ? " · 正在播放" : ""), Info = "", InfoTitle = "",
+        Tip = "Melvune" + (state.IsPlaying ? " · 正在播放" : ""), Info = "", InfoTitle = "",
         State = 0, StateMask = 0, Version = 0, InfoFlags = 0, Guid = Guid.Empty, BalloonIcon = 0
     };
 
@@ -203,7 +203,7 @@ internal sealed class SystemTrayService : IDisposable
         if (menu == 0) return 0;
         try
         {
-            Add(DesktopShellCommand.ShowMain, "打开飞牛音乐");
+            Add(DesktopShellCommand.ShowMain, "打开 Melvune");
             Separator();
             Add(DesktopShellCommand.PlayPause, state.IsPlaying ? "暂停" : "播放", state.CanControl);
             Add(DesktopShellCommand.Previous, "上一首", state.CanControl);
@@ -213,7 +213,7 @@ internal sealed class SystemTrayService : IDisposable
                 check: state.LyricsEnabled);
             Add(DesktopShellCommand.UnlockDesktopLyrics, "解锁并找回桌面歌词", state.LyricsEnabled && state.LyricsLocked);
             Separator();
-            Add(DesktopShellCommand.Exit, "退出飞牛音乐");
+            Add(DesktopShellCommand.Exit, "退出 Melvune");
             return menu;
 
             void Add(DesktopShellCommand command, string label, bool enabled = true, bool check = false)

@@ -81,6 +81,8 @@ def verify_portable(packages, payload, version=None):
     packages, payload = pathlib.Path(packages).absolute(), pathlib.Path(payload).absolute()
     require(packages.is_dir() and not linked(packages) and payload.is_dir() and not linked(payload), 'Invalid or linked package directory')
     payload_release = read_json(payload / 'release.json', 1024 ** 2)
+    product = payload_release.get('product', 'FnMusic')
+    require(product in ('FnMusic', 'Melvune'), 'Unsupported payload product')
     version = version or payload_release.get('version')
     require(version in VERSIONS and payload_release.get('version') == version, 'Unexpected payload version')
     source = payload_release.get('sourceCommit', '')
@@ -114,7 +116,7 @@ def verify_portable(packages, payload, version=None):
     sidecar = pathlib.Path(str(payload) + '.SHA256SUMS.txt')
     require(sidecar.is_file() and sidecar.stat().st_size < 4096 and not linked(sidecar), 'Payload ZIP checksum missing')
     require(sidecar.read_text(encoding='ascii').strip() == archive_hash + '  ' + archive_path.name, 'Payload ZIP checksum mismatch')
-    portable = packages / f'FnMusic-{version}-win-x64-portable.exe'
+    portable = packages / f'{product}-{version}-win-x64-portable.exe'
     require(portable.is_file() and not linked(portable), 'Portable executable missing')
     with portable.open('rb') as stream:
         size = portable.stat().st_size
@@ -158,6 +160,7 @@ def verify_portable(packages, payload, version=None):
             # Reading each full entry above validates CRC, as well as its digest.
             require(actual == expected, 'Portable ZIP differs from verified payload directory')
     metadata = read_json(packages / 'release.json', 1024 ** 2)
+    require(metadata.get('product', 'FnMusic') == product, 'Portable product differs from payload')
     require(metadata.get('version') == version and metadata.get('payloadSource') == source, 'Portable version/source mismatch')
     require(metadata.get('payloadZipSha256', '').upper() == payload_hash, 'Portable metadata digest mismatch')
     require(isinstance(metadata.get('packagingSource'), str) and re.fullmatch('[a-f0-9]{40}', metadata['packagingSource']), 'Invalid packaging source commit')

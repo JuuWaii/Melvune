@@ -14,13 +14,13 @@
 
 FFmpeg 源码提交 `38b88335f99e76ed89ff3c93f877fdefce736c13`，上游桥接提交 `841fc8e79346a235906f1dbd45be53034b2e2f52`，其 Libs 固定提交与包元数据一致。实际运行库导出 n8.1.2、LGPL 2.1 或更高版本，并禁用 GPL/version3。构建参数里的原机输出路径是上游构建路径，不需要在本机复用。构建后输出在 Output/FFmpegDesktop/x64。我们未重建这组上游 FFmpeg DLL，未声称编译器不同仍得到逐字节相同 DLL。
 
-## 构建修改过的桥接与 FNMusic
+## 构建修改过的桥接与 Melvune
 
-FNMusic 仓库含本项目 MIT 源码和 NuGet 锁文件。仓库执行 `scripts/native.ps1 bootstrap`、还原 native/FnMusic.sln 后，`scripts/build-native-decoder.py` 自动获取锁定 MSVC/SDK/C++WinRT 依赖，校验哈希，检出固定桥接提交并应用 `native/decoder/mp3-preroll.patch`。可离线使用归档中的 FFmpegInteropX 源码初始化 `.tools/native-decoder/source` 并建立固定提交的 Git 检出；常规在线脚本直接从固定提交获取。脚本记录源码、补丁、编译材料和实际 DLL 哈希至 native-decoder-build.json。源码构建方式详见仓库 docs/NATIVE_MP3_PREROLL.md。
+Melvune（原FnMusic）仓库含本项目MIT源码和NuGet锁文件。仓库执行 `scripts/native.ps1 bootstrap`、还原 `native/Melvune.sln` 后，`scripts/build-native-decoder.py` 自动获取锁定MSVC/SDK/C++WinRT依赖，校验哈希，检出固定桥接提交并应用 `native/decoder/mp3-preroll.patch`。可离线使用归档中的FFmpegInteropX源码初始化 `.tools/native-decoder/source` 并建立固定提交的Git检出；常规在线脚本直接从固定提交获取。脚本记录源码、补丁、编译材料和实际DLL哈希至native-decoder-build.json。源码构建方式详见仓库docs/NATIVE_MP3_PREROLL.md。源码内部的FnMusic命名为兼容标识，历史许可证和对应源码材料不因品牌更名重写。
 
 ```powershell
 ./scripts/native.ps1 build
-./scripts/package-preview.ps1 -Name FnMusic-0.2.0-rc.1-win-x64
+./scripts/package-preview.ps1 -Version 0.2.0-rc.7 -Name Melvune-0.2.0-rc.7-win-x64
 ```
 
 退出播放器后备份原 DLL，可用兼容 ABI 的自建 FFmpeg DLL/FFmpegInteropX.dll 替换包内同名文件。不要混合不同 FFmpeg ABI 主版本；本包使用 avcodec/avformat 62、avutil 60、swresample 6。替换后 SHA256.json 校验应报告差异，属于已修改包；不限制运行修改库。桥接 C# 投影/WinMD 来自锁定包，必须保持接口兼容。

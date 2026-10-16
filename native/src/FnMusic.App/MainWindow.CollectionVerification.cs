@@ -13,6 +13,7 @@ public sealed partial class MainWindow
         var checks = new Dictionary<string, bool>();
         var timings = new Dictionary<string, long>();
         string stage = "setup", error = "";
+        string? exceptionStack = null;
         void Verify(string name, bool value)
         { stage = name; checks[name] = value; if (!value) throw new InvalidOperationException(); }
         try
@@ -318,10 +319,10 @@ public sealed partial class MainWindow
             await VerifyUiMotionAsync(Verify);
             stage = "complete";
         }
-        catch (Exception ex) { error = ex.GetType().Name; }
+        catch (Exception ex) { error = ex.GetType().Name; exceptionStack = ex.StackTrace; }
         finally { motionPreferenceOverride = null; }
         await File.WriteAllTextAsync(Path.Combine(AppContext.BaseDirectory, "collection-window-verification.json"),
-            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, timings }));
+            JsonSerializer.Serialize(new { timestamp = DateTimeOffset.UtcNow, stage, error, checks, timings, exceptionStack }));
     }
     private sealed class CapabilityPlaybackSource(IMusicPlaybackSource source, MusicSourceCapabilities capabilities) : IMusicPlaybackSource
     {
