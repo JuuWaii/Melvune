@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v0.2.0-rc.5'
+      - 'v0.2.0-rc.6'
 
 permissions:
   contents: read
@@ -25,7 +25,7 @@ jobs:
         shell: pwsh
         run: |
           $version = ([xml](Get-Content native/src/FnMusic.App/FnMusic.App.csproj -Raw)).Project.PropertyGroup.Version
-          if ($version -ne '0.2.0-rc.5') { throw 'Unexpected candidate version' }
+          if ($version -ne '0.2.0-rc.6') { throw 'Unexpected candidate version' }
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne ('v' + $version)) { throw 'Tag differs from app version' }
       - name: Privacy review
         shell: pwsh
@@ -55,23 +55,23 @@ jobs:
       - name: Build verified ZIP and portable EXE
         shell: pwsh
         run: |
-          ./scripts/package-preview.ps1 -Version 0.2.0-rc.5 -Name FnMusic-0.2.0-rc.5-win-x64
-          ./scripts/package-windows.ps1 -Payload dist/FnMusic-0.2.0-rc.5-win-x64 -Name FnMusic-0.2.0-rc.5-win-x64-portable -PortableOnly
+          ./scripts/package-preview.ps1 -Version 0.2.0-rc.6 -Name FnMusic-0.2.0-rc.6-win-x64
+          ./scripts/package-windows.ps1 -Payload dist/FnMusic-0.2.0-rc.6-win-x64 -Name FnMusic-0.2.0-rc.6-win-x64-portable -PortableOnly
       - name: Verify candidate contents
         shell: pwsh
         run: |
-          python scripts/verify-portable-package.py --packages dist/FnMusic-0.2.0-rc.5-win-x64-portable --payload dist/FnMusic-0.2.0-rc.5-win-x64 --report .review-audit/portable-verification.json
+          python scripts/verify-portable-package.py --packages dist/FnMusic-0.2.0-rc.6-win-x64-portable --payload dist/FnMusic-0.2.0-rc.6-win-x64 --report .review-audit/portable-verification.json
           if ($LASTEXITCODE -ne 0) { throw 'Portable verification failed' }
-          python scripts/verify-icon-resources.py --icon assets/branding/fnmusic.ico dist/FnMusic-0.2.0-rc.5-win-x64/FnMusic.App.exe dist/FnMusic-0.2.0-rc.5-win-x64-portable/FnMusic-0.2.0-rc.5-win-x64-portable.exe
+          python scripts/verify-icon-resources.py --icon assets/branding/fnmusic.ico dist/FnMusic-0.2.0-rc.6-win-x64/FnMusic.App.exe dist/FnMusic-0.2.0-rc.6-win-x64-portable/FnMusic-0.2.0-rc.6-win-x64-portable.exe
           if ($LASTEXITCODE -ne 0) { throw 'Application icon verification failed' }
       - name: Upload candidate build artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: FnMusic-0.2.0-rc.5-win-x64
+          name: FnMusic-0.2.0-rc.6-win-x64
           path: |
-            dist/FnMusic-0.2.0-rc.5-win-x64.zip
-            dist/FnMusic-0.2.0-rc.5-win-x64.SHA256SUMS.txt
-            dist/FnMusic-0.2.0-rc.5-win-x64-portable/*
+            dist/FnMusic-0.2.0-rc.6-win-x64.zip
+            dist/FnMusic-0.2.0-rc.6-win-x64.SHA256SUMS.txt
+            dist/FnMusic-0.2.0-rc.6-win-x64-portable/*
           if-no-files-found: error
           compression-level: 0
           retention-days: 14

@@ -211,7 +211,7 @@ public sealed partial class MainWindow
                 verify("player_progress_time_labels_flank_slider_" + width, time.X + PlaybackTime.ActualWidth <= progress.X
                     && progress.X + SeekSlider.ActualWidth <= duration.X
                     && Math.Abs(time.Y + PlaybackTime.ActualHeight / 2 - duration.Y - PlaybackDuration.ActualHeight / 2) <= 1);
-                var sidebarRight = NewNasPlaylist.TransformToVisual(SidebarScroll).TransformPoint(new(NewNasPlaylist.ActualWidth, 0)).X;
+                var sidebarRight = NewPlaylistNavigation.TransformToVisual(SidebarScroll).TransformPoint(new(NewPlaylistNavigation.ActualWidth, 0)).X;
                 verify("sidebar_scroll_gutter_keeps_add_button_clear_" + width, SidebarScroll.ActualWidth - sidebarRight >= 19
                     && SidebarScroll.HorizontalScrollBarVisibility == ScrollBarVisibility.Disabled);
                 await OpenNowPlayingAsync();

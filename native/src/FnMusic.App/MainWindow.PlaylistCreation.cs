@@ -10,10 +10,16 @@ public sealed partial class MainWindow
 #if DEBUG
     private Action<ContentDialog, TextBox>? playlistNameDialogOpened;
 #endif
-    private bool CanOpenPlaylistNameDialog() => !closed && !themedDialogOpen && !contextPlaylistWriteBusy
-        && activePlaylistPage is not { BlockNavigation: true } and not { Editor.IsEnabled: false }
-        && fullPageView is not { BlockNavigation: true } and not { Editor.IsEnabled: false }
-        && queuePage is not { BlockNavigation: true } and not { Editor.IsEnabled: false };
+    private bool CanOpenPlaylistNameDialog()
+    {
+        // A full-page manager disables NormalContent, including an underlying detail editor.
+        // Inspect readiness of the foreground page rather than inherited disabled controls below it.
+        var foreground = queuePage ?? fullPageView ?? activePlaylistPage;
+        return !closed && !themedDialogOpen && !contextPlaylistWriteBusy
+            && foreground is not { BlockNavigation: true } and not { Editor.IsEnabled: false }
+            && activePlaylistPage is not { BlockNavigation: true } && fullPageView is not { BlockNavigation: true }
+            && queuePage is not { BlockNavigation: true };
+    }
 
     private async Task<string?> RequestPlaylistNameAsync(bool remote, string? initialName = null)
     {

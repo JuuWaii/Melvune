@@ -66,7 +66,7 @@ public sealed partial class MainWindow
         check("shell_restore_keeps_playback", AppWindow.IsVisible && !hiddenToTray && ReferenceEquals(source, music.Player.Source));
 
         ShellTrayEnabled.IsOn = false;
-        check("shell_unavailable_tray_never_hides", systemTray is null && !TryHideMainWindowToTray() && AppWindow.IsVisible && !ShellCloseToTray.IsEnabled);
+        check("shell_unavailable_tray_never_hides", systemTray is null && !TryHideMainWindowToTray() && AppWindow.IsVisible && ShellCloseToTray.IsEnabled);
         ShellTrayEnabled.IsOn = true;
         check("shell_reenabled_tray_ready", systemTray?.IsAvailable == true && ShellCloseToTray.IsEnabled);
         var persisted = JsonSerializer.Deserialize<DesktopIntegrationSettings>(File.ReadAllText(IntegrationSettingsFile))!;

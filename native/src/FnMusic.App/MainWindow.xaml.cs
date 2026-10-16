@@ -19,8 +19,9 @@ public sealed partial class MainWindow : Window
         ConfigureSongList(TrackList);
         QueueModeButton.Flyout.Opening += PlayerMenu_Opening;
         OutputDeviceButton.Flyout.Opening += PlayerOutput_Opening;
-        Title = "飞牛音乐 · 0.2.0-rc.5";
+        Title = "飞牛音乐 · 0.2.0-rc.6";
         AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1360, 900));
+        InitializePlaylistNavigationPreferences();
         InitializePlayback();
         InitializePresentation();
         InitializeDesktopIntegration();
@@ -34,6 +35,10 @@ public sealed partial class MainWindow : Window
     {
         Root.Loaded -= Root_Loaded;
 #if DEBUG
+        if (Environment.GetCommandLineArgs().Contains("--verify-close-choice-window") && IsSyntheticPreview)
+        { await VerifyCloseChoiceWindowAsync(); return; }
+        if (Environment.GetCommandLineArgs().Contains("--verify-music-management-window") && IsSyntheticPreview)
+        { await VerifyMusicManagementWindowAsync(); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-queue-startup-window") && IsSyntheticPreview)
         { await VerifyQueueStartupWindowAsync(Environment.GetCommandLineArgs().FirstOrDefault(arg => arg.StartsWith("--queue-startup-phase=", StringComparison.Ordinal))?.Split('=', 2)[1] ?? "mode-save"); Close(); return; }
         if (Environment.GetCommandLineArgs().Contains("--verify-queue-session-window") && IsSyntheticPreview)

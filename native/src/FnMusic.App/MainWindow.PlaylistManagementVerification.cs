@@ -34,8 +34,7 @@ public sealed partial class MainWindow
         playlistManagerOpened = view => verify("playlist_manager_loaded_hook_" + view.TitleText.Text, ReferenceEquals(activePlaylistPage, view) && !view.IsDisposed);
         try
         {
-            var category = FindSongVisual<Button>(SidebarHost, button => Equals(button.Content, "本地歌单")) ?? throw new InvalidOperationException();
-            ((IInvokeProvider)new ButtonAutomationPeer(category).GetPattern(PatternInterface.Invoke)).Invoke();
+            await ShowPlaylistManagerAsync(false);
             await WaitPlaylistManagerAsync("本地歌单管理");
             var view = View();
             verify("local_playlist_category_opens_manager_without_implicit_detail", view.List.Items.Count == 2 && view.LocalPlaylistId is null

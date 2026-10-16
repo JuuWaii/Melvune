@@ -16,7 +16,8 @@ public sealed partial class MainWindow
     private bool closingIntegration;
     private sealed record DesktopIntegrationSettings(bool LyricsEnabled = false, bool InformationEnabled = false,
         DesktopLyricsOptions? Lyrics = null, bool SystemMediaEnabled = true,
-        bool TrayEnabled = true, bool CloseToTray = false, bool GlobalHotkeysEnabled = false);
+        bool TrayEnabled = true, bool CloseToTray = false, bool GlobalHotkeysEnabled = false,
+        bool CloseChoiceRemembered = false);
     private DesktopIntegrationSettings integrationSettings = new();
     private string IntegrationSettingsFile => Path.Combine(AppDataDirectory.Resolve(), "desktop-integration.json");
 
@@ -27,7 +28,7 @@ public sealed partial class MainWindow
             if (File.Exists(IntegrationSettingsFile))
             {
                 if (new FileInfo(IntegrationSettingsFile).Length > 8192) throw new InvalidDataException();
-                integrationSettings = JsonSerializer.Deserialize<DesktopIntegrationSettings>(File.ReadAllText(IntegrationSettingsFile)) ?? new();
+                integrationSettings = ReadDesktopIntegrationSettings(File.ReadAllText(IntegrationSettingsFile));
             }
         }
         catch (Exception) { integrationSettings = new(); IntegrationStatus.Text = "桌面联动设置无法读取，已使用默认值。"; }
@@ -44,6 +45,17 @@ public sealed partial class MainWindow
         updatingIntegration = true;
         InitializeDesktopShell(); updatingIntegration = false;
         _ = ApplyDesktopIntegrationAsync();
+    }
+    private static DesktopIntegrationSettings ReadDesktopIntegrationSettings(string json)
+    {
+        var settings = JsonSerializer.Deserialize<DesktopIntegrationSettings>(json) ?? new();
+        // An older explicit close-to-tray preference must continue working without another prompt.
+        // Explicit false in the new field means a session-only choice and must not be migrated.
+        using var document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty(nameof(DesktopIntegrationSettings.CloseChoiceRemembered), out _)
+            && settings.CloseToTray)
+            settings = settings with { CloseChoiceRemembered = true };
+        return settings;
     }
     private void SyncDesktopOptions()
     {
@@ -177,7 +189,6 @@ public sealed partial class MainWindow
     {
         if (closingIntegration) return;
         args.Cancel = true;
-        if (TryHideMainWindowToTray()) return;
-        await RequestDesktopExitAsync();
+        await HandleMainWindowCloseAsync();
     }
 }

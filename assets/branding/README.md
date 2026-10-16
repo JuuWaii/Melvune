@@ -19,3 +19,7 @@ negative spaces and instantly legible at 16 and 32 pixels. Front facing flat ico
 no perspective, no letters, no text, no grid, no mockup, no watermark. Center the
 rounded tile filling 88% of a square canvas with true transparent outer corners
 and crisp edges. Must be original, do not copy the official fnOS or any existing logo.
+
+## 飞牛来源标志
+
+`fnos-music-source.png` 为用户 NAS 飞牛音乐公开静态资源 `/music/static/assets/img/logo.png`（2026-10-16，未使用登录凭据）。只用于标识飞牛同步歌单，原图未改绘，使用 20/30px 图标、圆角衬底与统一边距融入 WinUI。标志归原权利人所有，不作为本客户端应用图标，不表示官方关联或背书。

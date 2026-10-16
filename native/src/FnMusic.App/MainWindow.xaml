@@ -20,7 +20,7 @@
    <DataTemplate x:Key="PlaylistManagerCardTemplate">
     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,0,0,8" MinHeight="84">
      <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-      <FontIcon Glyph="&#xE8F1;" FontSize="24" VerticalAlignment="Center"/>
+      <Grid Width="36" Height="36" VerticalAlignment="Center"><FontIcon Glyph="&#xE8F1;" FontSize="24" Visibility="{Binding LocalVisibility}"/><Border CornerRadius="8" Padding="3" Background="{ThemeResource ControlFillColorSecondaryBrush}" Visibility="{Binding NasVisibility}"><Image Source="ms-appx:///Assets/FnOsMusic.png" Width="30" Height="30" AutomationProperties.Name="飞牛音乐同步歌单"/></Border></Grid>
       <StackPanel Grid.Column="1" Spacing="4" VerticalAlignment="Center"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis"/><TextBlock Text="{Binding Description}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextTrimming="CharacterEllipsis"/></StackPanel>
       <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
        <Button Tag="open" Click="PlaylistManagerAction_Click" IsEnabled="{Binding CanOpen}" Width="36" Height="36" Padding="8" AutomationProperties.Name="打开歌单" ToolTipService.ToolTip="打开歌单"><FontIcon Glyph="&#xE8A7;" FontSize="16"/></Button>
@@ -76,21 +76,19 @@
     <Button Content="首页" Click="Home_Click" HorizontalAlignment="Stretch"/>
     <Button x:Name="AllMusicNavigation" Content="所有音乐" Click="AllMusic_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteFavoritesNavigation" Content="收藏" Click="SidebarFavorites_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteAlbumsNavigation" Content="专辑" Click="SidebarAlbums_Click" HorizontalAlignment="Stretch"/><Button x:Name="RemoteArtistsNavigation" Content="歌手" Click="SidebarArtists_Click" HorizontalAlignment="Stretch"/>
     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
-    <TextBlock Text="歌单" Margin="8,12,0,2" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-    <Grid ColumnSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button x:Name="RemotePlaylistsNavigation" Content="飞牛歌单" Click="NasPlaylists_Click" HorizontalAlignment="Stretch"/><Button x:Name="NewNasPlaylist" Grid.Column="1" Click="NewNasPlaylist_Click" AutomationProperties.Name="新建飞牛歌单" ToolTipService.ToolTip="新建飞牛歌单"><FontIcon Glyph="&#xE710;" FontSize="14"/></Button></Grid>
-    <ListView x:Name="NasPlaylistNavigation" ContextRequested="PlaylistNavigation_ContextRequested" ContextCanceled="TrackContext_Canceled" SelectionMode="Single" MaxHeight="220" IsItemClickEnabled="True" ItemClick="NasPlaylistNavigation_ItemClick" AutomationProperties.Name="飞牛歌单导航"><ListView.ItemTemplate><DataTemplate><Grid ColumnSpacing="8" Padding="2,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><FontIcon Glyph="&#xE8F1;" FontSize="14"/><TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/></Grid></DataTemplate></ListView.ItemTemplate></ListView>
-    <TextBlock x:Name="NasPlaylistNavigationStatus" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <Grid ColumnSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button x:Name="PlaylistsNavigation" Content="歌单" Click="MusicPlaylists_Click" HorizontalAlignment="Stretch"/><Button x:Name="NewPlaylistNavigation" Grid.Column="1" Click="NewLocalPlaylist_Click" AutomationProperties.Name="新建歌单" ToolTipService.ToolTip="新建本地歌单；飞牛同步歌单可在音乐管理中新建"><FontIcon Glyph="&#xE710;" FontSize="14"/></Button></Grid>
+    <ListView x:Name="UnifiedPlaylistNavigation" ContextRequested="UnifiedPlaylist_ContextRequested" ContextCanceled="TrackContext_Canceled" SelectionMode="Single" MaxHeight="360" IsItemClickEnabled="True" ItemClick="UnifiedPlaylist_ItemClick" AutomationProperties.Name="歌单导航"><ListView.ItemTemplate><DataTemplate><Grid ColumnSpacing="8" Padding="2,4"><Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Grid Width="24" Height="24"><FontIcon Glyph="&#xE8F1;" FontSize="14" Visibility="{Binding LocalVisibility}"/><Border CornerRadius="6" Background="{ThemeResource ControlFillColorSecondaryBrush}" Padding="2" Visibility="{Binding NasVisibility}"><Image Source="ms-appx:///Assets/FnOsMusic.png" Width="20" Height="20" AutomationProperties.Name="飞牛音乐同步歌单"/></Border></Grid><TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center"/></Grid></DataTemplate></ListView.ItemTemplate></ListView>
+    <TextBlock x:Name="UnifiedPlaylistStatus" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+    <!-- Compatibility models for source-specific editors; the visible navigation is unified. -->
+    <StackPanel Visibility="Collapsed">
+     <Button x:Name="RemotePlaylistsNavigation" Content="飞牛歌单" Click="NasPlaylists_Click"/><Button x:Name="NewNasPlaylist" Click="NewNasPlaylist_Click"/>
+     <ListView x:Name="NasPlaylistNavigation"/><TextBlock x:Name="NasPlaylistNavigationStatus"/>
+     <ListView x:Name="LocalPlaylistNavigation"/><TextBlock x:Name="LocalPlaylistNavigationStatus"/>
+    </StackPanel>
     <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
-    <Grid ColumnSpacing="4"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions><Button Content="本地歌单" Click="LocalPlaylists_Click" HorizontalAlignment="Stretch"/><Button Grid.Column="1" Click="NewLocalPlaylist_Click" AutomationProperties.Name="新建本地歌单" ToolTipService.ToolTip="新建本地歌单"><FontIcon Glyph="&#xE710;" FontSize="14"/></Button></Grid>
-    <ListView x:Name="LocalPlaylistNavigation" ContextRequested="PlaylistNavigation_ContextRequested" ContextCanceled="TrackContext_Canceled" SelectionMode="Single" MaxHeight="220" IsItemClickEnabled="True" ItemClick="LocalPlaylistNavigation_ItemClick" AutomationProperties.Name="本地歌单导航"><ListView.ItemTemplate><DataTemplate><Grid ColumnSpacing="8" Padding="2,4"><Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><FontIcon Glyph="&#xE8F1;" FontSize="14"/><TextBlock Grid.Column="1" Text="{Binding Name}" TextTrimming="CharacterEllipsis"/></Grid></DataTemplate></ListView.ItemTemplate></ListView>
-    <TextBlock x:Name="LocalPlaylistNavigationStatus" FontSize="12" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-    <Border Height="1" Background="{ThemeResource DividerStrokeColorDefaultBrush}" />
-    <TextBlock Text="音乐库与设置" Margin="8,12,0,2" FontSize="12" FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-    <Button Content="导入文件夹" Click="ImportLocal_Click" HorizontalAlignment="Stretch" />
-    <Button Content="音乐库管理" Click="ManageLocalLibraries_Click" HorizontalAlignment="Stretch" />
+    <Button x:Name="MusicManagementNavigation" Content="音乐管理" Click="ManageMusic_Click" HorizontalAlignment="Stretch" Margin="0,8,0,0"/>
     <TextBlock x:Name="LocalScanStatus" TextWrapping="Wrap" FontSize="12" AutomationProperties.LiveSetting="Polite" />
     <Button x:Name="CancelLocalScan" Content="取消扫描" Visibility="Collapsed" Click="CancelLocalScan_Click" />
-    <Button Content="设置" Click="Settings_Click" HorizontalAlignment="Stretch" />
    </StackPanel>
   </ScrollViewer></Border><ScrollViewer x:Name="SettingsPanel" Grid.Column="1" HorizontalContentAlignment="Stretch" HorizontalScrollBarVisibility="Disabled" HorizontalScrollMode="Disabled">
    <StackPanel Margin="32" Spacing="20">
@@ -120,7 +118,7 @@
     </Border>
     <ProgressRing IsActive="{x:Bind ViewModel.IsBusy, Mode=OneWay}" Width="24" Height="24" HorizontalAlignment="Left" />
     <TextBlock Text="{x:Bind ViewModel.Status, Mode=OneWay}" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
-    <TextBlock Text="FNMusic 0.2.0-rc.5 · 非官方客户端。使用 FFmpeg（LGPL 2.1 或更高版本）；对应源码与许可证随包提供，见 licenses 目录。FN Connect 与 OAuth 后续支持。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+    <TextBlock Text="FNMusic 0.2.0-rc.6 · 非官方客户端。使用 FFmpeg（LGPL 2.1 或更高版本）；对应源码与许可证随包提供，见 licenses 目录。FN Connect 与 OAuth 后续支持。" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
     </StackPanel>
     <StackPanel x:Name="SettingsAppearanceSection" Visibility="Collapsed" Spacing="16">
      <TextBlock Text="外观" FontSize="20" FontWeight="SemiBold"/>
@@ -141,22 +139,22 @@
      </StackPanel></Border>
      <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24"><StackPanel Spacing="12">
       <TextBlock Text="桌面播放联动" FontWeight="SemiBold"/>
-      <ToggleSwitch x:Name="SystemMediaEnabled" Header="SMTC 开关" Toggled="DesktopIntegration_Toggled"/>
+      <ToggleSwitch x:Name="SystemMediaEnabled" Header="SMTC 开关" Toggled="DesktopIntegration_Toggled"/><TextBlock Text="在 Windows 媒体面板显示歌曲，并响应系统媒体按键的播放、暂停和切歌。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
       <ToggleSwitch x:Name="DesktopLyricsEnabled" Header="显示桌面歌词" Toggled="DesktopIntegration_Toggled"/>
       <ToggleSwitch x:Name="DesktopLyricsTopmost" Header="歌词置顶" Toggled="DesktopOptions_Changed"/>
       <ToggleSwitch x:Name="DesktopLyricsLocked" Header="锁定并穿透鼠标（可在此解锁）" Toggled="DesktopOptions_Changed"/>
       <Slider x:Name="DesktopLyricsFont" Header="歌词字号" Minimum="16" Maximum="64" Value="28" ValueChanged="DesktopFont_Changed"/>
       <ComboBox x:Name="DesktopLyricsTheme" Header="歌词颜色模式" SelectionChanged="DesktopTheme_Changed"><ComboBoxItem Content="跟随主窗口"/><ComboBoxItem Content="浅色"/><ComboBoxItem Content="深色"/></ComboBox>
       <Button Content="解锁并找回歌词窗口" Click="RecoverDesktopLyrics_Click" HorizontalAlignment="Left"/>
-      <ToggleSwitch x:Name="InformationEnabled" Header="本机只读音乐与歌词接口" Toggled="DesktopIntegration_Toggled"/>
-      <TextBlock Text="开启后，同一 Windows 用户的程序可按协议读取歌曲和歌词。关闭会移除本实例发现记录；第三方软件需自行接入。" TextWrapping="Wrap"/>
+      <TextBlock Text="第三方应用接入" FontWeight="SemiBold" Margin="0,12,0,0"/><ToggleSwitch x:Name="InformationEnabled" Header="允许本机应用读取播放信息与歌词" Toggled="DesktopIntegration_Toggled"/>
+      <TextBlock Text="供支持 FNMusic 协议的本机应用读取歌曲、播放进度和完整歌词，只读且不控制播放。默认关闭，关闭后停止服务并移除发现记录；与 Windows SMTC 媒体控制互相独立。" TextWrapping="Wrap"/>
       <TextBlock x:Name="IntegrationStatus" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>
      </StackPanel></Border>
      <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="24"><StackPanel Spacing="12">
       <TextBlock Text="桌面常驻" FontWeight="SemiBold"/>
       <ToggleSwitch x:Name="ShellTrayEnabled" Header="系统托盘" IsOn="True" Toggled="DesktopShell_Toggled"/>
       <ToggleSwitch x:Name="ShellCloseToTray" Header="关闭窗口时收起到托盘" Toggled="DesktopShell_Toggled"/>
-      <TextBlock Text="默认关闭窗口即退出。启用后，播放和歌词继续；从托盘菜单选择「退出」可结束应用。托盘不可用时仍正常退出。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+      <TextBlock Text="首次关闭时选择收起或退出，可记住选择；也可在此更改。收起后播放和歌词继续，从托盘菜单选择「退出」可结束应用。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
       <ToggleSwitch x:Name="ShellHotkeysEnabled" Header="全局播放与歌词快捷键" Toggled="DesktopShell_Toggled"/>
       <TextBlock Text="Ctrl + Alt + 空格：播放/暂停；← / →：上一首/下一首；L：显示/隐藏桌面歌词；U：解锁并找回歌词。各组合均按住 Ctrl + Alt。" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
       <TextBlock x:Name="ShellStatus" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite"/>

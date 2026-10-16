@@ -119,7 +119,8 @@ public sealed partial class MainWindow
             verify("library_type_switch_retains_local_draft", editor.LocalPath.Text == selected.Directory && editor.Name.Text == "未保存名称" && editor.Dialog.IsPrimaryButtonEnabled);
             return;
         }, false);
-        verify("library_create_cancel_has_no_write", (await localLibraryStore.LoadAsync()).Revision == revision && view.Fields.Visibility == Visibility.Collapsed);
+        verify("library_create_cancel_has_no_write", (await localLibraryStore.LoadAsync()).Revision == revision && view.Fields.Visibility == Visibility.Visible
+            && view.Fields.Children.OfType<SelectorBar>().Single().SelectedItem?.Text == "音乐库");
         await WithLibraryEditorAsync(view, Edit(), async editor =>
         {
             verify("library_edit_dialog_selected_identity_and_type", !editor.Kind.IsEnabled && editor.Name.Text == selected.Name && editor.LocalPath.Text == selected.Directory);

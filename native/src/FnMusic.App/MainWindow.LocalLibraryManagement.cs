@@ -44,8 +44,9 @@ public sealed partial class MainWindow
         var refresh = new Button { Content = "刷新音乐库" };
         var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
         actions.Children.Add(refresh);
-        var view = new PlaylistPageView("音乐库管理", new StackPanel { Visibility = Visibility.Collapsed }, list, actions,
+        var view = new PlaylistPageView("音乐管理", new StackPanel { Spacing = 12 }, list, actions,
             new TextBlock { Text = "正在读取音乐库…", TextWrapping = TextWrapping.Wrap }, localLifetime.Token);
+        InstallMusicManagementTabs(view, playlists: false);
         var topActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8, VerticalAlignment = VerticalAlignment.Center };
         topActions.Children.Add(add); topActions.Children.Add(scan); view.SetHeadingActions(topActions);
         view.PlayButton.Visibility = Visibility.Collapsed;
@@ -334,7 +335,7 @@ public sealed partial class MainWindow
         await Run(_ => Refresh(selectedLocalLibrary is { } id ? "local:" + id : null), false);
         if (localLibraryWork is not null && !view.IsDisposed) backgroundChanged();
 #if DEBUG
-        if (!view.IsDisposed) localLibraryPageOpened?.Invoke(view);
+        if (!view.IsDisposed) { localLibraryPageOpened?.Invoke(view); musicManagementPageOpened?.Invoke(view, false); }
 #endif
         if (createNew && !view.IsDisposed) await Edit(null);
     }

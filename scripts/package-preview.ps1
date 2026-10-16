@@ -1,11 +1,11 @@
 param(
-    [string]$Version = '0.2.0-rc.5',
+    [string]$Version = '0.2.0-rc.6',
     [string]$Name = ('FnMusic-' + $Version + '-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 )
 $ErrorActionPreference = 'Stop'
 if ($Name -notmatch '^[a-zA-Z0-9._-]+$' -or $Name -in @('.', '..')) { throw 'Invalid package name' }
 $repo = Split-Path $PSScriptRoot -Parent
-if ($Version -notin @('0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5')) { throw 'Unsupported release version' }
+if ($Version -notin @('0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6')) { throw 'Unsupported release version' }
 $appProject = Join-Path $repo 'native/src/FnMusic.App/FnMusic.App.csproj'
 [xml]$appDefinition = Get-Content -LiteralPath $appProject -Raw
 $declaredVersions = @($appDefinition.Project.PropertyGroup.Version | Where-Object { $_ })
@@ -29,7 +29,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Independent consumer restore failed' }
 & $sdk publish $consumerProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugSymbols=false -p:DebugType=None --no-restore --nologo -o (Join-Path $destination 'examples/InfoClient')
 if ($LASTEXITCODE -ne 0) { throw 'Independent consumer publish failed' }
 Copy-Item -LiteralPath (Join-Path $repo 'native/examples/FnMusic.InfoClient/README.md') -Destination (Join-Path $destination 'examples/InfoClient')
-foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Assets/FnMusic.ico', 'Assets/FnMusic.png')) {
+foreach ($required in @('FnMusic.App.exe', 'FnMusic.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Assets/FnMusic.ico', 'Assets/FnMusic.png', 'Assets/FnOsMusic.png')) {
     if (-not (Test-Path -LiteralPath (Join-Path $destination $required))) { throw "Missing preview file: $required" }
 }
 $candidateNumber = $Version.Split('.')[-1].Split('-')[-1]
@@ -39,9 +39,9 @@ Copy-Item -LiteralPath (Join-Path $repo 'docs/NAVIDROME_ACCEPTANCE.md') -Destina
 Copy-Item -LiteralPath (Join-Path $repo 'docs/PLAYBACK_RESUME_ACCEPTANCE.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'docs/EMBY_ACCEPTANCE.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'docs/SUBSONIC_ACCEPTANCE.md') -Destination $destination
-if ($Version -in @('0.2.0-rc.3', '0.2.0-rc.4', '0.2.0-rc.5')) { Copy-Item -LiteralPath (Join-Path $repo ('docs/RC' + $candidateNumber + '_ACCEPTANCE.md')) -Destination $destination }
-if ($Version -in @('0.2.0-rc.4', '0.2.0-rc.5')) { Copy-Item -LiteralPath (Join-Path $repo 'docs/HTTP_JSON_SOURCES.md') -Destination $destination }
-if ($Version -eq '0.2.0-rc.5') { Copy-Item -LiteralPath (Join-Path $repo 'docs/QUEUE_SESSION.md') -Destination $destination }
+if ($Version -in @('0.2.0-rc.3', '0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6')) { Copy-Item -LiteralPath (Join-Path $repo ('docs/RC' + $candidateNumber + '_ACCEPTANCE.md')) -Destination $destination }
+if ($Version -in @('0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6')) { Copy-Item -LiteralPath (Join-Path $repo 'docs/HTTP_JSON_SOURCES.md') -Destination $destination }
+if ($Version -in @('0.2.0-rc.5', '0.2.0-rc.6')) { Copy-Item -LiteralPath (Join-Path $repo 'docs/QUEUE_SESSION.md') -Destination $destination }
 New-Item -ItemType Directory -Path $decoderLicenses | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'licenses/FFmpegInteropX-Apache-2.0.txt') -Destination $decoderLicenses
 $decoderBuildMaterials = Join-Path $decoderLicenses 'FFmpegInteropX-build'
@@ -65,7 +65,7 @@ start "" "%~dp0FnMusic.App.exe"
 '@ | Set-Content -LiteralPath (Join-Path $destination 'Start-FnMusic.cmd') -Encoding ascii
 $files = Get-ChildItem -LiteralPath $destination -Recurse -File
 if ($files | Where-Object { [IO.Path]::GetRelativePath($destination, $_.FullName) -match '^(local-index|nas-metadata)[\\/]' }) { throw 'Personal music index found in preview' }
-if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|playback-resume|navidrome-connections|emby-connections|http-json-connections|appearance)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Unexpected development or personal artifact in preview' }
+if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|playback-resume|navidrome-connections|emby-connections|http-json-connections|appearance|playlist-navigation|desktop-integration)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Unexpected development or personal artifact in preview' }
 $manifest = $files | Sort-Object FullName | ForEach-Object {
     [ordered]@{ path = [IO.Path]::GetRelativePath($destination, $_.FullName); sha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash }
 }

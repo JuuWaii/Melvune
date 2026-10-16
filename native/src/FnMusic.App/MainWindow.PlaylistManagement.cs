@@ -10,6 +10,9 @@ public sealed partial class MainWindow
 {
     private sealed record PlaylistManagerRow(object Value, bool CanOpen, bool CanWrite)
     {
+        public override string ToString() => Name;
+        public Visibility NasVisibility => Value is NasPlaylist ? Visibility.Visible : Visibility.Collapsed;
+        public Visibility LocalVisibility => Value is LocalPlaylist ? Visibility.Visible : Visibility.Collapsed;
         public string Key => Value is LocalPlaylist local ? "local:" + local.Id : "nas:" + ((NasPlaylist)Value).Reference.SourceInstanceId + ":" + ((NasPlaylist)Value).Reference.PlaylistId;
         public string Name => Value is LocalPlaylist local ? local.Name : ((NasPlaylist)Value).Name;
         public string Description => Value is LocalPlaylist local ? $"{local.Entries.Count} 首 · 保存在本机 · 可跨音乐库"

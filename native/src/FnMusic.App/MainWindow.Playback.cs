@@ -413,7 +413,16 @@ public sealed partial class MainWindow
         if (!mediaReady)
         {
             updatingProgress = true;
-            try { SeekSlider.IsEnabled = false; SeekSlider.Maximum = Math.Max(1, pendingPlaybackResume?.Track.DurationSeconds ?? 1); SeekSlider.Value = Math.Min(pendingPlaybackResume?.PositionSeconds ?? 0, SeekSlider.Maximum); UpdatePlaybackTimes(TimeSpan.FromSeconds(pendingPlaybackResume?.PositionSeconds ?? 0), TimeSpan.FromSeconds(pendingPlaybackResume?.Track.DurationSeconds ?? 0)); ApplyPendingResumePresentation(); }
+            try
+            {
+                if (SeekSlider.IsEnabled) SeekSlider.IsEnabled = false;
+                double maximum = Math.Max(1, pendingPlaybackResume?.Track.DurationSeconds ?? 1);
+                if (SeekSlider.Maximum != maximum) SeekSlider.Maximum = maximum;
+                double position = Math.Min(pendingPlaybackResume?.PositionSeconds ?? 0, maximum);
+                if (SeekSlider.Value != position) SeekSlider.Value = position;
+                UpdatePlaybackTimes(TimeSpan.FromSeconds(pendingPlaybackResume?.PositionSeconds ?? 0), TimeSpan.FromSeconds(pendingPlaybackResume?.Track.DurationSeconds ?? 0));
+                ApplyPendingResumePresentation();
+            }
             finally { updatingProgress = false; }
             return;
         }
@@ -425,11 +434,14 @@ public sealed partial class MainWindow
         updatingProgress = true;
         try
         {
-            SeekSlider.Maximum = Math.Max(1, duration);
-            SeekSlider.IsEnabled = mediaReady && duration > 0 && session.CanSeek;
+            double maximum = Math.Max(1, duration);
+            if (SeekSlider.Maximum != maximum) SeekSlider.Maximum = maximum;
+            bool canSeek = mediaReady && duration > 0 && session.CanSeek;
+            if (SeekSlider.IsEnabled != canSeek) SeekSlider.IsEnabled = canSeek;
             if (!draggingSeek && pendingSeek is null && submittedSeek is null)
             {
-                SeekSlider.Value = Math.Clamp(session.Position.TotalSeconds, 0, SeekSlider.Maximum);
+                double position = Math.Clamp(session.Position.TotalSeconds, 0, maximum);
+                if (SeekSlider.Value != position) SeekSlider.Value = position;
                 UpdatePlaybackTimes(session.Position, session.NaturalDuration);
             }
         }
@@ -437,8 +449,9 @@ public sealed partial class MainWindow
     }
     private void UpdatePlaybackTimes(TimeSpan position, TimeSpan duration)
     {
-        PlaybackTime.Text = $"{position:mm\\:ss}";
-        PlaybackDuration.Text = $"{duration:mm\\:ss}";
+        string time = $"{position:mm\\:ss}", totalTime = $"{duration:mm\\:ss}";
+        if (PlaybackTime.Text != time) PlaybackTime.Text = time;
+        if (PlaybackDuration.Text != totalTime) PlaybackDuration.Text = totalTime;
     }
     private void CancelWork() { playbackResumeOpening = false; ResetSeek(); work.Cancel(); work.Dispose(); work = new(); }
     private void ResetLibrary()

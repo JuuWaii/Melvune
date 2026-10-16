@@ -61,7 +61,9 @@ public sealed partial class MainWindow
             systemTray.Dispose(); systemTray = null;
         }
         globalHotkeys?.SetEnabled(integrationSettings.GlobalHotkeysEnabled);
-        ShellCloseToTray.IsEnabled = integrationSettings.TrayEnabled && systemTray?.IsAvailable == true;
+        // Keep an active preference switch editable during tray failure so users can select Exit.
+        ShellCloseToTray.IsEnabled = integrationSettings.CloseToTray
+            || (integrationSettings.TrayEnabled && systemTray?.IsAvailable == true);
         SyncDesktopShellState(); UpdateDesktopShellStatus();
     }
 
@@ -69,14 +71,14 @@ public sealed partial class MainWindow
     {
         if (closed || closingIntegration) return;
         if (!available && hiddenToTray) RestoreMainWindow();
-        ShellCloseToTray.IsEnabled = integrationSettings.TrayEnabled && available;
+        ShellCloseToTray.IsEnabled = integrationSettings.CloseToTray || (integrationSettings.TrayEnabled && available);
         UpdateDesktopShellStatus();
     }
 
     private void UpdateDesktopShellStatus()
     {
         string tray = !integrationSettings.TrayEnabled ? "系统托盘已关闭。"
-            : systemTray?.IsAvailable == true ? "系统托盘已开启。" : "系统托盘暂不可用，关闭窗口会退出应用。";
+            : systemTray?.IsAvailable == true ? "系统托盘已开启。" : "系统托盘暂不可用，收起到托盘的操作会保留窗口。";
         string hotkeys = !integrationSettings.GlobalHotkeysEnabled ? "全局快捷键已关闭。"
             : globalHotkeys?.Conflicts is { Count: > 0 } conflicts ? "快捷键被占用：" + string.Join("、", conflicts) + "；其余组合仍可使用。"
             : "全局快捷键已开启。";
@@ -87,14 +89,16 @@ public sealed partial class MainWindow
     {
         if (closed || updatingIntegration) return;
         integrationSettings = integrationSettings with { TrayEnabled = ShellTrayEnabled.IsOn,
-            CloseToTray = ShellCloseToTray.IsOn, GlobalHotkeysEnabled = ShellHotkeysEnabled.IsOn };
+            CloseToTray = ShellCloseToTray.IsOn, GlobalHotkeysEnabled = ShellHotkeysEnabled.IsOn,
+            CloseChoiceRemembered = ReferenceEquals(sender, ShellCloseToTray) || integrationSettings.CloseChoiceRemembered };
+        if (ReferenceEquals(sender, ShellCloseToTray)) closeChoiceMadeThisSession = true;
         SaveDesktopIntegration(); ApplyDesktopShellSettings();
     }
 
     private bool TryHideMainWindowToTray()
     {
         if (closed || closingIntegration || explicitDesktopExit || !integrationSettings.CloseToTray
-            || !integrationSettings.TrayEnabled || systemTray?.IsAvailable != true) return false;
+            || !integrationSettings.TrayEnabled || !MainWindowTrayAvailable) return false;
         AppWindow.Hide(); hiddenToTray = true;
         return true;
     }
@@ -144,6 +148,7 @@ public sealed partial class MainWindow
     {
         if (closed || closingIntegration) return;
         explicitDesktopExit = true; closingIntegration = true;
+        closeChoiceDialog?.Hide();
         CloseAudioOutputs();
         CloseDesktopShell();
         await integrationGate.WaitAsync();

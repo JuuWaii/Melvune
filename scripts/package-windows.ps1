@@ -8,7 +8,7 @@ $root = Split-Path $PSScriptRoot -Parent
 $payloadPath = if ([IO.Path]::IsPathRooted($Payload)) { [IO.Path]::GetFullPath($Payload) } else { [IO.Path]::GetFullPath((Join-Path $root $Payload)) }
 $release = Get-Content -LiteralPath (Join-Path $payloadPath 'release.json') -Raw | ConvertFrom-Json
 $version = [string]$release.version
-if ($version -notin @('0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5')) { throw 'Unsupported payload version.' }
+if ($version -notin @('0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6')) { throw 'Unsupported payload version.' }
 if (-not $PortableOnly -and $version -ne '0.2.0-rc.2') { throw 'The full installer is pinned to rc.2. Use -PortableOnly for this payload version.' }
 if ([string]::IsNullOrEmpty($Name)) { $Name = 'FnMusic-' + $version + '-win-x64-' + $(if ($PortableOnly) { 'portable-' } else { 'windows-' }) + (Get-Date -Format 'yyyyMMdd-HHmmss') }
 if ($Name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]+$') { throw 'Unsafe output name.' }

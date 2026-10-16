@@ -49,6 +49,7 @@ public sealed partial class MainWindow
         Set(NewNasPlaylist, MusicSourceCapabilities.ReadPlaylists | MusicSourceCapabilities.WritePlaylists);
         NasPlaylistNavigation.IsEnabled = RemoteSupports(MusicSourceCapabilities.ReadPlaylists);
         Set(RemoteSettingsNavigation, MusicSourceCapabilities.ReadSettings);
+        RenderUnifiedPlaylistNavigation();
         UpdateTopNavigation();
         UpdateFavoriteButton();
         activePlaylistPage?.SourceChanged?.Invoke();

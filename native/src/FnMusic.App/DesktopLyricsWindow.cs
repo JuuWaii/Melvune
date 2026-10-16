@@ -43,7 +43,15 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
     private PointInt32? dragStart, dragPosition;
     private bool updatingMenu;
     private DesktopLyricsOptions options;
-    private bool disposed, applyingOptions, visible;
+    private volatile bool disposed, visible;
+    private bool applyingOptions;
+    private int snapshotQueued;
+    private PlaybackSnapshot? renderedSnapshot;
+    private PlaybackLyricsSnapshot? renderedLyrics;
+    private bool renderedLocked;
+#if DEBUG
+    private int snapshotDispatches, snapshotRenders, textUpdates;
+#endif
     private Guid? plainGeneration;
     private PlaybackLyricsSnapshot? plainLyrics;
     private string plainText = "";
@@ -246,8 +254,9 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
     {
         if (disposed) return;
         RecoverPosition();
-        RenderSnapshot();
         visible = true;
+        // Hidden windows do no snapshot work; reopening always catches up before presentation.
+        RenderSnapshot();
         if (options.Locked) AppWindow.Show(false);
         else Activate();
         transparentBackdrop.SuppressNativeFrame();
@@ -344,12 +353,35 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
     private void CapturePosition() => options = options with
     { X = AppWindow.Position.X, Y = AppWindow.Position.Y, Width = AppWindow.Size.Width, Height = AppWindow.Size.Height };
 
-    private void SnapshotChanged(PlaybackSnapshot _) => DispatcherQueue.TryEnqueue(() =>
-    { if (!disposed) RenderSnapshot(); });
+    private void SnapshotChanged(PlaybackSnapshot _)
+    {
+        // Publications can arrive from a worker or in bursts. Keep one pending UI callback,
+        // which reads the newest snapshot rather than replaying every stale clock tick.
+        if (disposed || !visible || Interlocked.CompareExchange(ref snapshotQueued, 1, 0) != 0) return;
+        if (!DispatcherQueue.TryEnqueue(() =>
+        {
+            Interlocked.Exchange(ref snapshotQueued, 0);
+            if (!disposed && visible) RenderSnapshot();
+        }))
+        { Interlocked.Exchange(ref snapshotQueued, 0); return; }
+#if DEBUG
+        Interlocked.Increment(ref snapshotDispatches);
+#endif
+    }
 
     private void RenderSnapshot()
     {
+        if (disposed || !visible) return;
         var snapshot = hub.Current;
+        var lyrics = snapshot.LyricsKind == PlaybackLyricsKind.Plain ? hub.Lyrics : null;
+        if (renderedSnapshot is { } previous && previous.State == snapshot.State
+            && previous.Title == snapshot.Title && previous.LyricsKind == snapshot.LyricsKind
+            && previous.CurrentLine == snapshot.CurrentLine && previous.TrackGeneration == snapshot.TrackGeneration
+            && renderedLocked == options.Locked && ReferenceEquals(renderedLyrics, lyrics)) return;
+        renderedSnapshot = snapshot; renderedLyrics = lyrics; renderedLocked = options.Locked;
+#if DEBUG
+        snapshotRenders++;
+#endif
         lyricScroll.VerticalScrollMode = snapshot.LyricsKind == PlaybackLyricsKind.Plain && !options.Locked
             ? ScrollMode.Enabled : ScrollMode.Disabled;
         lyricScroll.VerticalScrollBarVisibility = snapshot.LyricsKind == PlaybackLyricsKind.Plain && !options.Locked
@@ -366,14 +398,24 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
         {
             lyricText.Text = lyricsText;
             foreach (var outline in lyricOutlines) outline.Text = lyricsText;
+#if DEBUG
+            textUpdates += 1 + lyricOutlines.Count;
+#endif
         }
         string state = snapshot.State switch
         { PlaybackStatus.Loading => "正在加载", PlaybackStatus.Playing => "播放中", PlaybackStatus.Paused => "已暂停",
             PlaybackStatus.Buffering => "缓冲中", _ => "已停止" };
         string kind = snapshot.LyricsKind == PlaybackLyricsKind.Plain ? " · 纯文本歌词（无时间轴）" : "";
-        statusText.Text = string.IsNullOrWhiteSpace(snapshot.Title) ? state : $"{snapshot.Title} · {state}{kind}";
-        if (options.Locked) statusText.Text += " · 已锁定并穿透鼠标，在设置中解锁";
-        foreach (var outline in statusOutlines) outline.Text = statusText.Text;
+        string status = string.IsNullOrWhiteSpace(snapshot.Title) ? state : $"{snapshot.Title} · {state}{kind}";
+        if (options.Locked) status += " · 已锁定并穿透鼠标，在设置中解锁";
+        if (statusText.Text != status)
+        {
+            statusText.Text = status;
+            foreach (var outline in statusOutlines) outline.Text = status;
+#if DEBUG
+            textUpdates += 1 + statusOutlines.Count;
+#endif
+        }
     }
 
     private string ReadPlainLyrics(PlaybackSnapshot snapshot)
@@ -423,6 +465,9 @@ public sealed class DesktopLyricsWindow : Window, IDisposable
     }
 
 #if DEBUG
+    internal int SnapshotDispatches => Volatile.Read(ref snapshotDispatches);
+    internal int SnapshotRenders => snapshotRenders;
+    internal int TextUpdates => textUpdates;
     internal string DisplayedLyrics => lyricText.Text;
     internal string DisplayedStatus => statusText.Text;
     internal bool HasTransparentSurface => transparentBackdrop.IsConfigured && root.Background is SolidColorBrush brush && brush.Color.A == 0;

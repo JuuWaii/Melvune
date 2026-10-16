@@ -218,7 +218,7 @@ public sealed partial class MainWindow
             var origin = scan.TransformToVisual(view.Layout).TransformPoint(new global::Windows.Foundation.Point());
             verify("local_library_heading_actions_fit_compact_window", add.IsLoaded && scan.IsLoaded && add.ActualWidth > 0 && scan.ActualWidth > 0
                 && origin.X + scan.ActualWidth <= view.Layout.ActualWidth + 1 && origin.Y >= 0 && origin.Y < 50
-                && view.TitleText.ActualWidth > 100 && view.CancelButton.Visibility == Visibility.Collapsed);
+                && view.TitleText.Text == "音乐管理" && view.TitleText.ActualWidth >= 4 * view.TitleText.FontSize - 1 && view.CancelButton.Visibility == Visibility.Collapsed);
         }
         finally { AppWindow.Resize(size); await Task.Delay(100); Root.UpdateLayout(); }
     }

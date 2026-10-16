@@ -25,6 +25,8 @@ public sealed partial class MainWindow
             stage = "smtc-api-regression";
             await SystemMediaBridgeVerification.RunAsync(DispatcherQueue, WinRT.Interop.WindowNative.GetWindowHandle(this)); Check("smtc_api_regression", true);
             await DesktopLyricsWindowVerification.RunAsync(Check);
+            await DesktopLyricsEfficiencyVerification.RunAsync(Check);
+            VerifyPlaybackTimeEfficiency(Check);
             await VerifyDialogThemeAsync(Check);
             music.Player.IsMuted = true;
             string fixture = Path.Combine(AppDataDirectory.Resolve(), "fixture"); Directory.CreateDirectory(fixture);

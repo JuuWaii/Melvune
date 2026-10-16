@@ -94,3 +94,7 @@ preview.3 随附 FFmpegInteropX 2.1.0 桥接库和 FFmpeg 8.1.2 动态库，来�
 说明（2026-09-13）：Electron 与 electron-builder 已退出活动依赖，以下相关条目作为历史归属保留。
 
 2026-10-01 后续源码构建修改 FFmpegInteropX 桥接库的纯音频 MP3 定位，增加解码预滚。修改文件为 Source/FFmpegReader.cpp，仍适用 Apache-2.0；原始版权及许可头保留。预览打包包含 `licenses/FFmpegInteropX-build/` 中的补丁、构建脚本和依赖锁，`native-decoder-build.json` 标识固定源码提交及实际 DLL 哈希。开发机微软编译工具仅用于构建，不随播放器分发；FFmpeg 库本身仍来自原锁定包。
+
+## 飞牛音乐来源标志
+
+`Assets/FnOsMusic.png` 取自飞牛音乐服务的公开静态资源，仅标识飞牛同步歌单；飞牛名称和标志属于各自权利人。该素材不按本项目开源许可再授权。本客户端为非官方项目，应用图标仍使用独立设计。
