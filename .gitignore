@@ -21,6 +21,11 @@ dev.config.json
 新建 文本文档.txt
 Project Introduction.txt
 
+# 本机反馈、未审查截图与已弃用的标志（正式图标使用 assets/branding）
+/bug/
+/img/
+/logo/
+
 # 调试/下载产物
 electron-tmp.zip
 probe-*.txt
