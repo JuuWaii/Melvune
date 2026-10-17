@@ -6,7 +6,7 @@
 
 使用 C#、WinUI 3 和 FFmpeg 构建的多来源Windows桌面音乐播放器。统一浏览与播放本地音乐、飞牛音乐、Navidrome、Emby、Subsonic兼容源及匿名HTTP/JSON音乐源，采用黑白界面并跟随Windows主题。
 
-**当前候选：0.2.0-rc.8，源码回归完成，本地封装中。** Windows 10 2004（19041）及以上，x64。当前进度以 [开发清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md) 为唯一入口，结果记录于 [rc.8验收](docs/RC8_ACCEPTANCE.md)。
+**当前候选：0.2.0-rc.8，已完成本地交付验证。** Windows 10 2004（19041）及以上，x64。当前进度以 [开发清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md) 为唯一入口，结果记录于 [rc.8验收](docs/RC8_ACCEPTANCE.md)。
 
 本轮将目录、namespace、工程、资源、构建与数据/协议身份整体统一为Melvune，不保留改名前版本的兼容回退。普通版使用 `%LOCALAPPDATA%/Melvune.Native`，便携版使用旁边 `Melvune-portable/Data`；新版需要重新添加音乐源和登录。旧个人数据和历史发布包保留原样。详见 [命名与数据说明](docs/MELVUNE_MIGRATION.md)。
 
@@ -14,7 +14,7 @@
 
 当前候选提供ZIP与便携EXE。ZIP解压并保持完整目录，运行 `Start-Melvune.cmd` 或 `Melvune.App.exe`；便携EXE放在可写目录双击，首次校验并解包后启动。随包提供运行时和解码依赖，无需另装.NET或FFmpeg。候选未签名，完整安装器和自动更新后续实施。
 
-本地rc.8文件和摘要待集中验收完成后列入清单。已公开的旧版本仍在 [历史Releases](https://github.com/JuuWaii/Melvune/releases)，其功能与配置身份不等同于当前源码。当前GitHub工作流仅构建并上传Actions产物，不自动创建Release。
+本地rc.8产物、摘要、源码提交和实际启动结果见 [交付回执](docs/RC8_DELIVERY.md)。本轮未上传GitHub。已公开的旧版本仍在 [历史Releases](https://github.com/JuuWaii/Melvune/releases)，其功能与配置身份不等同于当前源码。当前GitHub工作流仅构建并上传Actions产物，不自动创建Release。
 
 首次启动可直接在“音乐管理 → 音乐库”添加本地目录。连接服务时填写HTTP/HTTPS地址并登录；会话由当前Windows用户的DPAPI保护，不保存明文密码。双击歌曲播放，右键可收藏、安排下一曲或加入歌单；点击左下角封面进入应用内歌词。
 
