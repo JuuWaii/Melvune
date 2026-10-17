@@ -56,7 +56,7 @@ class ReleaseTests(unittest.TestCase):
         for name in RELEASE.CONTENT:
             (self.directory / name).write_text('synthetic release fixture ' + name, encoding='utf-8')
         self.metadata = dict(product='Melvune', version=RELEASE.VERSION, architecture='win-x64',
-                             packageKind='zip-and-portable', signed=False, sourceCommit=SOURCE,
+                             packageKind='windows-full', msiVersion='0.2.1009', wixVersion='4.0.6', signed=False, sourceCommit=SOURCE,
                              packagingSource=SOURCE, workflowRun=RUN,
                              artifacts=[RELEASE.record(self.directory / name) for name in sorted(RELEASE.CONTENT)])
         self.write_metadata()
@@ -82,7 +82,7 @@ class ReleaseTests(unittest.TestCase):
         self.assertFalse(self.github.release['draft'])
         self.assertTrue(self.github.release['prerelease'])
         self.assertEqual(self.github.release['make_latest'], 'false')
-        self.assertEqual(len(self.github.assets), 7)
+        self.assertEqual(len(self.github.assets), 11)
         self.assertEqual(self.github.mutations[-1][0], 'PATCH')
 
     def test_annotated_tag_resolves_to_same_commit(self):
@@ -175,8 +175,17 @@ class ReleaseTests(unittest.TestCase):
             fixture.create_package()
             destination = fixture.root / 'public-assets'
             root = pathlib.Path(RELEASE.__file__).resolve().parents[1]
-            RELEASE.stage(root, fixture.payload, fixture.packages, destination, SOURCE, RUN)
-            self.assertEqual(len(RELEASE.validate(destination, SOURCE, RUN)), 7)
+            installers = fixture.root / 'installers'; installers.mkdir()
+            for name in RELEASE.INSTALLERS:
+                (installers / name).write_bytes(b'synthetic installer fixture')
+            metadata = dict(product='Melvune', version=RELEASE.VERSION, architecture='win-x64', packageKind='installers',
+                            signed=False, msiVersion='0.2.1009', wixVersion='4.0.6', payloadSource=SOURCE, packagingSource=SOURCE,
+                            payloadZipSha256=RELEASE.digest(fixture.zip),
+                            artifacts=[f'Melvune-{RELEASE.VERSION}-win-x64-setup.exe', f'Melvune-{RELEASE.VERSION}-win-x64-setup.msi'])
+            (installers / 'release.json').write_text(json.dumps(metadata))
+            (installers / 'SHA256SUMS.txt').write_text('\n'.join(RELEASE.digest(p).upper()+'  '+p.name for p in installers.iterdir()))
+            RELEASE.stage(root, fixture.payload, fixture.packages, destination, SOURCE, RUN, installers)
+            self.assertEqual(len(RELEASE.validate(destination, SOURCE, RUN)), 11)
         finally:
             fixture.tearDown()
 

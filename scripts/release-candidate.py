@@ -13,12 +13,13 @@ import shutil
 import subprocess
 from urllib.parse import quote
 
-VERSION = '0.2.0-rc.8'
+VERSION = '0.2.0-rc.9'
 TAG = 'v' + VERSION
 REPOSITORY = 'JuuWaii/Melvune'
 ZIP = f'Melvune-{VERSION}-win-x64.zip'
 PORTABLE = f'Melvune-{VERSION}-win-x64-portable.exe'
-CONTENT = {ZIP, PORTABLE, 'USER_GUIDE.md', 'RELEASE_NOTES.md', 'AI_DISCLOSURE.md'}
+INSTALLERS = {f'Melvune-{VERSION}-win-x64-setup.exe', f'Melvune-{VERSION}-win-x64-setup.msi', 'WIX_NOTICE.md', 'WIX_LICENSE.txt'}
+CONTENT = {ZIP, PORTABLE, 'USER_GUIDE.md', 'RELEASE_NOTES.md', 'AI_DISCLOSURE.md'} | INSTALLERS
 ASSETS = CONTENT | {'release.json', 'SHA256SUMS.txt'}
 
 
@@ -45,7 +46,7 @@ def identity(source, run_url):
     require(bool(re.fullmatch(r'https://github\.com/JuuWaii/Melvune/actions/runs/[0-9]+', run_url)), 'Invalid workflow URL')
 
 
-def stage(root, payload, packages, output, source, run_url):
+def stage(root, payload, packages, output, source, run_url, installers):
     identity(source, run_url)
     require(not output.exists(), 'Release staging directory already exists')
     spec = importlib.util.spec_from_file_location('portable_verifier', root / 'scripts/verify-portable-package.py')
@@ -55,15 +56,29 @@ def stage(root, payload, packages, output, source, run_url):
     require(verified['sourceCommit'] == source, 'Verified payload differs from tag commit')
     archive = pathlib.Path(str(payload) + '.zip')
     require(archive.name == ZIP, 'Unexpected ZIP name')
+    installer_metadata = read_json(installers / 'release.json')
+    require(installer_metadata.get('product') == 'Melvune' and installer_metadata.get('version') == VERSION and
+            installer_metadata.get('architecture') == 'win-x64' and installer_metadata.get('packageKind') == 'installers' and
+            installer_metadata.get('signed') is False and installer_metadata.get('msiVersion') == '0.2.1009' and
+            installer_metadata.get('wixVersion') == '4.0.6', 'Installer identity mismatch')
+    require(installer_metadata.get('payloadSource') == source and installer_metadata.get('packagingSource') == source and
+            installer_metadata.get('payloadZipSha256', '').lower() == verified['payloadZipSha256'].lower(), 'Installer source differs from portable payload')
+    require(installer_metadata.get('artifacts') == [f'Melvune-{VERSION}-win-x64-setup.exe', f'Melvune-{VERSION}-win-x64-setup.msi'], 'Installer declarations missing EXE or MSI')
+    installer_names = INSTALLERS | {'release.json', 'SHA256SUMS.txt'}
+    require({p.name for p in installers.iterdir()} == installer_names, 'Unexpected installer file set')
+    expected_rows = {digest(installers / name).upper() + '  ' + name for name in installer_names - {'SHA256SUMS.txt'}}
+    rows = (installers / 'SHA256SUMS.txt').read_text(encoding='ascii').splitlines()
+    require(len(rows) == len(expected_rows) and set(rows) == expected_rows, 'Installer checksum mismatch')
     files = {ZIP: archive, PORTABLE: packages / PORTABLE,
              'USER_GUIDE.md': root / 'docs/USER_GUIDE.md',
              'RELEASE_NOTES.md': root / f'docs/releases/{VERSION}.md',
              'AI_DISCLOSURE.md': root / 'AI_DISCLOSURE.md'}
+    files.update({name: installers / name for name in INSTALLERS})
     output.mkdir(parents=True)
     for name, path in files.items():
         shutil.copyfile(path, output / name)
     metadata = dict(product='Melvune', version=VERSION, architecture='win-x64',
-                    packageKind='zip-and-portable', signed=False, sourceCommit=source,
+                    packageKind='windows-full', msiVersion='0.2.1009', wixVersion='4.0.6', signed=False, sourceCommit=source,
                     packagingSource=source, workflowRun=run_url,
                     artifacts=[record(output / name) for name in sorted(CONTENT)])
     (output / 'release.json').write_text(json.dumps(metadata, indent=2) + '\n', encoding='utf-8')
@@ -82,7 +97,8 @@ def validate(directory, source, run_url):
     metadata = read_json(directory / 'release.json')
     require(metadata.get('product') == 'Melvune' and metadata.get('version') == VERSION, 'Release identity mismatch')
     require(metadata.get('sourceCommit') == source and metadata.get('packagingSource') == source, 'Release source mismatch')
-    require(metadata.get('architecture') == 'win-x64' and metadata.get('packageKind') == 'zip-and-portable', 'Release kind mismatch')
+    require(metadata.get('architecture') == 'win-x64' and metadata.get('packageKind') == 'windows-full' and
+            metadata.get('msiVersion') == '0.2.1009' and metadata.get('wixVersion') == '4.0.6', 'Release kind mismatch')
     require(metadata.get('signed') is False and metadata.get('workflowRun') == run_url, 'Release build declaration mismatch')
     expected = [record(directory / name) for name in sorted(CONTENT)]
     require(metadata.get('artifacts') == expected, 'Release artifact digest mismatch')
@@ -187,10 +203,11 @@ def main():
     parser.add_argument('--run-url', required=True)
     parser.add_argument('--payload', type=pathlib.Path)
     parser.add_argument('--packages', type=pathlib.Path)
+    parser.add_argument('--installers', type=pathlib.Path)
     args = parser.parse_args()
     if args.command == 'stage':
-        require(args.payload is not None and args.packages is not None, 'Staging requires both payload and portable packages')
-        stage(pathlib.Path(__file__).resolve().parents[1], args.payload, args.packages, args.directory, args.source, args.run_url)
+        require(args.payload is not None and args.packages is not None and args.installers is not None, 'Staging requires payload, portable and installer packages')
+        stage(pathlib.Path(__file__).resolve().parents[1], args.payload, args.packages, args.directory, args.source, args.run_url, args.installers)
     elif args.command == 'verify':
         print(json.dumps(validate(args.directory, args.source, args.run_url), indent=2))
     else:

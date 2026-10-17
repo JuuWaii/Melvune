@@ -1,4 +1,4 @@
-﻿using Melvune.App.ViewModels;
+using Melvune.App.ViewModels;
 using Microsoft.UI.Xaml;
 
 namespace Melvune.App;
@@ -19,7 +19,7 @@ public sealed partial class MainWindow : Window
         ConfigureSongList(TrackList);
         QueueModeButton.Flyout.Opening += PlayerMenu_Opening;
         OutputDeviceButton.Flyout.Opening += PlayerOutput_Opening;
-        Title = "Melvune · 0.2.0-rc.8";
+        Title = "Melvune · 0.2.0-rc.9";
         AppWindow.Resize(new global::Windows.Graphics.SizeInt32(1360, 900));
         InitializePlaylistNavigationPreferences();
         InitializePlayback();

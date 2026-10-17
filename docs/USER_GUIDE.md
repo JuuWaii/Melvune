@@ -1,6 +1,6 @@
 # Melvune 使用指南
 
-Windows x64 候选版，支持 Windows 10 2004（19041）及以上系统。ZIP保持完整目录，运行 Start-Melvune.cmd 或 Melvune.App.exe；随包包含 .NET、Windows App SDK 与解码动态库，无需安装 FFmpeg。首次启动可直接导入本地音乐。当前版本未签名，提供 ZIP 与便携 EXE 预发布候选；完整安装器后续提供。下载与云端校验和见 GitHub Release，交付状态见当前开发清单。
+Windows x64 候选版，支持 Windows 10 2004（19041）及以上系统。ZIP保持完整目录，运行 Start-Melvune.cmd 或 Melvune.App.exe；随包包含 .NET、Windows App SDK 与解码动态库，无需安装 FFmpeg。首次启动可直接导入本地音乐。当前版本未签名，提供 ZIP 与便携 EXE 预发布候选；安装 EXE 和 MSI 均可选择当前用户的可写目录，选择其中一种安装即可；卸载保留配置。下载与云端校验和见 GitHub Release，交付状态见当前开发清单。
 
 便携EXE放在可写目录启动，创建 Melvune-portable，个人配置位于其中Data目录。移动时一起复制EXE与整个目录；换机器或Windows用户后需重新登录。ZIP使用 %LOCALAPPDATA%\Melvune.Native，和便携配置相互独立。本轮采用新的独立身份，不自动读取旧版目录、凭据或信息发现记录，旧数据不修改。
 
@@ -68,9 +68,9 @@ Windows x64 候选版，支持 Windows 10 2004（19041）及以上系统。ZIP�
 
 ## 已知限制和反馈
 
-MP3 远距离首次定位可能读取较多数据；准确模式保持启用。尚未承诺全部编码、DPI/触摸、任意硬件热插拔或长期压力组合。认证式自定义源、脚本转换、跨域 CDN、自定义快捷键、第三方远端写入、转码和自动更新后续添加。本轮的 ZIP 和便携 EXE 使用同一份应用内容，最终交付状态见当前清单，旧安装器不自动更新。
+MP3 远距离首次定位可能读取较多数据；准确模式保持启用。尚未承诺全部编码、DPI/触摸、任意硬件热插拔或长期压力组合。认证式自定义源、脚本转换、跨域 CDN、自定义快捷键、第三方远端写入、转码和自动更新后续添加。本轮 ZIP、便携 EXE、安装 EXE 和 MSI 使用同一份应用内容，最终交付状态见当前清单，旧安装器不自动更新。
 
-集中验证见 [rc.8 用户验证单](RC8_USER_VALIDATION.md)。反馈提供入口（ZIP/便携 EXE）、步骤、预期/实际、版本、格式和错误提示，隐去密码、令牌和私人路径。软件使用 FFmpeg（LGPL 2.1 或更高版本），完整对应源码见 `licenses/corresponding-source/decoder-corresponding-source.zip`；构建与替换方式见 `BUILDING_SOURCES.md`，其他许可见 `licenses/`。
+集中验证见 [rc.9 用户验证单](RC9_USER_VALIDATION.md)。反馈提供入口（ZIP/便携 EXE）、步骤、预期/实际、版本、格式和错误提示，隐去密码、令牌和私人路径。软件使用 FFmpeg（LGPL 2.1 或更高版本），完整对应源码见 `licenses/corresponding-source/decoder-corresponding-source.zip`；构建与替换方式见 `BUILDING_SOURCES.md`，其他许可见 `licenses/`。
 
 ## 桌面联动
 

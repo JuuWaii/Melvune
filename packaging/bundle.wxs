@@ -1,0 +1,13 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:bal="http://wixtoolset.org/schemas/v4/wxs/bal">
+  <Bundle Name="Melvune 0.2.0-rc.9" Manufacturer="Melvune contributors" Version="0.2.1009.0" UpgradeCode="C5117DE7-026D-4577-B99A-909744919BDF" IconSourceFile="$(var.BrandingDir)\melvune.ico">
+    <Variable Name="InstallFolder" Type="formatted" Value="[LocalAppDataFolder]Programs\Melvune" Persisted="yes" bal:Overridable="yes" />
+    <BootstrapperApplication>
+      <bal:WixStandardBootstrapperApplication Theme="hyperlinkLicense" LicenseUrl="https://github.com/JuuWaii/Melvune/blob/master/LICENSE" LogoFile="$(var.BrandingDir)\melvune.png" />
+    </BootstrapperApplication>
+    <Chain>
+      <MsiPackage SourceFile="$(var.MsiPath)" Compressed="yes" Visible="no" ForcePerMachine="no">
+        <MsiProperty Name="INSTALLFOLDER" Value="[InstallFolder]" />
+      </MsiPackage>
+    </Chain>
+  </Bundle>
+</Wix>

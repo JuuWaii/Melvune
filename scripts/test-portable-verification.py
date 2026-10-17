@@ -20,7 +20,7 @@ class PortableVerificationTests(unittest.TestCase):
         self.payload, self.packages = self.root / 'payload', self.root / 'packages'
         self.payload.mkdir()
         self.packages.mkdir()
-        self.version = '0.2.0-rc.8'
+        self.version = '0.2.0-rc.9'
         self.source = 'a' * 40
         (self.payload / 'Melvune.App.exe').write_bytes(b'MZ-fixture-app')
         (self.payload / 'release.json').write_text(json.dumps(dict(product='Melvune', version=self.version, sourceCommit=self.source, architecture='win-x64')))

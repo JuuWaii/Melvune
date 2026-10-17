@@ -104,7 +104,7 @@ internal static class Program
         using var document = JsonDocument.Parse(File.ReadAllBytes(metadata.FullName));
         var release = document.RootElement;
         if (release.GetProperty("product").GetString() != "Melvune" ||
-            release.GetProperty("version").GetString() != "0.2.0-rc.8")
+            release.GetProperty("version").GetString() != "0.2.0-rc.9")
             throw new IOException("Portable trailer does not match the payload product/version.");
         var commit = release.GetProperty("sourceCommit").GetString();
         if (commit is null || commit.Length != 40 || commit.Any(c => (c < '0' || c > '9') && (c < 'a' || c > 'f')) ||
@@ -114,7 +114,7 @@ internal static class Program
         if (!File.Exists(application) || Directory.EnumerateFiles(destination, "*.App.exe").Count() != 1)
             throw new IOException("Portable product executable is missing or mixed.");
         var executableVersion = FileVersionInfo.GetVersionInfo(application);
-        if (executableVersion.ProductName != "Melvune" || executableVersion.ProductVersion != "0.2.0-rc.8+" + commit)
+        if (executableVersion.ProductName != "Melvune" || executableVersion.ProductVersion != "0.2.0-rc.9+" + commit)
             throw new IOException("Portable application source differs from its release metadata.");
         return application;
     }

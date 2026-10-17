@@ -3,7 +3,7 @@
 <p align="center">把自己的音乐，放在一起听。</p>
 <p align="center">Windows 原生多来源音乐播放器 · WinUI 3 · 本地音乐与个人音乐服务器</p>
 <p align="center">
-  <a href="https://github.com/JuuWaii/Melvune/releases/tag/v0.2.0-rc.8">下载候选版</a> ·
+  <a href="https://github.com/JuuWaii/Melvune/releases/tag/v0.2.0-rc.9">下载候选版</a> ·
   <a href="docs/USER_GUIDE.md">使用指南</a> · <a href="docs/README.md">文档</a> ·
   <a href="https://github.com/JuuWaii/Melvune/issues">反馈问题</a>
 </p>
@@ -16,15 +16,17 @@ Melvune（合听）是一款面向 Windows 的开源音乐播放器。它把本�
 
 ## 快速下载
 
-**当前候选版本：0.2.0-rc.8，已发布。** 支持 Windows 10 2004（19041）及以上 **x64** 系统。
+**当前候选版本：0.2.0-rc.9。** 支持 Windows 10 2004（19041）及以上 **x64** 系统。
 
 | 下载 | 如何使用 |
 | --- | --- |
-| [便携 EXE](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.8/Melvune-0.2.0-rc.8-win-x64-portable.exe) | 放在可写目录运行；首次校验并解包到旁边的 `Melvune-portable`，配置保存在其 `Data` 目录 |
-| [完整 ZIP](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.8/Melvune-0.2.0-rc.8-win-x64.zip) | 完整解压，运行 `Start-Melvune.cmd` 或 `Melvune.App.exe` |
-| [Release 与校验和](https://github.com/JuuWaii/Melvune/releases/tag/v0.2.0-rc.8) | 查看更新说明、`SHA256SUMS.txt` 和构建来源 `release.json` |
+| [安装 EXE](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.9/Melvune-0.2.0-rc.9-win-x64-setup.exe) | 常规安装入口，Options / Browse 选择可写目录 |
+| [安装 MSI](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.9/Melvune-0.2.0-rc.9-win-x64-setup.msi) | 中文目录选择页，与安装 EXE 选择一种即可 |
+| [便携 EXE](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.9/Melvune-0.2.0-rc.9-win-x64-portable.exe) | 放在可写目录运行；首次校验并解包到旁边的 `Melvune-portable`，配置保存在其 `Data` 目录 |
+| [完整 ZIP](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.9/Melvune-0.2.0-rc.9-win-x64.zip) | 完整解压，运行 `Start-Melvune.cmd` 或 `Melvune.App.exe` |
+| [Release 与校验和](https://github.com/JuuWaii/Melvune/releases/tag/v0.2.0-rc.9) | 查看更新说明、`SHA256SUMS.txt` 和构建来源 `release.json` |
 
-运行时与解码依赖随包提供，无需另装 .NET 或 FFmpeg。此版本为**未签名的预发布候选版**，完整安装器、代码签名和自动更新尚未提供。请从本仓库 Release 下载，以该次云端构建附带的校验和为准。[云端发布回执](docs/RC8_PUBLICATION.md)记录构建来源与验证结果。
+运行时与解码依赖随包提供，无需另装 .NET 或 FFmpeg。此版本为**未签名的预发布候选版**，代码签名和自动更新尚未提供。请从本仓库 Release 下载，以该次云端构建附带的校验和为准。[发布流程](docs/RELEASING.md)说明构建来源与校验方式。
 
 > 改名前版本的配置不会自动迁入 Melvune。新版需要重新添加音乐源、登录和建立歌单；旧配置不会被覆盖。普通 ZIP 的配置在 `%LOCALAPPDATA%\Melvune.Native`，与便携版独立。详见 [配置与命名说明](docs/MELVUNE_MIGRATION.md)。
 
@@ -74,17 +76,18 @@ Navidrome、Emby 和 Subsonic 接入当前以**只读浏览和原始音频播放
 
 - [文档索引](docs/README.md)：使用、来源接入、桌面联动、构建和历史验收。
 - [开发清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)：当前发布进度的统一入口。
-- [rc.8 验收](docs/RC8_ACCEPTANCE.md) / [用户验证单](docs/RC8_USER_VALIDATION.md)：已验证范围和仍需真实环境验证的项目。
+- [rc.9 验收](docs/RC9_ACCEPTANCE.md) / [用户验证单](docs/RC9_USER_VALIDATION.md)：已验证范围和仍需真实环境验证的项目。
 - [贡献指南](CONTRIBUTING.md)：构建、检查与反馈约定。
 
 从源码构建需要 Windows x64、Git、Python 3.11+ 和 Node.js。脚本会在 `.tools` 中准备固定版本的 SDK 与解码工具链。
 
 ```powershell
 ./scripts/native.ps1 bootstrap
-./scripts/native.ps1 build
+./scripts/preview.ps1 -Run
 ./scripts/native.ps1 test
-./scripts/native.ps1 run
 ```
+
+开发时仅按需要生成可运行 Debug 预览，不生成发行 ZIP 或安装器；最终发布推送时由标签工作流统一打包。预览位于 `dist/previews`，每日清理保留最近3份及7天内产物，历史发行包不受影响。
 
 解决方案为 `native/Melvune.sln`。[封装说明](docs/WINDOWS_PACKAGING.md)介绍 ZIP 和便携 EXE；[发布流程](docs/RELEASING.md)说明 GitHub Actions 的构建、校验和发布步骤。
 
@@ -92,7 +95,7 @@ Navidrome、Emby 和 Subsonic 接入当前以**只读浏览和原始音频播放
 
 项目仍在持续开发。飞牛网页修改歌单后需刷新读取，不承诺实时推送或并发编辑事务；第三方服务版本、实体媒体键、全部 DPI/编码/设备热插拔及长期运行组合尚未全面验收。正常退出保存进度不等于崩溃或断电恢复。具体边界随版本记录，未实测项目不视为已通过。
 
-认证式自定义来源、第三方服务端写入、转码、完整安装器和自动更新留待后续版本。欢迎在 [Issues](https://github.com/JuuWaii/Melvune/issues) 提供版本、复现步骤、预期与实际结果；分享截图或日志前请隐去凭据、服务地址和私人路径。
+认证式自定义来源、第三方服务端写入、转码、自动更新留待后续版本。欢迎在 [Issues](https://github.com/JuuWaii/Melvune/issues) 提供版本、复现步骤、预期与实际结果；分享截图或日志前请隐去凭据、服务地址和私人路径。
 
 ## AI 生成与辅助开发声明
 

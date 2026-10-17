@@ -20,7 +20,7 @@ Melvune仓库含本项目MIT源码和NuGet锁文件。仓库执行 `scripts/nati
 
 ```powershell
 ./scripts/native.ps1 build
-./scripts/package-preview.ps1 -Version 0.2.0-rc.7 -Name Melvune-0.2.0-rc.7-win-x64
+./scripts/package-release.ps1 -Version 0.2.0-rc.9 -Name Melvune-0.2.0-rc.9-win-x64
 ```
 
 退出播放器后备份原 DLL，可用兼容 ABI 的自建 FFmpeg DLL/FFmpegInteropX.dll 替换包内同名文件。不要混合不同 FFmpeg ABI 主版本；本包使用 avcodec/avformat 62、avutil 60、swresample 6。替换后 SHA256.json 校验应报告差异，属于已修改包；不限制运行修改库。桥接 C# 投影/WinMD 来自锁定包，必须保持接口兼容。

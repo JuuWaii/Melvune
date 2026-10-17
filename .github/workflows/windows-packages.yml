@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
   push:
     tags:
-      - 'v0.2.0-rc.8'
+      - 'v0.2.0-rc.9'
 
 permissions:
   contents: read
@@ -29,7 +29,7 @@ jobs:
         shell: pwsh
         run: |
           $version = ([xml](Get-Content native/src/Melvune.App/Melvune.App.csproj -Raw)).Project.PropertyGroup.Version
-          if ($version -ne '0.2.0-rc.8') { throw 'Unexpected candidate version' }
+          if ($version -ne '0.2.0-rc.9') { throw 'Unexpected candidate version' }
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne ('v' + $version)) { throw 'Tag differs from app version' }
       - name: Privacy review
         shell: pwsh
@@ -56,34 +56,41 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Portable integrity checks failed' }
           python -m unittest discover -s tests -p test_release_publication.py
           if ($LASTEXITCODE -ne 0) { throw 'Release publication checks failed' }
-      - name: Build verified ZIP and portable EXE
+          python -m unittest discover -s tests -p test_preview_cleanup.py
+          if ($LASTEXITCODE -ne 0) { throw 'Preview cleanup checks failed' }
+          python -m unittest discover -s tests -p test_installer_authoring.py
+          if ($LASTEXITCODE -ne 0) { throw 'Installer authoring checks failed' }
+      - name: Build ZIP, portable EXE, setup EXE and MSI
         shell: pwsh
         run: |
-          ./scripts/package-preview.ps1 -Version 0.2.0-rc.8 -Name Melvune-0.2.0-rc.8-win-x64
-          ./scripts/package-windows.ps1 -Payload dist/Melvune-0.2.0-rc.8-win-x64 -Name Melvune-0.2.0-rc.8-win-x64-portable -PortableOnly
+          ./scripts/package-release.ps1 -Version 0.2.0-rc.9 -Name Melvune-0.2.0-rc.9-win-x64
+          ./scripts/package-windows.ps1 -Payload dist/Melvune-0.2.0-rc.9-win-x64 -Name Melvune-0.2.0-rc.9-win-x64-portable
       - name: Verify candidate contents
         shell: pwsh
         run: |
-          python scripts/verify-portable-package.py --packages dist/Melvune-0.2.0-rc.8-win-x64-portable --payload dist/Melvune-0.2.0-rc.8-win-x64 --report .review-audit/portable-verification.json
+          python scripts/verify-portable-package.py --packages dist/Melvune-0.2.0-rc.9-win-x64-portable --payload dist/Melvune-0.2.0-rc.9-win-x64 --report .review-audit/portable-verification.json
           if ($LASTEXITCODE -ne 0) { throw 'Portable verification failed' }
-          python scripts/verify-icon-resources.py --icon assets/branding/melvune.ico dist/Melvune-0.2.0-rc.8-win-x64/Melvune.App.exe dist/Melvune-0.2.0-rc.8-win-x64-portable/Melvune-0.2.0-rc.8-win-x64-portable.exe
+          python scripts/verify-icon-resources.py --icon assets/branding/melvune.ico dist/Melvune-0.2.0-rc.9-win-x64/Melvune.App.exe dist/Melvune-0.2.0-rc.9-win-x64-portable/Melvune-0.2.0-rc.9-win-x64-portable.exe dist/Melvune-0.2.0-rc.9-win-x64-portable-installers/Melvune-0.2.0-rc.9-win-x64-setup.exe
           if ($LASTEXITCODE -ne 0) { throw 'Application icon verification failed' }
+      - name: Exercise MSI and EXE install and uninstall
+        shell: pwsh
+        run: ./scripts/test-installer-smoke.ps1 -Packages dist/Melvune-0.2.0-rc.9-win-x64-portable-installers -Payload dist/Melvune-0.2.0-rc.9-win-x64
       - name: Stage verified release assets
         shell: pwsh
         run: |
-          python scripts/release-candidate.py stage --directory dist/release-assets --payload dist/Melvune-0.2.0-rc.8-win-x64 --packages dist/Melvune-0.2.0-rc.8-win-x64-portable --source $env:GITHUB_SHA --run-url "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          python scripts/release-candidate.py stage --directory dist/release-assets --payload dist/Melvune-0.2.0-rc.9-win-x64 --packages dist/Melvune-0.2.0-rc.9-win-x64-portable --installers dist/Melvune-0.2.0-rc.9-win-x64-portable-installers --source $env:GITHUB_SHA --run-url "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
           if ($LASTEXITCODE -ne 0) { throw 'Release staging failed' }
       - name: Upload verified release artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: Melvune-0.2.0-rc.8-win-x64
+          name: Melvune-0.2.0-rc.9-win-x64
           path: dist/release-assets/*
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
 
   publish:
-    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.0-rc.8'
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.0-rc.9'
     needs: package
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -96,7 +103,7 @@ jobs:
           persist-credentials: false
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          name: Melvune-0.2.0-rc.8-win-x64
+          name: Melvune-0.2.0-rc.9-win-x64
           path: dist/release-assets
       - name: Verify assets and publish prerelease
         env:

@@ -1,18 +1,16 @@
 param(
-    [string]$Payload = 'dist/Melvune-0.2.0-rc.8-win-x64',
+    [string]$Payload = 'dist/Melvune-0.2.0-rc.9-win-x64',
     [string]$Name,
     [switch]$PortableOnly
 )
 $ErrorActionPreference = 'Stop'
-# Fail before reading payloads, creating output or preparing installer tools.
-if (-not $PortableOnly) { throw 'Melvune currently supports -PortableOnly. Full installers are deferred and no installer toolchain will run.' }
 $root = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'build-environment.ps1')
 Initialize-MelvuneGitEnvironment $root
 $payloadPath = if ([IO.Path]::IsPathRooted($Payload)) { [IO.Path]::GetFullPath($Payload) } else { [IO.Path]::GetFullPath((Join-Path $root $Payload)) }
 $release = Get-Content -LiteralPath (Join-Path $payloadPath 'release.json') -Raw | ConvertFrom-Json
 $version = [string]$release.version
-if ($release.product -ne 'Melvune' -or $version -ne '0.2.0-rc.8') { throw 'This writer requires a Melvune 0.2.0-rc.8 payload. Retired products are not supported.' }
+if ($release.product -ne 'Melvune' -or $version -ne '0.2.0-rc.9') { throw 'This writer requires a Melvune 0.2.0-rc.9 payload. Retired products are not supported.' }
 if ($release.sourceCommit -notmatch '^[a-f0-9]{40}$') { throw 'Invalid payload source revision.' }
 if ([string]::IsNullOrEmpty($Name)) { $Name = 'Melvune-' + $version + '-win-x64-portable-' + (Get-Date -Format 'yyyyMMdd-HHmmss') }
 if ($Name -notmatch '^[A-Za-z0-9][A-Za-z0-9._-]+$') { throw 'Unsafe output name.' }
@@ -62,3 +60,6 @@ Get-ChildItem -LiteralPath $output -File | Sort-Object Name | ForEach-Object { (
 & python (Join-Path $PSScriptRoot 'verify-portable-package.py') --packages $output --payload $payloadPath --report (Join-Path $work 'portable-verification.json')
 if ($LASTEXITCODE -ne 0) { throw 'Portable package verification failed.' }
 Write-Output "Windows portable package: $output"
+if (-not $PortableOnly) {
+    & (Join-Path $PSScriptRoot 'package-installers.ps1') -Payload $payloadPath -Name ($Name + '-installers')
+}

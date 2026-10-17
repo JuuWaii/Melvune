@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.0-rc.8',
+    [string]$Version = '0.2.0-rc.9',
     [string]$Name = ('Melvune-' + $Version + '-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 )
 $ErrorActionPreference = 'Stop'
@@ -7,7 +7,7 @@ if ($Name -notmatch '^[a-zA-Z0-9._-]+$' -or $Name -in @('.', '..')) { throw 'Inv
 $repo = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'build-environment.ps1')
 Initialize-MelvuneGitEnvironment $repo
-if ($Version -ne '0.2.0-rc.8') { throw 'Unsupported release version' }
+if ($Version -ne '0.2.0-rc.9') { throw 'Unsupported release version' }
 $appProject = Join-Path $repo 'native/src/Melvune.App/Melvune.App.csproj'
 [xml]$appDefinition = Get-Content -LiteralPath $appProject -Raw
 $declaredVersions = @($appDefinition.Project.PropertyGroup.Version | Where-Object { $_ })

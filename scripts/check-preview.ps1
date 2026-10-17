@@ -1,9 +1,9 @@
 param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [string]$ExpectedVersion = '0.2.0-rc.8'
+    [string]$ExpectedVersion = '0.2.0-rc.9'
 )
 $ErrorActionPreference = 'Stop'
-if ($ExpectedVersion -ne '0.2.0-rc.8') { throw 'This verifier accepts the current Melvune rc.8 candidate only' }
+if ($ExpectedVersion -ne '0.2.0-rc.9') { throw 'This verifier accepts the current Melvune rc.9 candidate only' }
 $previewRoot = (Get-Item -LiteralPath $Path).FullName
 $previewPrefix = $previewRoot.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
 $manifestPath = Join-Path $previewRoot 'SHA256.json'
@@ -40,11 +40,11 @@ $requiredFiles = @('Melvune.App.exe', 'Melvune.App.dll', 'Melvune.App.pri', 'App
     'LICENSE', 'THIRD_PARTY_NOTICES.md', 'NATIVE_DECODER_DEPENDENCIES.md', 'native-decoder-build.json',
     'licenses/FFmpegInteropX-Apache-2.0.txt', 'licenses/FFmpegInteropX-build/mp3-preroll.patch',
     'licenses/FFmpegInteropX-build/toolchain-lock.json', 'licenses/FFmpegInteropX-build/build-native-decoder.py',
-    'USER_GUIDE.md', 'RC8_USER_VALIDATION.md', '0.2.0-rc.8.md', 'BUILDING_SOURCES.md', 'release.json',
+    'USER_GUIDE.md', 'RC9_USER_VALIDATION.md', '0.2.0-rc.9.md', 'BUILDING_SOURCES.md', 'release.json',
     'licenses/corresponding-source/decoder-corresponding-source.zip', 'licenses/corresponding-source/decoder-distribution.json',
     'licenses/corresponding-source/runtime-license-index.json', 'licenses/packages.lock.json',
     'DESKTOP_INTEGRATION.md', 'PLAYBACK_INFORMATION_PROTOCOL.md', 'examples/InfoClient/Melvune.InfoClient.exe', 'examples/InfoClient/README.md',
-    'NAVIDROME_ACCEPTANCE.md', 'PLAYBACK_RESUME_ACCEPTANCE.md', 'EMBY_ACCEPTANCE.md', 'SUBSONIC_ACCEPTANCE.md', 'RC8_ACCEPTANCE.md',
+    'NAVIDROME_ACCEPTANCE.md', 'PLAYBACK_RESUME_ACCEPTANCE.md', 'EMBY_ACCEPTANCE.md', 'SUBSONIC_ACCEPTANCE.md', 'RC9_ACCEPTANCE.md',
     'HTTP_JSON_SOURCES.md', 'QUEUE_SESSION.md')
 foreach ($required in $requiredFiles) {
     if (-not $known.Contains([IO.Path]::GetFullPath((Join-Path $previewRoot $required)))) { throw "Required file missing: $required" }

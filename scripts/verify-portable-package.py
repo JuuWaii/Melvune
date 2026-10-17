@@ -11,7 +11,7 @@ import zipfile
 
 MAGIC = b'MELVUNE-PAYLOAD-1'
 TRAILER_LENGTH = len(MAGIC) + 32 + 8
-VERSIONS = {'0.2.0-rc.8'}
+VERSIONS = {'0.2.0-rc.9'}
 MAX_FILES = 10001
 MAX_PAYLOAD = 8 * 1024 ** 3
 

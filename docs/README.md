@@ -2,6 +2,8 @@
 
 ## 使用与下载
 
+当前安装版补齐见 [rc.9更新说明](releases/0.2.0-rc.9.md)、[验收范围](RC9_ACCEPTANCE.md)与[用户验证单](RC9_USER_VALIDATION.md)。rc.8资料保留为历史交付快照。
+
 - [使用指南](USER_GUIDE.md)：连接来源、音乐库、歌单、歌词、队列和设置。
 - [rc.8 云端发布回执](RC8_PUBLICATION.md)。
 - [rc.8 更新说明](releases/0.2.0-rc.8.md)、[验收范围](RC8_ACCEPTANCE.md)、[用户验证单](RC8_USER_VALIDATION.md)。
