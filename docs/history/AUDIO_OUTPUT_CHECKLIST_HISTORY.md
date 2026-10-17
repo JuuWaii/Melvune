@@ -6,7 +6,7 @@
 
 - rc.1 发布、rc.2 桌面联动、UI 反馈修复和桌面常驻增强均已形成独立交付记录。
 - 导航/歌单/封面/应用内歌词、黑白主题、本地索引/后台扫描、当前飞牛设置已实现；托盘、歌词解锁、可选全局快捷键、睡眠定时已交付。
-- 当前推荐包为 [音频输出可靠性 Windows x64 ZIP](../dist/FnMusic-0.2.0-rc.2-win-x64-audio-output-20261012.zip)，源码 `fcf20f030825187e90122805fd456cef1318be24`，窗口集中回归 152/152，真实静音播放专项 8/8，最终包启动、设备菜单/刷新及退出通过。见 [验收记录](AUDIO_OUTPUT_ACCEPTANCE.md) 和 [SHA-256](../dist/FnMusic-0.2.0-rc.2-win-x64-audio-output-20261012.SHA256SUMS.txt)。桌面常驻及所有旧批次保留。
+- 当前推荐包为 [音频输出可靠性 Windows x64 ZIP](../../dist/FnMusic-0.2.0-rc.2-win-x64-audio-output-20261012.zip)，源码 `fcf20f030825187e90122805fd456cef1318be24`，窗口集中回归 152/152，真实静音播放专项 8/8，最终包启动、设备菜单/刷新及退出通过。见 [验收记录](../AUDIO_OUTPUT_ACCEPTANCE.md) 和 [SHA-256](../../dist/FnMusic-0.2.0-rc.2-win-x64-audio-output-20261012.SHA256SUMS.txt)。桌面常驻及所有旧批次保留。
 - bug/ 当前没有现存文件；已有受版本控制的删除及 img/、logo 变动属于用户现有修改，不恢复、不清理或提交。
 
 ## 本轮工作
@@ -30,4 +30,4 @@
 
 ## 当前进度
 
-T01–T06 已完成，本轮長任务已交付独立 ZIP。证据及硬件验收边界见 [本轮验收](AUDIO_OUTPUT_ACCEPTANCE.md)。下一阶段先处理本包实际反馈，设备拔插硬件验收留在 [用户验证单](RC2_USER_VALIDATION.md)；旧包及用户无关修改保持。
+T01–T06 已完成，本轮長任务已交付独立 ZIP。证据及硬件验收边界见 [本轮验收](../AUDIO_OUTPUT_ACCEPTANCE.md)。下一阶段先处理本包实际反馈，设备拔插硬件验收留在 [用户验证单](../RC2_USER_VALIDATION.md)；旧包及用户无关修改保持。

@@ -17,7 +17,7 @@
 
 通用 Subsonic 按专辑目录读取最多 10000 首，不保证未归专辑曲目或任意 REST 服务；第三方服务端写入、转码、任意 JSON 映射、完整队列持久化、自动更新、签名与本轮完整安装器后置。真实第三方服务器、硬件、全部 DPI/编码组合不冒充已验收。
 
-唯一推荐：[rc.3 完整 ZIP](../dist/FnMusic-0.2.0-rc.3-win-x64.zip)，解压保持完整目录并运行 Start-FnMusic.cmd。可选 [便携 EXE](../dist/FnMusic-0.2.0-rc.3-win-x64-portable/FnMusic-0.2.0-rc.3-win-x64-portable.exe)，移动时一起保留旁边 FnMusic-portable/Data；本轮没有新完整安装器。源与封装修订为 `3cf319bf9af81dbc701fcb2b3f61ad22959e2cf4`，598 项清单文件/599 个实际文件与 CRC、图标、运行后文件校验通过，详见 [本批验收](RC3_ACCEPTANCE.md)。
+唯一推荐：[rc.3 完整 ZIP](../../dist/FnMusic-0.2.0-rc.3-win-x64.zip)，解压保持完整目录并运行 Start-FnMusic.cmd。可选 [便携 EXE](../../dist/FnMusic-0.2.0-rc.3-win-x64-portable/FnMusic-0.2.0-rc.3-win-x64-portable.exe)，移动时一起保留旁边 FnMusic-portable/Data；本轮没有新完整安装器。源与封装修订为 `3cf319bf9af81dbc701fcb2b3f61ad22959e2cf4`，598 项清单文件/599 个实际文件与 CRC、图标、运行后文件校验通过，详见 [本批验收](../RC3_ACCEPTANCE.md)。
 
 ZIP SHA-256：`0E649418E8EB1072D291CE2B10E21BC63A08F96766A2B7531BCFED95A6EE2271`。便携 EXE SHA-256：`5221A4F0B3AEB39E7D74CAF67D11B246EE2ED513D706AEE6074A4B396F172B3D`。候选版未签名；没有推送、标签或远端上传。
 

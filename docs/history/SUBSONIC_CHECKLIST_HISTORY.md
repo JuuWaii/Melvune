@@ -10,7 +10,7 @@
 | S04 | 已通过（真实服务待验收） | 核心 120/120，窗口 310/310，Navidrome/Subsonic 八组和 Emby 十组协议/存储及续播专项通过 |
 | S05 | 已交付 | 独立 Windows x64 ZIP、来源修订、597 项文件哈希与 598 个 ZIP 文件 CRC、隐私扫描和使用/验收文档通过 |
 
-当前推荐：[Subsonic 兼容源 Windows x64 ZIP](../dist/FnMusic-0.2.0-rc.2-win-x64-subsonic-20261014.zip)。包含此前 Emby、Navidrome、续播和桌面功能。细节及边界见 [本批验收](SUBSONIC_ACCEPTANCE.md)。旧包及用户改动保留；本批本地交付，未上传发布。
+当前推荐：[Subsonic 兼容源 Windows x64 ZIP](../../dist/FnMusic-0.2.0-rc.2-win-x64-subsonic-20261014.zip)。包含此前 Emby、Navidrome、续播和桌面功能。细节及边界见 [本批验收](../SUBSONIC_ACCEPTANCE.md)。旧包及用户改动保留；本批本地交付，未上传发布。
 
 ZIP SHA-256：`8689AE91D740813F884DDB6AE0E6F0524044F2388B5E71FC2D502FEABCF31C04`。包和程序集来源修订：`a063c11e656a628df624aeb56f8b70101aca486f`。
 

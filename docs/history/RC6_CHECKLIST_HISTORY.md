@@ -14,6 +14,6 @@
 
 旧包、用户 bug/logo 删除和 img 文件保持。不推送、打标签、上传或发布远端。实际服务及更多硬件/DPI/听音验证标注边界，第三方写入、签名和完整安装器继续后置。
 
-集中验证已通过：核心120、队列15组、窗口927、Node24、发布材料9、便携损坏拒绝14，隐私阻断0。证据见 [rc.6 验收](RC6_ACCEPTANCE.md)。最终包602文件、实际音乐管理/关闭记忆/重启保持、便携续播与数据保护均已验收完成。
+集中验证已通过：核心120、队列15组、窗口927、Node24、发布材料9、便携损坏拒绝14，隐私阻断0。证据见 [rc.6 验收](../RC6_ACCEPTANCE.md)。最终包602文件、实际音乐管理/关闭记忆/重启保持、便携续播与数据保护均已验收完成。
 
-已交付 [rc.6 ZIP](../dist/FnMusic-0.2.0-rc.6-win-x64.zip) 和 [便携 EXE](../dist/FnMusic-0.2.0-rc.6-win-x64-portable/FnMusic-0.2.0-rc.6-win-x64-portable.exe)，二选一。源码修订 `f2092c30a2d16ef14b49c7ddd9ac5eee1484c495`；摘要和实际运行细节见 [rc.6 验收](RC6_ACCEPTANCE.md)。本阶段M01–M07全部完成，可交用户验证。FPS未做硬件实测，真实服务及听音验证边界不变。
+已交付 [rc.6 ZIP](../../dist/FnMusic-0.2.0-rc.6-win-x64.zip) 和 [便携 EXE](../../dist/FnMusic-0.2.0-rc.6-win-x64-portable/FnMusic-0.2.0-rc.6-win-x64-portable.exe)，二选一。源码修订 `f2092c30a2d16ef14b49c7ddd9ac5eee1484c495`；摘要和实际运行细节见 [rc.6 验收](../RC6_ACCEPTANCE.md)。本阶段M01–M07全部完成，可交用户验证。FPS未做硬件实测，真实服务及听音验证边界不变。

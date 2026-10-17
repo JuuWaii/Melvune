@@ -11,7 +11,7 @@
 | R05 | 已通过 | 存储专项、多个独立进程的保存/离线/恢复/停止/零位置窗口验证、既有桌面与 Navidrome 回归 |
 | R06 | 已交付 | 独立 x64 ZIP、哈希、进度说明和验证边界；保留用户改动及所有旧包 |
 
-当前推荐：[关闭后续播 ZIP](../dist/FnMusic-0.2.0-rc.2-win-x64-playback-resume-20261013.zip)。集中回归及边界见 [验收记录](PLAYBACK_RESUME_ACCEPTANCE.md)，包内 595 项哈希、596 个 ZIP 文件及 CRC 均通过。
+当前推荐：[关闭后续播 ZIP](../../dist/FnMusic-0.2.0-rc.2-win-x64-playback-resume-20261013.zip)。集中回归及边界见 [验收记录](../PLAYBACK_RESUME_ACCEPTANCE.md)，包内 595 项哈希、596 个 ZIP 文件及 CRC 均通过。
 
 ZIP SHA-256：`AFEED2DD9646E2A90FB6A35D028ABB7F9C280C575BF51C77789C6D9F1BF824D5`。来源提交：`fb4d50e6d0ce1db1997cd38c8367f6f10da9606b`。旧包与用户改动保留，本批未上传发布。
 

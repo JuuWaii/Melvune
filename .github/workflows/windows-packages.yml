@@ -1,4 +1,4 @@
-name: Windows candidate packages
+name: Windows candidate release
 
 on:
   workflow_dispatch:
@@ -8,6 +8,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: windows-candidate-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   package:
@@ -50,6 +54,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Node checks failed' }
           python scripts/test-portable-verification.py
           if ($LASTEXITCODE -ne 0) { throw 'Portable integrity checks failed' }
+          python -m unittest discover -s tests -p test_release_publication.py
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication checks failed' }
       - name: Build verified ZIP and portable EXE
         shell: pwsh
         run: |
@@ -62,14 +68,40 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Portable verification failed' }
           python scripts/verify-icon-resources.py --icon assets/branding/melvune.ico dist/Melvune-0.2.0-rc.8-win-x64/Melvune.App.exe dist/Melvune-0.2.0-rc.8-win-x64-portable/Melvune-0.2.0-rc.8-win-x64-portable.exe
           if ($LASTEXITCODE -ne 0) { throw 'Application icon verification failed' }
-      - name: Upload candidate build artifacts
+      - name: Stage verified release assets
+        shell: pwsh
+        run: |
+          python scripts/release-candidate.py stage --directory dist/release-assets --payload dist/Melvune-0.2.0-rc.8-win-x64 --packages dist/Melvune-0.2.0-rc.8-win-x64-portable --source $env:GITHUB_SHA --run-url "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          if ($LASTEXITCODE -ne 0) { throw 'Release staging failed' }
+      - name: Upload verified release artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: Melvune-0.2.0-rc.8-win-x64
-          path: |
-            dist/Melvune-0.2.0-rc.8-win-x64.zip
-            dist/Melvune-0.2.0-rc.8-win-x64.SHA256SUMS.txt
-            dist/Melvune-0.2.0-rc.8-win-x64-portable/*
+          path: dist/release-assets/*
           if-no-files-found: error
           compression-level: 0
           retention-days: 14
+
+  publish:
+    if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.0-rc.8'
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: Melvune-0.2.0-rc.8-win-x64
+          path: dist/release-assets
+      - name: Verify assets and publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          python3 scripts/release-candidate.py publish
+          --directory dist/release-assets --source "$GITHUB_SHA"
+          --run-url "https://github.com/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"

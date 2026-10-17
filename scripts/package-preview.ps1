@@ -35,6 +35,7 @@ foreach ($required in @('Melvune.App.exe', 'Melvune.App.pri', 'App.xbf', 'MainWi
     if (-not (Test-Path -LiteralPath (Join-Path $destination $required))) { throw "Missing preview file: $required" }
 }
 $candidateNumber = $Version.Split('.')[-1].Split('-')[-1]
+Copy-Item -LiteralPath (Join-Path $repo 'AI_DISCLOSURE.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'LICENSE'), (Join-Path $repo 'THIRD_PARTY_NOTICES.md'), (Join-Path $repo 'docs/USER_GUIDE.md'), (Join-Path $repo ('docs/RC' + $candidateNumber + '_USER_VALIDATION.md')), (Join-Path $repo ('docs/releases/' + $Version + '.md')), (Join-Path $repo 'docs/BUILDING_SOURCES.md'), (Join-Path $repo 'docs/PLAYBACK_INFORMATION_PROTOCOL.md'), (Join-Path $repo 'docs/DESKTOP_INTEGRATION.md') -Destination $destination
 $decoderLicenses = Join-Path $destination 'licenses'
 Copy-Item -LiteralPath (Join-Path $repo 'docs/NAVIDROME_ACCEPTANCE.md') -Destination $destination
