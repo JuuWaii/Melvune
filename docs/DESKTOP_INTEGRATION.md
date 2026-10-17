@@ -14,15 +14,15 @@
 
 「允许本机应用读取播放信息与歌词」默认关闭。此功能与 SMTC 独立：SMTC 负责 Windows 媒体面板及播放控制，此接口仅为第三方程序提供读取能力。在同一设置页开启后，同一 Windows 用户的程序可读取歌曲信息及歌词。接口不提供播放控制，不开放网络端口，不输出 NAS 地址、账户、认证信息、文件完整路径或来源内部 ID。第三方软件必须按 [协议](PLAYBACK_INFORMATION_PROTOCOL.md) 接入；开启接口不能使所有软件自动兼容。
 
-默认发现目录为 `%LOCALAPPDATA%/FnMusic.Native/playback-information/`；便携 EXE 为便携 Data 目录的同名子目录；指定 `--data-directory=<绝对目录>` 时随该目录。发现文件只含版本、随机实例 ID 和管道名。多个运行实例独立注册；关闭接口/正常退出只移除自身注册。强制结束进程可能保留旧记录，客户端应跳过不能连接的记录。
+默认发现目录为 `%LOCALAPPDATA%/Melvune.Native/playback-information/`；便携 EXE 为便携 Data 目录的同名子目录；指定 `--data-directory=<绝对目录>` 时随该目录。发现文件只含版本、随机实例 ID 和管道名。多个运行实例独立注册；关闭接口/正常退出只移除自身注册。强制结束进程可能保留旧记录，客户端应跳过不能连接的记录。
 
 独立 .NET 示例消费者随包位于 `examples/InfoClient/`。从终端运行：
 
 ```powershell
-./examples/InfoClient/FnMusic.InfoClient.exe list
-./examples/InfoClient/FnMusic.InfoClient.exe snapshot
-./examples/InfoClient/FnMusic.InfoClient.exe lyrics --offset 0 --limit 32
-./examples/InfoClient/FnMusic.InfoClient.exe subscribe --count 5
+./examples/InfoClient/Melvune.InfoClient.exe list
+./examples/InfoClient/Melvune.InfoClient.exe snapshot
+./examples/InfoClient/Melvune.InfoClient.exe lyrics --offset 0 --limit 32
+./examples/InfoClient/Melvune.InfoClient.exe subscribe --count 5
 ```
 
 消费者输出真实跨进程读取结果；歌词通过有界分页读取，订阅有背压和写超时。配置、发现和用户音频不属于公开发行材料。封面只用有界本机字节提供给 Windows，不传认证 URL。

@@ -27,7 +27,7 @@ MP3 每轮响应约为文件的92.7%，OGG约43.0%。较大的读取量仍存在
 
 ## 证据与边界
 
-复现：`FnMusic.SeekProbe.exe --verify-range-stress`，或从仓库根目录用既有 `dotnet run --project native/tests/FnMusic.SeekProbe/FnMusic.SeekProbe.csproj --no-restore -- --verify-range-stress`。需要现有 FFmpeg 编码器、至少1 GiB空闲空间和Windows媒体环境，不使用账号、用户歌曲或实际网络。
+复现：`FnMusic.SeekProbe.exe --verify-range-stress`，或从仓库根目录用既有 `dotnet run --project native/tests/Melvune.SeekProbe/FnMusic.SeekProbe.csproj --no-restore -- --verify-range-stress`。需要现有 FFmpeg 编码器、至少1 GiB空闲空间和Windows媒体环境，不使用账号、用户歌曲或实际网络。
 
 报告 `.review-audit/range-stress-probe/range-stress-verification.json`，时间 `2026-10-08T12:52:40.2108035+00:00`，stage=complete、error为空、cleanup=true，367条件全部true。自建进程结束、随机测试目录已不存在。实际解码器SHA-256为 `3DBE6C7083A78C8129BD994C5499385098645235A5E0B23B5F0E6E7C1585B803`，与当前固定交付相同。独立探针Debug/Release构建零警告零错误、隐私回归8/8通过；这是测试工程变化，没有修改生产App或覆盖preview.13。
 

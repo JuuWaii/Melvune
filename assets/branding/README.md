@@ -1,7 +1,7 @@
-# FnMusic 应用图标
+# Melvune 应用图标
 
 2026-10-10：用户从 A 青绿音符、B 紫色唱片、C 黑白飞牛音符中选择 C。
-使用内置 imagegen 生成，透明 PNG 原图保存在 fnmusic.png；fnmusic.ico 仅做
+使用内置 imagegen 生成，透明 PNG 原图保存在 melvune.png；melvune.ico 仅做
 Windows 格式转换，包含 16/24/32/48/64/128/256 像素版本。
 
 用于主应用/便携启动器 EXE、窗口/任务栏、标题栏品牌、安装器和开始菜单
@@ -10,7 +10,7 @@ Windows 格式转换，包含 16/24/32/48/64/128/256 像素版本。
 生成提示词：
 
 Use case: logo-brand. Create ONE production-ready Windows desktop app icon for
-FnMusic, an unofficial NAS and local music player with a clean monochrome WinUI
+Melvune, an unofficial NAS and local music player with a clean monochrome WinUI
 interface. Variant C: a charcoal-black rounded square tile, with a bold ivory-white
 original abstract symbol combining two upward swept bull horns, a musical note,
 and a gentle wing-like sweep. Extremely simple geometric silhouette, elegant and

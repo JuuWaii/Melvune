@@ -1,6 +1,6 @@
 # Melvune WinUI 3 原生客户端
 
-阶段 4 的原生预览工程。已实现登录、加密会话恢复、分页曲库、FFmpeg 播放及队列管理；NAS OAuth 和 FN Connect 仍待适配。旧 Electron 已归档，见 ../docs/ELECTRON_ARCHIVE.md。
+当前为Melvune rc.8原生工程，最新进展以../docs/NEXT_DEVELOPMENT_CHECKLIST.md为准；本文下半部保留早期阶段记录。已实现登录、加密会话恢复、分页曲库、FFmpeg 播放及队列管理；NAS OAuth 和 FN Connect 仍待适配。旧 Electron 已归档，见 ../docs/ELECTRON_ARCHIVE.md。
 
 ## 构建与运行
 
@@ -9,29 +9,29 @@
 从仓库根目录运行：
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/native.ps1 bootstrap
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/native.ps1 build
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/native.ps1 test
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/native.ps1 run
+./scripts/native.ps1 bootstrap
+./scripts/native.ps1 build
+./scripts/native.ps1 test
+./scripts/native.ps1 run
 ```
 
 bootstrap 从微软下载已固定版本 SDK，校验 SHA-512 后解压至 `.tools/`；不修改系统 PATH。已具备匹配 SDK 时可以跳过 bootstrap。依赖还原只使用 native/NuGet.Config 中的官方源。修改依赖时需主动更新锁文件，常规构建使用 locked-mode。
 
-当前 App/SeekProbe 使用固定源码的 MP3 预滚补丁库。首次 build 还需要 Python 3.11+ 和 Git，自动下载经哈希校验的微软 C++ 构建工具到 `.tools/native-decoder`；后续复用缓存，不安装系统开发工具。直接调用 dotnet build 前先还原依赖并运行 `python scripts/build-native-decoder.py`，见 [预滚构建与验证](../docs/NATIVE_MP3_PREROLL.md)。
+当前 App/SeekProbe 使用固定源码的 MP3 预滚补丁库。首次 build 还需要 Python 3.11+ 和 Git，自动下载经哈希校验的微软 C++ 构建工具；NAS工作副本使用本机临时工具链缓存，最终解码器输出写回 `.tools/native-decoder/build`；后续复用缓存，不安装系统开发工具。直接调用 dotnet build 前先还原依赖并运行 `python scripts/build-native-decoder.py`，见 [预滚构建与验证](../docs/NATIVE_MP3_PREROLL.md)。
 
-当前生成路径：`src/FnMusic.App/bin/Melvune/Release/net10.0-windows10.0.26100.0/win-x64/Melvune.App.exe`。Melvune使用独立输出目录，不覆盖旧FnMusic构建缓存。运行需保留同目录依赖文件，不可只复制exe。它不是最终安装包。
+当前生成路径：`src/Melvune.App/bin/Release/net10.0-windows10.0.26100.0/win-x64/Melvune.App.exe`。Melvune使用独立输出目录，中间输出隔离旧构建缓存。运行需保留同目录依赖文件，不可只复制exe。它不是最终安装包。
 
 ## 项目边界
 
-- FnMusic.App：原生窗口、中文资源、ConnectionViewModel，异步操作期间禁用重复提交。
-- FnMusic.Core：连接身份、业务错误、会话存储接口。
-- FnMusic.Infrastructure：NAS HTTP 接口、响应校验、普通连接设置。
-- FnMusic.Windows：按当前 Windows 用户和连接身份保护的 DPAPI 会话存储。
-- FnMusic.Tests：无真实凭据的可执行 C# 验证集，覆盖 HTTP/凭据边界和真实 DPAPI 行为。
+- Melvune.App：原生窗口、中文资源、ConnectionViewModel，异步操作期间禁用重复提交。
+- Melvune.Core：连接身份、业务错误、会话存储接口。
+- Melvune.Infrastructure：NAS HTTP 接口、响应校验、普通连接设置。
+- Melvune.Windows：按当前 Windows 用户和连接身份保护的 DPAPI 会话存储。
+- Melvune.Tests：无真实凭据的可执行 C# 验证集，覆盖 HTTP/凭据边界和真实 DPAPI 行为。
 
 HTTP 自动重定向关闭。服务器错误不直接显示原始 body 或异常消息。原始密码仅用于当次登录，不写配置或日志；SHA-256 摘要同样不持久保存。令牌仅在用户选择记住登录时经 DPAPI 加密保存，不提供明文降级。
 
-本机配置位于 `%LOCALAPPDATA%/FnMusic.Native/`，与 Electron 配置分离。服务器地址属于本机普通设置，不会被写入仓库。Cookie 文件、浏览器调试资料或 HAR 都不应纳入打包。
+本机配置位于 `%LOCALAPPDATA%/Melvune.Native/`，与 Electron 配置分离。服务器地址属于本机普通设置，不会被写入仓库。Cookie 文件、浏览器调试资料或 HAR 都不应纳入打包。
 
 ## 验证范围
 

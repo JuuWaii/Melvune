@@ -1,5 +1,7 @@
 <Project>
   <PropertyGroup>
+    <BaseIntermediateOutputPath>obj/Melvune/</BaseIntermediateOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);**/obj/**;**/bin/**</DefaultItemExcludes>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>latest</LangVersion>

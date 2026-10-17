@@ -1,8 +1,8 @@
 # 0.2.0-rc.1 对应源码、构建与替换
 
-本包使用 FFmpeg，许可为 LGPL 2.1 或更高版本；它不适用 FNMusic 的 MIT 许可证。允许为修改这些库而调试、逆向工程和替换动态库，FNMusic 不附加限制这些权利的 EULA。保留原始版权和许可证。随软件一起分发本文件、第三方声明、licenses 目录及对应源码归档；公开下载页应指明 FFmpeg 许可和随包源码位置。无需向开发者索取源码或接受额外条款。
+本包使用 FFmpeg，许可为 LGPL 2.1 或更高版本；它不适用 Melvune 的 MIT 许可证。允许为修改这些库而调试、逆向工程和替换动态库，Melvune 不附加限制这些权利的 EULA。保留原始版权和许可证。随软件一起分发本文件、第三方声明、licenses 目录及对应源码归档；公开下载页应指明 FFmpeg 许可和随包源码位置。无需向开发者索取源码或接受额外条款。
 
-`licenses/corresponding-source/decoder-corresponding-source.zip` 包含 FFmpegInteropX 上游完整固定源码、所有本构建启用的 FFmpeg 依赖、构建辅助脚本、本项目 MP3 补丁及工具链锁。来源和归档哈希见同目录 `decoder-distribution.json`；FFmpeg 的实际版本、configure 参数、许可和每个 DLL 哈希也在该文件。归档内 FFmpeg 根目录 `FNMUSIC-BINARY-CONFIG.txt` 保留实际 DLL 导出的参数。本项目未修改 FFmpeg；只修改桥接库 `Source/FFmpegReader.cpp` 的 MP3 定位预滚。
+`licenses/corresponding-source/decoder-corresponding-source.zip` 包含 FFmpegInteropX 上游完整固定源码、所有本构建启用的 FFmpeg 依赖、构建辅助脚本、本项目 MP3 补丁及工具链锁。来源和归档哈希见同目录 `decoder-distribution.json`；FFmpeg 的实际版本、configure 参数、许可和每个 DLL 哈希也在该文件。归档内 FFmpeg 根目录 `MELVUNE-BINARY-CONFIG.txt` 保留实际 DLL 导出的参数。本项目未修改 FFmpeg；只修改桥接库 `Source/FFmpegReader.cpp` 的 MP3 定位预滚。
 
 ## 构建 FFmpeg 和静态依赖
 
@@ -16,7 +16,7 @@ FFmpeg 源码提交 `38b88335f99e76ed89ff3c93f877fdefce736c13`，上游桥接提
 
 ## 构建修改过的桥接与 Melvune
 
-Melvune（原FnMusic）仓库含本项目MIT源码和NuGet锁文件。仓库执行 `scripts/native.ps1 bootstrap`、还原 `native/Melvune.sln` 后，`scripts/build-native-decoder.py` 自动获取锁定MSVC/SDK/C++WinRT依赖，校验哈希，检出固定桥接提交并应用 `native/decoder/mp3-preroll.patch`。可离线使用归档中的FFmpegInteropX源码初始化 `.tools/native-decoder/source` 并建立固定提交的Git检出；常规在线脚本直接从固定提交获取。脚本记录源码、补丁、编译材料和实际DLL哈希至native-decoder-build.json。源码构建方式详见仓库docs/NATIVE_MP3_PREROLL.md。源码内部的FnMusic命名为兼容标识，历史许可证和对应源码材料不因品牌更名重写。
+Melvune仓库含本项目MIT源码和NuGet锁文件。仓库执行 `scripts/native.ps1 bootstrap`、还原 `native/Melvune.sln` 后，`scripts/build-native-decoder.py` 自动获取锁定MSVC/SDK/C++WinRT依赖，校验哈希，检出固定桥接提交并应用 `native/decoder/mp3-preroll.patch`。可离线使用归档中的FFmpegInteropX源码初始化 `.tools/native-decoder/source` 并建立固定提交的Git检出；常规在线脚本直接从固定提交获取。脚本记录源码、补丁、编译材料和实际DLL哈希至native-decoder-build.json。源码构建方式详见仓库docs/NATIVE_MP3_PREROLL.md。当前源码、工程、构建属性和资源全部使用Melvune命名；历史发布材料保留在Git历史和原始交付包中。
 
 ```powershell
 ./scripts/native.ps1 build

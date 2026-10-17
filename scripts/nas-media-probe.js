@@ -137,5 +137,5 @@ if (typeof module !== 'undefined' && module.exports) {
   void runNasMediaProbe({
     href: location.href, fetch: (...args) => fetch(...args),
     createAudio: () => new Audio(), isPageVisible: () => document.visibilityState === 'visible'
-  }).then(report => console.info('FN_MUSIC_SAFE_MEDIA_PROBE ' + JSON.stringify(report)));
+  }).then(report => console.info('MELVUNE_SAFE_MEDIA_PROBE ' + JSON.stringify(report)));
 }

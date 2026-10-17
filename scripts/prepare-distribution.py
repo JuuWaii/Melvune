@@ -72,7 +72,7 @@ def prepare(destination):
                     output.writestr('FFmpegInteropX/Libs/' + item['name'] + '/' + '/'.join(relative.parts[1:]), archive.extractfile(entry).read())
         for relative in ['native/decoder/mp3-preroll.patch', 'native/decoder/toolchain-lock.json',
                          'native/decoder/distribution-lock.json', 'scripts/build-native-decoder.py']:
-            output.write(REPO / relative, 'fnmusic/' + relative)
+            output.write(REPO / relative, 'melvune/' + relative)
     ffmpeg = REPO / '.tools/nuget/ffmpeginteropx.desktop.ffmpeg/8.1.2/runtimes/win-x64/native'
     with os.add_dll_directory(str(ffmpeg)):
         lib = ctypes.CDLL(str(ffmpeg / 'avutil-60.dll'))
@@ -85,14 +85,14 @@ def prepare(destination):
         raise ValueError('Unexpected FFmpeg binary configuration')
     facts['binarySha256'] = {p.name: digest(p) for p in ffmpeg.glob('*.dll')}
     with zipfile.ZipFile(archive_path, 'a', zipfile.ZIP_DEFLATED) as output:
-        output.writestr('FFmpegInteropX/Libs/ffmpeg/FNMUSIC-BINARY-CONFIG.txt',
+        output.writestr('FFmpegInteropX/Libs/ffmpeg/MELVUNE-BINARY-CONFIG.txt',
                         json.dumps(facts, indent=2) + '\nUnmodified FFmpeg from locked FFmpegInteropX.Desktop.FFmpeg 8.1.2.\n')
         output.write(REPO / 'docs/BUILDING_SOURCES.md', 'BUILDING_SOURCES.md')
     facts['sourceArchiveSha256'] = digest(archive_path)
     facts['sources'] = lock
     (destination / 'decoder-distribution.json').write_text(json.dumps(facts, indent=2) + '\n', encoding='utf-8')
     # Preserve package-specific terms, including runtime packs omitted from compile dependencies.
-    assets = json.loads((REPO / 'native/src/FnMusic.App/obj/project.assets.json').read_text('utf-8'))
+    assets = json.loads((REPO / 'native/src/Melvune.App/obj/Melvune/project.assets.json').read_text('utf-8'))
     packages = REPO / '.tools/nuget'
     resolved = {name.lower() for name, value in assets['libraries'].items() if value['type'] == 'package'}
     for family in ['microsoft.netcore.app.runtime.win-x64', 'microsoft.windowsdesktop.app.runtime.win-x64']:

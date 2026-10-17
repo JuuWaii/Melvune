@@ -28,11 +28,16 @@ FORBIDDEN = re.compile(r'(^|/)(dev\.config\.json|settings\.json|session[^/]*\.(j
 REVIEWED_FIXTURES = {
     # Historical privacy checker itself names this exact reviewed synthetic value.
     ('scripts/check-privacy.js', 'assigned-credential', '00309c34e2ce97d5'),
-    ('native/src/FnMusic.App/MainWindow.NavidromeVerification.cs', 'assigned-credential', '00309c34e2ce97d5'),
     ('tests/nas-browser-probe.test.cjs', 'assigned-credential', 'c2a1e943e897abe2'),
     ('scripts/test-headless.js', 'assigned-credential', '31773c851b2d9f01'),
     ('scripts/test-headless.js', 'personal-connect-domain', '24619caa7ecbe974'),
 }
+def reviewed_fixture(path, category, fingerprint):
+    if (path, category, fingerprint) in REVIEWED_FIXTURES:
+        return True
+    return (path.startswith('native/src/') and path.endswith('/MainWindow.NavidromeVerification.cs')
+            and category == 'assigned-credential' and fingerprint == '00309c34e2ce97d5')
+
 def git(*args):
     return subprocess.check_output([*GIT, *args], cwd=ROOT)
 def scan(content, location, scope, findings):
@@ -85,7 +90,7 @@ def main():
     blockers = []
     for finding in findings:
         file = finding['location'].split(':', 1)[-1] if finding['scope'] == 'git-history' else finding['location']
-        reviewed = (file, finding['category'], finding.get('fingerprint')) in REVIEWED_FIXTURES
+        reviewed = reviewed_fixture(file, finding['category'], finding.get('fingerprint'))
         finding['reviewedSyntheticFixture'] = reviewed
         # Email addresses include upstream copyright contacts and Git metadata;
         # these remain visible as redacted review candidates, not secret gates.

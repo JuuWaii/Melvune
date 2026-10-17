@@ -6,7 +6,7 @@
 
 旧代码在真实回环 TCP 服务器声明 PNG 完整长度、只发送一个字节后，超过 18 秒看门狗仍未结束；记录 `.review-audit/cover-lifetime-before.log`。测试自行取消并清理连接，没有访问 NAS。修复后验证正文 15 秒超时并关闭连接、8 秒响应头延迟仍计入总期限、调用者取消保留替换会话、重复关闭客户端立即结束正文，以及正文意外截断转为连接失败。服务器核对调用次数及合成会话头，显式重试取回完整 PNG 字节，不把字节读取检查描述为新增图片显示验收。
 
-聚焦命令：`dotnet run --project native/tests/FnMusic.Tests/FnMusic.Tests.csproj -c Debug -- --verify-cover-requests`。五项封面 TCP 检查也纳入完整核心回归，和 JSON 四项使用同一服务器夹具；JSON 的原有期限与关闭检查继续保留。完整检查需要首个参数指定独立数据目录，`--ffmpeg` 增加六项生成音频检查。
+聚焦命令：`dotnet run --project native/tests/Melvune.Tests/FnMusic.Tests.csproj -c Debug -- --verify-cover-requests`。五项封面 TCP 检查也纳入完整核心回归，和 JSON 四项使用同一服务器夹具；JSON 的原有期限与关闭检查继续保留。完整检查需要首个参数指定独立数据目录，`--ffmpeg` 增加六项生成音频检查。
 
 封面原生窗口专项报告 `.review-audit/cover-lifetime-app/artwork-window-verification.json`，时间 `2026-10-05T17:07:52.9024484+08:00`，21/21、stage=complete、error 为空；核对生产解码、像素尺寸、缓存、大封面与关闭取消。没有因本次接口修复重跑已通过的 574 项整套导航布局检查，其证据仍属于顶部导航阶段。完整核心、构建及当前运行目录见 NATIVE_BACKLOG.md。
 

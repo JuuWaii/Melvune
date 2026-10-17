@@ -1,8 +1,8 @@
-# Melvune 使用指南（兼容原FnMusic）
+# Melvune 使用指南
 
-Windows x64 候选版，支持 Windows 10 2004（19041）及以上的 x64 系统。集中验证与交付结果以当前清单为准，完整安装器与远端发布后置；最终产物与校验值见仓库 `docs/NEXT_DEVELOPMENT_CHECKLIST.md`。ZIP版保持完整目录，新构建双击 `Start-Melvune.cmd` 或 `Melvune.App.exe`，历史FnMusic包使用其原有入口。随包包含 .NET、Windows App SDK 与解码动态库，无需安装 FFmpeg。首次启动无账号也可使用本地音乐。候选版未签名，不提供自动更新；品牌更名继续使用旧配置和来源身份，详见MELVUNE_MIGRATION.md。
+Windows x64 候选版，支持 Windows 10 2004（19041）及以上系统。ZIP保持完整目录，运行 Start-Melvune.cmd 或 Melvune.App.exe；随包包含 .NET、Windows App SDK 与解码动态库，无需安装 FFmpeg。首次启动可直接导入本地音乐。当前版本未签名，完整安装器和正式Release后续提供；交付状态见 docs/NEXT_DEVELOPMENT_CHECKLIST.md。
 
-便携EXE放在可写目录启动，新品牌默认创建 `Melvune-portable`，同级只有旧 `FnMusic-portable` 时继续使用旧目录。配置位于选中目录的 `Data` 子目录；移动时一起复制EXE与该目录，换机器或Windows用户后需重新登录。更新前退出旧客户端并备份Data；程序不会自动合并两份Data或清理旧应用解包目录。ZIP默认仍使用 `%LOCALAPPDATA%\FnMusic.Native`，与便携数据相互独立。
+便携EXE放在可写目录启动，创建 Melvune-portable，个人配置位于其中Data目录。移动时一起复制EXE与整个目录；换机器或Windows用户后需重新登录。ZIP使用 %LOCALAPPDATA%\Melvune.Native，和便携配置相互独立。本轮采用新的独立身份，不自动读取旧版目录、凭据或信息发现记录，旧数据不修改。
 
 历史 EXE/MSI 安装包仍保留，但不包含本轮新增自定义来源功能，不应将安装器版本视作本轮版本。历史安装器按当前用户安装，自选目录保存供维修/卸载恢复，卸载保留个人配置。
 
@@ -60,9 +60,9 @@ Windows x64 候选版，支持 Windows 10 2004（19041）及以上的 x64 系统
 
 ## 配置、升级与错误恢复
 
-默认配置在 `%LOCALAPPDATA%/FnMusic.Native/`，与原生预览共用。关闭旧客户端后备份整个配置目录，再解压新版本到新目录启动；不要覆盖旧包或同时运行两版写入同一配置。本地歌单保存为第 2 版，preview.5 及更早客户端不能读取，回退应同时恢复备份。会话不能复制给其他 Windows 用户使用。
+默认配置在 `%LOCALAPPDATA%/Melvune.Native/`，与改名前版本的配置分离。关闭旧客户端后备份整个配置目录，再解压新版本到新目录启动；不要覆盖旧包或同时运行两版写入同一配置。本地歌单保存为第 2 版，preview.5 及更早客户端不能读取，回退应同时恢复备份。会话不能复制给其他 Windows 用户使用。
 
-需要独立配置时可运行 `FnMusic.App.exe "--data-directory=D:\FNMusicProfile"`，参数必须为绝对目录；连接、索引、歌单、主题与会话均使用该目录。它不会把已有配置自动迁入新目录。
+需要独立配置时可运行 `Melvune.App.exe "--data-directory=D:\MelvuneProfile"`，参数必须为绝对目录；连接、索引、歌单、主题与会话均使用该目录。它不会把已有配置自动迁入新目录。
 
 网络失败保留本地来源和已保存数据；检查网络后刷新或重新连接。登录失效需要重新登录。写入超时先刷新核对服务器，不立即重复提交。损坏设置显示失败提示；恢复备份或重新配置，不在程序运行时编辑文件。
 
@@ -88,4 +88,4 @@ MP3 远距离首次定位可能读取较多数据；准确模式保持启用。�
 
 首次关闭窗口可选择收起到托盘、退出或取消；默认勾选记住选择，未勾选则下次启动重新询问。可在设置更改关闭行为，托盘退出始终结束应用。
 
-SMTC 为 Windows 媒体面板与媒体按键提供播放控制；「允许本机应用读取播放信息与歌词」为适配 FNMusic 协议的应用只读提供元数据和歌词，默认关闭，与 SMTC 独立。
+SMTC 为 Windows 媒体面板与媒体按键提供播放控制；「允许本机应用读取播放信息与歌词」为适配 Melvune 协议的应用只读提供元数据和歌词，默认关闭，与 SMTC 独立。

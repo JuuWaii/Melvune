@@ -1,18 +1,18 @@
-# FNMusic 本机播放信息协议 v1
+# Melvune 本机播放信息协议 v1
 
 rc.2 提供可选、默认关闭的只读音乐/歌词信息接口。使用设置入口启用后，本机当前用户的第三方软件可按本协议接入；第三方软件需要实现消费者，不表示任意软件自动兼容。本接口没有播放控制或账号配置读取命令。
 
 ## 发现与权限
 
-应用数据目录由 `AppDataDirectory.Resolve()` 决定，默认 `%LOCALAPPDATA%\FnMusic.Native`；应用启动参数 `--data-directory=<绝对目录>` 指定隔离目录时发现记录也位于该目录。接口不会扫描其他应用的配置。
+应用数据目录由 `AppDataDirectory.Resolve()` 决定，默认 `%LOCALAPPDATA%\Melvune.Native`；应用启动参数 `--data-directory=<绝对目录>` 指定隔离目录时发现记录也位于该目录。接口不会扫描其他应用的配置。
 
 每个启用实例在 `playback-information/<随机实例GUID无连字符>.json` 原子写入一条记录。该文件严格只有三个字段：
 
 ```json
-{"protocolVersion":1,"instanceId":"随机实例GUID","pipeName":"fnmusic-info-v1-随机GUID无连字符"}
+{"protocolVersion":1,"instanceId":"随机实例GUID","pipeName":"melvune-info-v1-随机GUID无连字符"}
 ```
 
-管道为 `\\.\pipe\<pipeName>`，仅连接本机 `.`。服务器使用 `PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly`，独立消费者也使用 `CurrentUserOnly` 校验服务器；服务器另在当前用户 ACL 上明确拒绝 Network SID 的全部访问，阻止相同账号经网络登录读取。Windows 对当前用户和提升权限级别同时校验，因此常规消费者应与 FNMusic 处于相同权限级别。见 [Microsoft PipeOptions 文档](https://learn.microsoft.com/en-us/dotnet/api/system.io.pipes.pipeoptions?view=net-10.0) 和 [管道 ACL API](https://learn.microsoft.com/en-us/dotnet/api/system.io.pipes.pipesaclextensions.setaccesscontrol?view=net-10.0)。
+管道为 `\\.\pipe\<pipeName>`，仅连接本机 `.`。服务器使用 `PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly`，独立消费者也使用 `CurrentUserOnly` 校验服务器；服务器另在当前用户 ACL 上明确拒绝 Network SID 的全部访问，阻止相同账号经网络登录读取。Windows 对当前用户和提升权限级别同时校验，因此常规消费者应与 Melvune 处于相同权限级别。见 [Microsoft PipeOptions 文档](https://learn.microsoft.com/en-us/dotnet/api/system.io.pipes.pipeoptions?view=net-10.0) 和 [管道 ACL API](https://learn.microsoft.com/en-us/dotnet/api/system.io.pipes.pipesaclextensions.setaccesscontrol?view=net-10.0)。
 
 启用时使用新的随机管道名；正常禁用或退出只删除本次激活仍拥有的记录，其他实例保留。强制结束、掉电可能留下发现文件：消费者必须以成功连接为准，跳过过期记录，不删除其他实例记录。示例最多检查 128 条记录，每条不超过 4096 字节。
 
@@ -84,12 +84,12 @@ rc.2 提供可选、默认关闭的只读音乐/歌词信息接口。使用设�
 
 ## 独立消费者和集中回归
 
-可直接构建/运行 [FnMusic.InfoClient 示例](../native/examples/FnMusic.InfoClient/README.md)，它没有 Core 或播放器引用，通过跨进程管道获取真实数据。分发目录附带已构建的消费者时可直接运行 `FnMusic.InfoClient.exe list|snapshot|lyrics|subscribe`；隔离数据目录用 `--data-directory <目录>`，多实例用 `--instance <GUID>`。
+可直接构建/运行 [Melvune.InfoClient 示例](../native/examples/Melvune.InfoClient/README.md)，它没有 Core 或播放器引用，通过跨进程管道获取真实数据。分发目录附带已构建的消费者时可直接运行 `Melvune.InfoClient.exe list|snapshot|lyrics|subscribe`；隔离数据目录用 `--data-directory <目录>`，多实例用 `--instance <GUID>`。
 
-专用集中回归项目 `native/tests/FnMusic.Information.Tests` 包含独立消费者进程读取/订阅、错误/只读边界、非 ASCII 大歌词分页、纯文本/空歌词、代次隔离、异常/慢客户端、4 客户端上限、禁用/重启/多实例发现清理。它是独立测试项目，不修改现有测试入口，也不以同进程 hub 读取代替消费者验证。执行方式：
+专用集中回归项目 `native/tests/Melvune.Information.Tests` 包含独立消费者进程读取/订阅、错误/只读边界、非 ASCII 大歌词分页、纯文本/空歌词、代次隔离、异常/慢客户端、4 客户端上限、禁用/重启/多实例发现清理。它是独立测试项目，不修改现有测试入口，也不以同进程 hub 读取代替消费者验证。执行方式：
 
 ```powershell
-dotnet run --project native/tests/FnMusic.Information.Tests -c Release
+dotnet run --project native/tests/Melvune.Information.Tests -c Release
 ```
 
 源码测试通过和最终候选包实际接口验收应分别记录。本协议只承诺当前用户边界；没有将另一个 Windows 账号的实际连接测试、其他厂商消费者兼容性或强制退出发现清理写作通过。

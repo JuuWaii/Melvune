@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "dependencies": {
+    "net10.0-windows7.0": {
+      "melvune.core": {
+        "type": "Project"
+      },
+      "melvune.infrastructure": {
+        "type": "Project",
+        "dependencies": {
+          "Melvune.Core": "[1.0.0, )"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Melvune.InfoClient</AssemblyName>
+    <RootNamespace>Melvune.InfoClient</RootNamespace>
+    <Product>Melvune</Product>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../src/Melvune.Core/ProductIdentity.cs" Link="ProductIdentity.cs" />
+  </ItemGroup>
+</Project>

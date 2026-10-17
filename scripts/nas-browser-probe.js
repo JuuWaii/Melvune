@@ -120,5 +120,5 @@ if (typeof module !== 'undefined' && module.exports) {
     resourceUrls: performance.getEntriesByType('resource').map(entry => entry.name),
     loadApi: url => import(url),
     fetch: (...args) => fetch(...args)
-  }).then(report => console.info('FN_MUSIC_SAFE_PROBE ' + JSON.stringify(report)));
+  }).then(report => console.info('MELVUNE_SAFE_PROBE ' + JSON.stringify(report)));
 }

@@ -93,7 +93,7 @@ test('preview decoder metadata exemptions reject the same digits in endpoints or
   const version = [2, 1, 0, 1].join('.');
   const fixtures = {
     'docs/PREVIEW7_ACCEPTANCE.md': 'MP3 预滚 DLL 版本 `' + version + '`',
-    'scripts/check-preview.ps1': "$decoder.version -ne '" + version + "-fnmusic-mp3-preroll'"
+    'scripts/check-preview.ps1': "$expectedDecoderVersion = '" + version + "-melvune-mp3-preroll'"
   };
   for (const [name, metadata] of Object.entries(fixtures)) {
     assert.equal(scan({ [name]: metadata }).status, 0);

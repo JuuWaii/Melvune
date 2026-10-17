@@ -6,7 +6,7 @@
 
 固定 FFmpegInteropX 的源代码提交为 `841fc8e79346a235906f1dbd45be53034b2e2f52`，与 Desktop.Lib 2.1.0 的 NuGet 元数据一致。`native/decoder/mp3-preroll.patch` 只修改纯音频 MP3 的定位：解码位置提前 500 毫秒，最早为曲首；缓冲定位也查找这段更早的输入，不足时回到正常定位。交给 MediaStreamSource 的实际起始位置保持用户请求的时间，使解码器恢复状态而不改变曲目时间线。其他格式及视频定位沿用原行为。正式配置继续不启用 `fflags=+fastseek`。
 
-`scripts/build-native-decoder.py` 从固定提交应用补丁，使用 `native/decoder/toolchain-lock.json` 固定微软 MSVC 14.44、Windows SDK 26100、C++/WinRT 和原项目的 Windows App SDK 1.4 构建依赖。所有下载校验 SHA-256，只解压到 `.tools/native-decoder`，不运行 Visual Studio 安装器、不修改系统 PATH。构建要求 Python 3.11+、Git 和已还原的项目 NuGet 包。C# 投影、WinMD 及 FFmpeg 8.1.2 动态库保持原锁定版本；桥接 DLL 文件版本为 `2.1.0.1`。
+`scripts/build-native-decoder.py` 从固定提交应用补丁，使用 `native/decoder/toolchain-lock.json` 固定微软 MSVC 14.44、Windows SDK 26100、C++/WinRT 和原项目的 Windows App SDK 1.4 构建依赖。所有下载校验 SHA-256，普通工作副本解压到 `.tools/native-decoder`；NAS工作副本使用本机临时工具链缓存并将最终输出写回NAS，不运行 Visual Studio 安装器、不修改系统 PATH。构建要求 Python 3.11+、Git 和已还原的项目 NuGet 包。C# 投影、WinMD 及 FFmpeg 8.1.2 动态库保持原锁定版本；桥接 DLL 文件版本为 `2.1.0.1`。
 
 常规 `scripts/native.ps1 build` 和 `scripts/package-preview.ps1` 会在缺失或输入变化时构建补丁库，缓存有效时直接复用。直接调用 dotnet build 前，先还原并运行：
 

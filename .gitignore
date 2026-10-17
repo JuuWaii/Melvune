@@ -44,3 +44,6 @@ scripts/tmp-*
 
 # 本机旧版归档（不发布）
 .legacy-archive/
+
+# NAS AppleDouble metadata
+._*

@@ -12,8 +12,8 @@ https://github.com/wixtoolset/wix/tree/73c897383236ddbbbc6ba257634013c1269ceec2
 The pinned bootstrapper extension is WixToolset.Bal.wixext 4.0.6.
 The MSI directory-selection interface uses WixToolset.UI.wixext 4.0.6.
 
-The FnMusic portable launcher is MIT-licensed; its source is in
-packaging/portable in the FnMusic repository. Its self-contained .NET runtime
-uses the Microsoft runtime notices already provided inside the FnMusic payload.
+The Melvune portable launcher is MIT-licensed; its source is in
+packaging/portable in the Melvune repository. Its self-contained .NET runtime
+uses the Microsoft runtime notices already provided inside the Melvune payload.
 Application/FFmpeg licenses and complete corresponding decoder source are
 installed alongside the application and included inside the portable EXE.

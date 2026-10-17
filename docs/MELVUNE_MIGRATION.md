@@ -1,26 +1,30 @@
-# Melvune 本地迁移与名称兼容
+# Melvune 整体命名与独立配置
 
-2026-10-16起项目正式名称为 **Melvune**，中文名 **合听**。主工作副本迁入NAS中已经建立的Melvune目录；旧本机目录作为回退副本保留，不再在两处同时开发。具体私有路径、复制日志和摘要记录保存在本机及NAS的忽略目录中，不发布到GitHub。
+2026-10-17按用户最新决定，当前项目采用完整的新身份，不继续保留旧版运行时兼容。之前仅修改显示名称、保留旧namespace和配置的迁移方案已由本阶段替代；历史验收记录描述的是当时的版本。
 
-迁移保留Git完整历史、分支、标签、未提交删除和img资料，以及SDK、依赖、rc.7与rc.6回退包、关键验收报告和旧版源码归档。按用户追加要求，不继续搬运约103GB的重复验证构建与旧调试缓存；原本机副本仍保留完整历史资料。原有FnMusic发布包内容和SHA-256不因改名重写。当前已交付版本仍以历史包文件名为准，新品牌源码的构建不等同于新版本已远端发布。
+## 当前名称
 
-## 新名称范围
+- 解决方案native/Melvune.sln；源码工程、C# namespace、XAML x:Class、程序集与资源均使用Melvune。
+- 应用Melvune.App.exe，独立消费者Melvune.InfoClient.exe，便携启动器Melvune.Portable。
+- 新ZIP启动入口Start-Melvune.cmd，当前候选0.2.0-rc.8。
+- 应用与托盘、桌面歌词使用Melvune；飞牛音乐作为音乐服务名称继续保留，provider标识使用fnos-music。
 
-- 文档首页、窗口标题、标题栏文字、桌面歌词标题、关闭对话框和托盘使用Melvune。
-- Visual Studio入口改为 `native/Melvune.sln`，新应用入口为 `Melvune.App.exe`，便携启动器和新包使用Melvune前缀，新包启动脚本为 `Start-Melvune.cmd`。
-- Emby/Navidrome请求中的用户可见客户端名改为Melvune；设备标识和音乐来源身份不随改名改变。
-- GitHub远端改名独立执行，参见 [方案](GITHUB_RENAME_PLAN.md)。
+## 独立数据与协议
 
-## 保留的兼容标识
+普通ZIP默认使用 %LOCALAPPDATA%/Melvune.Native；显式--data-directory绝对路径优先。便携版只使用旁边Melvune-portable/Data。不会自动搜索、合并、复制或改写旧版个人配置，因此新版需要重新配置音乐来源和登录。不要把旧配置手动覆盖到新目录；来源账号与凭据摘要域也已统一为melvune。
 
-`FnMusic.*`源码目录、C#命名空间、既有图标资源路径、`%LOCALAPPDATA%/FnMusic.Native`配置目录、音乐源ID计算、凭据保护键、只读信息协议和便携尾部格式保持兼容。这些内部名称不再代表应用显示名称。保留它们可避免出现新配置空白、登录失效、跨库歌单引用丢失和第三方发现协议断裂。
+信息接口发现记录位于当前配置的playback-information子目录，管道名称melvune-info-v1-加随机GUID。独立消费者按相同新身份发现，不承诺与改名前消费者互通。SMTC继续使用Windows系统接口。
 
-新便携程序默认使用 `Melvune-portable/Data`；同级已有 `FnMusic-portable` 且没有新目录时继续使用旧目录，不自动覆盖或移动已有Data。若两种目录都存在，使用新的Melvune目录，旧目录保留。旧ZIP和EXE保留原样，包校验器仍可验证历史FnMusic包。
+便携格式为MELVUNE-PAYLOAD-1，新启动器与校验器仅接受新产品、格式、版本和完整摘要/来源绑定；不提供旧EXE或旧Data目录回退。
 
-飞牛音乐作为来源类型和同步歌单的名称继续保留。现有图标暂沿用原项目素材，独立品牌图标设计属于后续工作。
+历史发布包、Git历史、旧本机回退副本和用户原有个人数据保留原样，不因源码改名重写。旧完整安装器和一次性发布工具停止作为当前入口；后续安装升级及发布器单独实施。
 
-## NAS开发
+## 开发与构建
 
-可通过映射的Windows盘符打开NAS工作副本，运行 `./scripts/native.ps1 build` 或 `test`。Git所有权提示使用仅作用于该次命令的 `git -c safe.directory=<当前仓库绝对路径>`，不要配置通配符信任。不要同时在UNC路径和映射盘符路径启动两个构建，避免共享obj/bin冲突。
+NAS为唯一开发主副本，旧本机副本只用于回退。断线时停止写入，不在两处同步覆盖。shell明确指定NAS工作目录；Git所有权信任仅限当前仓库和该进程。
 
-NAS是源码和历史资料的主存放位置；`native.ps1 test`默认将一万文件等合成测试夹具放在本机临时目录，避免将SMB文件创建延迟误认为代码执行耗时，可用 `-TestDataDirectory` 显式指定其他测试目录。源码和编译输出仍在NAS。若网络延迟影响构建，可以将可重建的SDK/NuGet/编译缓存放到本机，但不能再将旧目录作为另一份开发主副本。NAS断线时停止写入，恢复后核对Git状态，不自动覆盖回迁。
+scripts/native.ps1支持bootstrap、build、test和run；新的中间输出为obj/Melvune，避免旧生成XAML或程序集残留混入当前构建。合成规模夹具默认放在本机临时目录，源码与构建输出保留NAS。
+
+构建脚本及MP3补丁的品牌属性同步更新后，原生解码桥接库会按固定工具链重新编译，生成新的实际provenance；不会只给旧二进制换标签。
+
+NAS路径下解码器工具链默认使用本机临时目录Melvune-build-cache，减少SMB小文件往返；已锁定下载仍逐项校验，构建完成后将DLL、manifest与MSBuild属性写回NAS。可通过绝对路径环境变量MELVUNE_DECODER_CACHE指定其他可重建缓存位置。该目录不存用户音乐或凭据。

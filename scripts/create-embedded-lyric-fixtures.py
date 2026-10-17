@@ -22,7 +22,7 @@ for extension, codec, key in specs:
         output = args.output / name
         metadata = args.output / "input.ffmetadata"
         escaped = text.replace("\\", "\\\\").replace("=", "\\=").replace(";", "\\;").replace("#", "\\#").replace("\n", "\\\n")
-        metadata.write_text(f";FFMETADATA1\ntitle={kind}-{extension}\nartist=FNMusic fixture\n{key}={escaped}\n", encoding="utf-8", newline="\n")
+        metadata.write_text(f";FFMETADATA1\ntitle={kind}-{extension}\nartist=Melvune fixture\n{key}={escaped}\n", encoding="utf-8", newline="\n")
         command = [str(args.ffmpeg), "-hide_banner", "-loglevel", "error", "-nostdin", "-y",
                    "-f", "lavfi", "-i", "sine=frequency=440:duration=30", "-i", str(metadata),
                    "-map", "0:a", "-map_metadata", "1", "-c:a", codec]

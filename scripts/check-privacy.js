@@ -125,10 +125,10 @@ function reviewedDecoderVersion(file, match, content) {
   }
   if (file === 'scripts/build-native-decoder.py') {
     return (prefix.endsWith('LIB_VERSION_STR="') && suffix.startsWith('"')) ||
-      (prefix.endsWith("'version': '") && suffix.startsWith("-fnmusic-mp3-preroll'"));
+      (prefix.endsWith("'version': '") && suffix.startsWith("-melvune-mp3-preroll'"));
   }
   if (file === 'scripts/check-preview.ps1') {
-    return prefix.endsWith("$decoder.version -ne '") && suffix.startsWith("-fnmusic-mp3-preroll'");
+    return prefix.endsWith("$expectedDecoderVersion = '") && suffix.startsWith("-melvune-mp3-preroll'");
   }
   return false;
 }
@@ -152,7 +152,7 @@ function checkFile(file) {
       .map(match => match[0]);
     if (!matches.length) continue;
     // Exact dummy password used only with the in-process .invalid Navidrome fixture.
-    if (file === 'native/src/FnMusic.App/MainWindow.NavidromeVerification.cs' && name === '凭据（token/secret/password/key）') {
+    if (file === 'native/src/Melvune.App/MainWindow.NavidromeVerification.cs' && name === '凭据（token/secret/password/key）') {
       for (let i = matches.length - 1; i >= 0; i--) {
         if (/^Password\x20=\x20"fixture-only"$/.test(matches[i])) matches.splice(i, 1);
       }
@@ -189,7 +189,7 @@ function checkFile(file) {
   }
 }
 
-console.log('=== FN Music PC 隐私合规检查 ===');
+console.log('=== Melvune 隐私合规检查 ===');
 const files = [...new Set([...(trackedFilesFromIndex() || []), ...fallbackFiles()])]
   .filter(file => fs.existsSync(path.join(ROOT, file)));
 console.log('扫描 ' + files.length + ' 个版本库及源码工作区文件');

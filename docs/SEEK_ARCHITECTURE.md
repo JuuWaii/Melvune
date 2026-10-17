@@ -4,7 +4,7 @@
 
 ## 首轮可执行验证
 
-新增 `native/tests/FnMusic.SeekProbe`，固定 FFmpegInteropX 2.1.0.81200。已在 .NET 10 / Windows x64 实际加载原生库，用 IRandomAccessStream 播放 10 分钟合成 WAV，向 570、30、450 秒定位并确认播放位置继续推进。首次样本每次读取 294,912 字节，约 280 毫秒（包含 250 毫秒播放观察）；总读取约 1.84 MB，源文件 57.6 MB。该结果只证明本地可随机读取路径，无真实 NAS 性能结论。具体运行步骤与限制见验证工程 README。
+新增 `native/tests/Melvune.SeekProbe`，固定 FFmpegInteropX 2.1.0.81200。已在 .NET 10 / Windows x64 实际加载原生库，用 IRandomAccessStream 播放 10 分钟合成 WAV，向 570、30、450 秒定位并确认播放位置继续推进。首次样本每次读取 294,912 字节，约 280 毫秒（包含 250 毫秒播放观察）；总读取约 1.84 MB，源文件 57.6 MB。该结果只证明本地可随机读取路径，无真实 NAS 性能结论。具体运行步骤与限制见验证工程 README。
 
 后续已完成受控 HttpRangeStream 桥接的 WAV/FLAC/MP3/OGG 定位，以及阻塞响应时关闭输入、取消原生打开的验证。MP3 首次尾部定位读取约 4.46 MB / 4.8 MB，OGG 一次定位读取约 1.57 MB / 1.95 MB；功能通过但网络效率仍有缺口。详细矩阵见验证工程 README。下一阶段优先调查媒体索引/定位策略，再验证响应正文取消与 App 生命周期；正式播放器仍保留原实现。
 

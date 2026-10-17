@@ -1,5 +1,5 @@
 param(
-    [string]$Version = '0.2.0-rc.7',
+    [string]$Version = '0.2.0-rc.8',
     [string]$Name = ('Melvune-' + $Version + '-win-x64-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
 )
 $ErrorActionPreference = 'Stop'
@@ -7,8 +7,8 @@ if ($Name -notmatch '^[a-zA-Z0-9._-]+$' -or $Name -in @('.', '..')) { throw 'Inv
 $repo = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'build-environment.ps1')
 Initialize-MelvuneGitEnvironment $repo
-if ($Version -notin @('0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) { throw 'Unsupported release version' }
-$appProject = Join-Path $repo 'native/src/FnMusic.App/FnMusic.App.csproj'
+if ($Version -ne '0.2.0-rc.8') { throw 'Unsupported release version' }
+$appProject = Join-Path $repo 'native/src/Melvune.App/Melvune.App.csproj'
 [xml]$appDefinition = Get-Content -LiteralPath $appProject -Raw
 $declaredVersions = @($appDefinition.Project.PropertyGroup.Version | Where-Object { $_ })
 if ($declaredVersions.Count -ne 1 -or [string]$declaredVersions[0] -ne $Version) { throw 'Application declaration differs from requested package version' }
@@ -22,16 +22,16 @@ $sdk = Join-Path $repo '.tools/dotnet/dotnet.exe'
 & $sdk restore (Join-Path $repo 'native/Melvune.sln') --configfile (Join-Path $repo 'native/NuGet.Config') --locked-mode --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Restore failed' }
 . (Join-Path $PSScriptRoot 'ensure-native-decoder.ps1')
-Ensure-FnMusicNativeDecoder $repo
-& $sdk publish (Join-Path $repo 'native/src/FnMusic.App/FnMusic.App.csproj') -c Release --no-restore --nologo -p:DebugSymbols=false -p:DebugType=None -o $destination
+Ensure-MelvuneNativeDecoder $repo
+& $sdk publish (Join-Path $repo 'native/src/Melvune.App/Melvune.App.csproj') -c Release --no-restore --nologo -p:DebugSymbols=false -p:DebugType=None -o $destination
 if ($LASTEXITCODE -ne 0) { throw 'Publish failed' }
-$consumerProject = Join-Path $repo 'native/examples/FnMusic.InfoClient/FnMusic.InfoClient.csproj'
+$consumerProject = Join-Path $repo 'native/examples/Melvune.InfoClient/Melvune.InfoClient.csproj'
 & $sdk restore $consumerProject -r win-x64 -p:SelfContained=true --configfile (Join-Path $repo 'native/NuGet.Config') --locked-mode --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Independent consumer restore failed' }
 & $sdk publish $consumerProject -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:DebugSymbols=false -p:DebugType=None --no-restore --nologo -o (Join-Path $destination 'examples/InfoClient')
 if ($LASTEXITCODE -ne 0) { throw 'Independent consumer publish failed' }
-Copy-Item -LiteralPath (Join-Path $repo 'native/examples/FnMusic.InfoClient/README.md') -Destination (Join-Path $destination 'examples/InfoClient')
-foreach ($required in @('Melvune.App.exe', 'Melvune.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Assets/FnMusic.ico', 'Assets/FnMusic.png', 'Assets/FnOsMusic.png')) {
+Copy-Item -LiteralPath (Join-Path $repo 'native/examples/Melvune.InfoClient/README.md') -Destination (Join-Path $destination 'examples/InfoClient')
+foreach ($required in @('Melvune.App.exe', 'Melvune.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf', 'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Assets/Melvune.ico', 'Assets/Melvune.png', 'Assets/FnOsMusic.png')) {
     if (-not (Test-Path -LiteralPath (Join-Path $destination $required))) { throw "Missing preview file: $required" }
 }
 $candidateNumber = $Version.Split('.')[-1].Split('-')[-1]
@@ -41,9 +41,9 @@ Copy-Item -LiteralPath (Join-Path $repo 'docs/NAVIDROME_ACCEPTANCE.md') -Destina
 Copy-Item -LiteralPath (Join-Path $repo 'docs/PLAYBACK_RESUME_ACCEPTANCE.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'docs/EMBY_ACCEPTANCE.md') -Destination $destination
 Copy-Item -LiteralPath (Join-Path $repo 'docs/SUBSONIC_ACCEPTANCE.md') -Destination $destination
-if ($Version -in @('0.2.0-rc.3', '0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) { Copy-Item -LiteralPath (Join-Path $repo ('docs/RC' + $candidateNumber + '_ACCEPTANCE.md')) -Destination $destination }
-if ($Version -in @('0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) { Copy-Item -LiteralPath (Join-Path $repo 'docs/HTTP_JSON_SOURCES.md') -Destination $destination }
-if ($Version -in @('0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) { Copy-Item -LiteralPath (Join-Path $repo 'docs/QUEUE_SESSION.md') -Destination $destination }
+Copy-Item -LiteralPath (Join-Path $repo ('docs/RC' + $candidateNumber + '_ACCEPTANCE.md')) -Destination $destination
+Copy-Item -LiteralPath (Join-Path $repo 'docs/HTTP_JSON_SOURCES.md') -Destination $destination
+Copy-Item -LiteralPath (Join-Path $repo 'docs/QUEUE_SESSION.md') -Destination $destination
 New-Item -ItemType Directory -Path $decoderLicenses | Out-Null
 Copy-Item -LiteralPath (Join-Path $repo 'licenses/FFmpegInteropX-Apache-2.0.txt') -Destination $decoderLicenses
 $decoderBuildMaterials = Join-Path $decoderLicenses 'FFmpegInteropX-build'
@@ -56,7 +56,7 @@ foreach ($licenseFile in (Get-ChildItem -LiteralPath (Join-Path $ffmpegPackage '
 Copy-Item -LiteralPath (Join-Path $repo 'docs/NATIVE_DECODER_DEPENDENCIES.md') -Destination $destination
 & python (Join-Path $repo 'scripts/prepare-distribution.py') (Join-Path $decoderLicenses 'corresponding-source')
 if ($LASTEXITCODE -ne 0) { throw 'Corresponding source preparation failed' }
-Copy-Item -LiteralPath (Join-Path $repo 'native/src/FnMusic.App/packages.lock.json') -Destination (Join-Path $decoderLicenses 'packages.lock.json')
+Copy-Item -LiteralPath (Join-Path $repo 'native/src/Melvune.App/packages.lock.json') -Destination (Join-Path $decoderLicenses 'packages.lock.json')
 $revision = & git -c ('safe.directory=' + $repo.Replace('\', '/')) -C $repo rev-parse HEAD
 if ($LASTEXITCODE -ne 0) { throw 'Source revision unavailable' }
 @{ product = 'Melvune'; version = $Version; sourceCommit = $revision.Trim(); architecture = 'win-x64' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $destination 'release.json') -Encoding utf8

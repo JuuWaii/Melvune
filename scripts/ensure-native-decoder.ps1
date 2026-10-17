@@ -1,4 +1,4 @@
-function Ensure-FnMusicNativeDecoder([string]$RepositoryRoot) {
+function Ensure-MelvuneNativeDecoder([string]$RepositoryRoot) {
     $decoderBuild = Join-Path $RepositoryRoot '.tools/native-decoder/build'
     $decoderManifest = Join-Path $decoderBuild 'build-manifest.json'
     $decoderInputs = @{

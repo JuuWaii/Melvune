@@ -7,7 +7,7 @@ index 7d9daab..99c74ae 100644
      auto isForwardSeek = position > currentPosition;
  
 -    if (isForwardSeek && TrySeekBuffered(position, actualPosition, fastSeek, isForwardSeek, videoStream, audioStream))
-+    // FNMusic modification (2026-10-01): restore MP3 bit reservoir and synthesis
++    // Melvune modification (2026-10-01): restore MP3 bit reservoir and synthesis
 +    // state after a decoder flush by decoding preroll. Keep the requested
 +    // presentation position so MediaStreamSource drops the earlier audio.
 +    auto decoderPosition = position;

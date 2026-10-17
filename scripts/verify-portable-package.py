@@ -9,9 +9,9 @@ import stat
 import struct
 import zipfile
 
-MAGIC = b'FNMUSIC-PAYLOAD-1'
+MAGIC = b'MELVUNE-PAYLOAD-1'
 TRAILER_LENGTH = len(MAGIC) + 32 + 8
-VERSIONS = {'0.2.0-rc.1', '0.2.0-rc.2', '0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7'}
+VERSIONS = {'0.2.0-rc.8'}
 MAX_FILES = 10001
 MAX_PAYLOAD = 8 * 1024 ** 3
 
@@ -81,8 +81,8 @@ def verify_portable(packages, payload, version=None):
     packages, payload = pathlib.Path(packages).absolute(), pathlib.Path(payload).absolute()
     require(packages.is_dir() and not linked(packages) and payload.is_dir() and not linked(payload), 'Invalid or linked package directory')
     payload_release = read_json(payload / 'release.json', 1024 ** 2)
-    product = payload_release.get('product', 'FnMusic')
-    require(product in ('FnMusic', 'Melvune'), 'Unsupported payload product')
+    product = payload_release.get('product')
+    require(product == 'Melvune', 'Unsupported payload product')
     version = version or payload_release.get('version')
     require(version in VERSIONS and payload_release.get('version') == version, 'Unexpected payload version')
     source = payload_release.get('sourceCommit', '')
@@ -98,6 +98,9 @@ def verify_portable(packages, payload, version=None):
             case_names.add(relative.casefold())
             expected[relative] = digest(path)
     require(1 <= len(expected) <= MAX_FILES, 'Unexpected payload file count')
+    require(f'{product}.App.exe' in expected, 'Payload product executable is missing')
+    require({name for name in expected if '/' not in name and name.casefold().endswith('.app.exe')} ==
+            {'Melvune.App.exe'}, 'Mixed product executables')
     manifest = read_json(payload / 'SHA256.json', 16 * 1024 ** 2)
     require(isinstance(manifest, list) and 1 <= len(manifest) < MAX_FILES, 'Invalid payload manifest')
     listed, listed_names = {}, set()
@@ -123,7 +126,8 @@ def verify_portable(packages, payload, version=None):
         require(size > TRAILER_LENGTH + 2, 'Portable executable is truncated')
         require(stream.read(2) == b'MZ', 'Portable launcher is not a Windows executable')
         stream.seek(size - TRAILER_LENGTH)
-        require(stream.read(len(MAGIC)) == MAGIC, 'Portable trailer magic mismatch')
+        magic = stream.read(len(MAGIC))
+        require(magic == MAGIC, 'Portable trailer magic mismatch')
         payload_hash = stream.read(32).hex().upper()
         length = struct.unpack('<q', stream.read(8))[0]
         require(0 < length <= MAX_PAYLOAD and length < size - TRAILER_LENGTH, 'Invalid portable payload length')
@@ -160,17 +164,16 @@ def verify_portable(packages, payload, version=None):
             # Reading each full entry above validates CRC, as well as its digest.
             require(actual == expected, 'Portable ZIP differs from verified payload directory')
     metadata = read_json(packages / 'release.json', 1024 ** 2)
-    require(metadata.get('product', 'FnMusic') == product, 'Portable product differs from payload')
+    require(metadata.get('product') == product, 'Portable product differs from payload')
     require(metadata.get('version') == version and metadata.get('payloadSource') == source, 'Portable version/source mismatch')
     require(metadata.get('payloadZipSha256', '').upper() == payload_hash, 'Portable metadata digest mismatch')
     require(isinstance(metadata.get('packagingSource'), str) and re.fullmatch('[a-f0-9]{40}', metadata['packagingSource']), 'Invalid packaging source commit')
+    require(metadata['packagingSource'] == source, 'Packaging source differs from payload')
     require(metadata.get('signed') is False, 'Unexpected package signature declaration')
-    if metadata.get('packageKind') == 'portable-only':
-        require(metadata.get('architecture') == 'win-x64' and metadata.get('artifacts') == [portable.name], 'Invalid portable-only artifact declaration')
-        require('msiVersion' not in metadata and 'wixVersion' not in metadata, 'Portable-only metadata includes an installer')
-        require({path.name for path in packages.iterdir()} == {portable.name, 'release.json', 'SHA256SUMS.txt'}, 'Unexpected portable-only output')
-    else:
-        require(version == '0.2.0-rc.2' and metadata.get('packageKind') in (None, 'windows-full'), 'Unsupported installer package identity')
+    require(metadata.get('packageKind') == 'portable-only', 'Unsupported package kind')
+    require(metadata.get('architecture') == 'win-x64' and metadata.get('artifacts') == [portable.name], 'Invalid portable-only artifact declaration')
+    require('msiVersion' not in metadata and 'wixVersion' not in metadata, 'Portable-only metadata includes an installer')
+    require({path.name for path in packages.iterdir()} == {portable.name, 'release.json', 'SHA256SUMS.txt'}, 'Unexpected portable-only output')
     checksum_file = packages / 'SHA256SUMS.txt'
     require(checksum_file.is_file() and not linked(checksum_file) and checksum_file.stat().st_size < 1024 ** 2, 'Invalid distribution checksums')
     checksummed = set()
@@ -183,8 +186,9 @@ def verify_portable(packages, payload, version=None):
         path = packages / name
         require(path.is_file() and not linked(path) and digest(path) == checksum.upper(), 'Distribution checksum mismatch')
     require(checksummed == {path.name.casefold() for path in packages.iterdir() if path.name != checksum_file.name}, 'Distribution checksums do not cover every file')
-    return dict(version=version, sourceCommit=source, packagingSource=metadata['packagingSource'], portableFiles=len(actual),
+    return dict(product=product, version=version, sourceCommit=source, packagingSource=metadata['packagingSource'], portableFiles=len(actual),
                 zipEntries=len(rows), payloadZipSha256=payload_hash, portableSha256=digest(portable),
+                trailerFormat=magic.decode('ascii'),
                 trailerVerified=True, crcVerified=True, fileDigestsVerified=True, sourceMatched=True,
                 portableOnly=metadata.get('packageKind') == 'portable-only')
 

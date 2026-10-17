@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net10.0-windows</TargetFramework></PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Melvune.Infrastructure/Melvune.Infrastructure.csproj" />
+    <ProjectReference Include="../../examples/Melvune.InfoClient/Melvune.InfoClient.csproj" ReferenceOutputAssembly="false" />
+  </ItemGroup>
+  <Target Name="CopyIndependentInformationClient" AfterTargets="Build">
+    <ItemGroup><InformationClientFiles Include="../../examples/Melvune.InfoClient/bin/$(Configuration)/net10.0-windows/*.*" /></ItemGroup>
+    <Copy SourceFiles="@(InformationClientFiles)" DestinationFolder="$(OutDir)info-client" />
+  </Target>
+</Project>

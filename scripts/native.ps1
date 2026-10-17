@@ -40,17 +40,17 @@ try {
     }
     if ($Action -eq 'build') {
         . (Join-Path $PSScriptRoot 'ensure-native-decoder.ps1')
-        Ensure-FnMusicNativeDecoder $nativeRepoRoot
-        & $nativeSdk build src/FnMusic.App/FnMusic.App.csproj -c Release --no-restore --nologo
+        Ensure-MelvuneNativeDecoder $nativeRepoRoot
+        & $nativeSdk build src/Melvune.App/Melvune.App.csproj -c Release --no-restore --nologo
         if ($LASTEXITCODE -ne 0) { throw 'Native build failed.' }
     } elseif ($Action -eq 'test') {
         # Keep 10000-file synthetic fixtures off SMB by default; source and builds remain in the NAS checkout.
         $nativeTestData = if ($TestDataDirectory) { [IO.Path]::GetFullPath($TestDataDirectory) }
             else { Join-Path ([IO.Path]::GetTempPath()) ('melvune-tests-' + [Guid]::NewGuid().ToString('N')) }
-        & $nativeSdk run --project tests/FnMusic.Tests/FnMusic.Tests.csproj --no-restore -- $nativeTestData
+        & $nativeSdk run --project tests/Melvune.Tests/Melvune.Tests.csproj --no-restore -- $nativeTestData
         if ($LASTEXITCODE -ne 0) { throw 'Native checks failed.' }
     } elseif ($Action -eq 'run') {
-        $nativeExe = Join-Path (Get-Location).Path 'src/FnMusic.App/bin/Melvune/Release/net10.0-windows10.0.26100.0/win-x64/Melvune.App.exe'
+        $nativeExe = Join-Path (Get-Location).Path 'src/Melvune.App/bin/Release/net10.0-windows10.0.26100.0/win-x64/Melvune.App.exe'
         if (-not (Test-Path -LiteralPath $nativeExe)) { throw 'Run the build action first.' }
         $nativeStart = [Diagnostics.ProcessStartInfo]::new($nativeExe)
         $nativeStart.UseShellExecute = $false

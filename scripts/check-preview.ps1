@@ -1,8 +1,9 @@
 param(
     [Parameter(Mandatory = $true)][string]$Path,
-    [string]$ExpectedVersion = '0.2.0-rc.7'
+    [string]$ExpectedVersion = '0.2.0-rc.8'
 )
 $ErrorActionPreference = 'Stop'
+if ($ExpectedVersion -ne '0.2.0-rc.8') { throw 'This verifier accepts the current Melvune rc.8 candidate only' }
 $previewRoot = (Get-Item -LiteralPath $Path).FullName
 $previewPrefix = $previewRoot.TrimEnd('\', '/') + [IO.Path]::DirectorySeparatorChar
 $manifestPath = Join-Path $previewRoot 'SHA256.json'
@@ -30,36 +31,30 @@ $files = @($contents | Where-Object { -not $_.PSIsContainer -and $_.FullName -ne
 if ($files | Where-Object { [IO.Path]::GetRelativePath($previewRoot, $_.FullName) -match '^(local-index|nas-metadata|playback-information)[\\/]' }) { throw 'Personal music index found in preview' }
 if ($files.Count -ne $manifest.Count -or @($files | Where-Object { -not $known.Contains($_.FullName) }).Count -gt 0) { throw 'Manifest does not describe every package file' }
 if ($files | Where-Object { $_.Name -match '^(connection|sources|local-music|local-libraries|local-playlists|playback-resume|navidrome-connections|emby-connections|http-json-connections|appearance|playlist-navigation|desktop-integration)\.json(\.lock)?$|verification\.json$|\.pdb$|\.bin$|^ffmpeg\.exe$' }) { throw 'Development or personal artifact found' }
-$product = if (Test-Path -LiteralPath (Join-Path $previewRoot 'Melvune.App.exe')) { 'Melvune' } else { 'FnMusic' }
-if ($product -eq 'Melvune' -and (Test-Path -LiteralPath (Join-Path $previewRoot 'FnMusic.App.exe'))) { throw 'Mixed product executables' }
-$requiredFiles = @("$product.App.exe", "$product.App.dll", "$product.App.pri", 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf',
-    'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', "Start-$product.cmd",
+$product = 'Melvune'
+$appExecutables = @($files | Where-Object { $_.DirectoryName -eq $previewRoot -and $_.Name -like '*.App.exe' })
+if ($appExecutables.Count -ne 1 -or $appExecutables[0].Name -cne 'Melvune.App.exe') { throw 'Missing or mixed product executables' }
+$requiredFiles = @('Melvune.App.exe', 'Melvune.App.dll', 'Melvune.App.pri', 'App.xbf', 'MainWindow.xbf', 'MonochromeResources.xbf',
+    'FFmpegInteropX.dll', 'avcodec-62.dll', 'avformat-62.dll', 'avutil-60.dll', 'swresample-6.dll', 'Start-Melvune.cmd',
+    'Assets/Melvune.ico', 'Assets/Melvune.png', 'Assets/FnOsMusic.png',
     'LICENSE', 'THIRD_PARTY_NOTICES.md', 'NATIVE_DECODER_DEPENDENCIES.md', 'native-decoder-build.json',
     'licenses/FFmpegInteropX-Apache-2.0.txt', 'licenses/FFmpegInteropX-build/mp3-preroll.patch',
-    'licenses/FFmpegInteropX-build/toolchain-lock.json', 'licenses/FFmpegInteropX-build/build-native-decoder.py')
-if ($ExpectedVersion -in @('0.2.0-rc.1','0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) {
-    $candidateNumber = $ExpectedVersion.Split('.')[-1].Split('-')[-1]
-    $requiredFiles += @('USER_GUIDE.md', ('RC' + $candidateNumber + '_USER_VALIDATION.md'), ($ExpectedVersion + '.md'), 'BUILDING_SOURCES.md', 'release.json',
-        'licenses/corresponding-source/decoder-corresponding-source.zip', 'licenses/corresponding-source/decoder-distribution.json',
-        'licenses/corresponding-source/runtime-license-index.json', 'licenses/packages.lock.json')
-} else { $requiredFiles += 'PREVIEW_VALIDATION.md' }
-if ($ExpectedVersion -in @('0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) {
-    $requiredFiles += @('DESKTOP_INTEGRATION.md', 'PLAYBACK_INFORMATION_PROTOCOL.md', "examples/InfoClient/$product.InfoClient.exe", 'examples/InfoClient/README.md')
-}
-if ($ExpectedVersion -in @('0.2.0-rc.3', '0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) {
-    $requiredFiles += @('NAVIDROME_ACCEPTANCE.md', 'PLAYBACK_RESUME_ACCEPTANCE.md', 'EMBY_ACCEPTANCE.md', 'SUBSONIC_ACCEPTANCE.md', ('RC' + $candidateNumber + '_ACCEPTANCE.md'))
-}
-if ($ExpectedVersion -in @('0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) { $requiredFiles += 'HTTP_JSON_SOURCES.md' }
-if ($ExpectedVersion -in @('0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) { $requiredFiles += 'QUEUE_SESSION.md' }
-if ($ExpectedVersion -in @('0.2.0-rc.6', '0.2.0-rc.7')) { $requiredFiles += 'Assets/FnOsMusic.png' }
+    'licenses/FFmpegInteropX-build/toolchain-lock.json', 'licenses/FFmpegInteropX-build/build-native-decoder.py',
+    'USER_GUIDE.md', 'RC8_USER_VALIDATION.md', '0.2.0-rc.8.md', 'BUILDING_SOURCES.md', 'release.json',
+    'licenses/corresponding-source/decoder-corresponding-source.zip', 'licenses/corresponding-source/decoder-distribution.json',
+    'licenses/corresponding-source/runtime-license-index.json', 'licenses/packages.lock.json',
+    'DESKTOP_INTEGRATION.md', 'PLAYBACK_INFORMATION_PROTOCOL.md', 'examples/InfoClient/Melvune.InfoClient.exe', 'examples/InfoClient/README.md',
+    'NAVIDROME_ACCEPTANCE.md', 'PLAYBACK_RESUME_ACCEPTANCE.md', 'EMBY_ACCEPTANCE.md', 'SUBSONIC_ACCEPTANCE.md', 'RC8_ACCEPTANCE.md',
+    'HTTP_JSON_SOURCES.md', 'QUEUE_SESSION.md')
 foreach ($required in $requiredFiles) {
     if (-not $known.Contains([IO.Path]::GetFullPath((Join-Path $previewRoot $required)))) { throw "Required file missing: $required" }
 }
 $version = (Get-Item -LiteralPath (Join-Path $previewRoot "$product.App.exe")).VersionInfo.ProductVersion
 if ($version -ne $ExpectedVersion -and -not $version.StartsWith($ExpectedVersion + '+', [StringComparison]::Ordinal)) { throw 'Unexpected application version' }
 $decoder = Get-Content -LiteralPath (Join-Path $previewRoot 'native-decoder-build.json') -Raw | ConvertFrom-Json
+$expectedDecoderVersion = '2.1.0.1-melvune-mp3-preroll'
 if ($decoder.sourceCommit -ne '841fc8e79346a235906f1dbd45be53034b2e2f52' -or
-    $decoder.version -ne '2.1.0.1-fnmusic-mp3-preroll') { throw 'Unexpected native decoder provenance' }
+    $decoder.version -ne $expectedDecoderVersion) { throw 'Unexpected native decoder provenance' }
 foreach ($binding in @(
     @('FFmpegInteropX.dll', $decoder.decoderSha256),
     @('licenses/FFmpegInteropX-build/mp3-preroll.patch', $decoder.patchSha256),
@@ -68,18 +63,16 @@ foreach ($binding in @(
     if ($binding[1] -notmatch '^[0-9A-Fa-f]{64}$' -or
         (Get-FileHash -LiteralPath (Join-Path $previewRoot $binding[0]) -Algorithm SHA256).Hash -ne $binding[1]) { throw 'Decoder material does not match provenance' }
 }
-if ($ExpectedVersion -in @('0.2.0-rc.1','0.2.0-rc.2','0.2.0-rc.3','0.2.0-rc.4', '0.2.0-rc.5', '0.2.0-rc.6', '0.2.0-rc.7')) {
-    $distribution = Get-Content -LiteralPath (Join-Path $previewRoot 'licenses/corresponding-source/decoder-distribution.json') -Raw | ConvertFrom-Json
-    if ((Get-FileHash -LiteralPath (Join-Path $previewRoot 'licenses/corresponding-source/decoder-corresponding-source.zip') -Algorithm SHA256).Hash -ne $distribution.sourceArchiveSha256) { throw 'Corresponding source archive mismatch' }
-    foreach ($binary in $distribution.binarySha256.PSObject.Properties) {
-        if ((Get-FileHash -LiteralPath (Join-Path $previewRoot $binary.Name) -Algorithm SHA256).Hash -ne $binary.Value) { throw 'FFmpeg binary provenance mismatch' }
-    }
-    $release = Get-Content -LiteralPath (Join-Path $previewRoot 'release.json') -Raw | ConvertFrom-Json
-    if ($release.version -ne $ExpectedVersion -or $release.sourceCommit -notmatch '^[a-f0-9]{40}$' -or $release.architecture -ne 'win-x64') { throw 'Release identity mismatch' }
-    if (($product -eq 'Melvune' -and $release.product -ne 'Melvune') -or ($product -eq 'FnMusic' -and $release.product -and $release.product -ne 'FnMusic')) { throw 'Release product differs from payload' }
-    foreach ($applicationFile in @("$product.App.exe", "$product.App.dll")) {
-        $productVersion = (Get-Item -LiteralPath (Join-Path $previewRoot $applicationFile)).VersionInfo.ProductVersion
-        if ($productVersion -ne ($ExpectedVersion + '+' + $release.sourceCommit)) { throw "Application source commit differs from release metadata: $applicationFile" }
-    }
+$distribution = Get-Content -LiteralPath (Join-Path $previewRoot 'licenses/corresponding-source/decoder-distribution.json') -Raw | ConvertFrom-Json
+if ((Get-FileHash -LiteralPath (Join-Path $previewRoot 'licenses/corresponding-source/decoder-corresponding-source.zip') -Algorithm SHA256).Hash -ne $distribution.sourceArchiveSha256) { throw 'Corresponding source archive mismatch' }
+foreach ($binary in $distribution.binarySha256.PSObject.Properties) {
+    if ((Get-FileHash -LiteralPath (Join-Path $previewRoot $binary.Name) -Algorithm SHA256).Hash -ne $binary.Value) { throw 'FFmpeg binary provenance mismatch' }
+}
+$release = Get-Content -LiteralPath (Join-Path $previewRoot 'release.json') -Raw | ConvertFrom-Json
+if ($release.version -ne $ExpectedVersion -or $release.sourceCommit -notmatch '^[a-f0-9]{40}$' -or $release.architecture -ne 'win-x64') { throw 'Release identity mismatch' }
+if ($release.product -ne 'Melvune') { throw 'Release product differs from payload' }
+foreach ($applicationFile in @("$product.App.exe", "$product.App.dll")) {
+    $productVersion = (Get-Item -LiteralPath (Join-Path $previewRoot $applicationFile)).VersionInfo.ProductVersion
+    if ($productVersion -ne ($ExpectedVersion + '+' + $release.sourceCommit)) { throw "Application source commit differs from release metadata: $applicationFile" }
 }
 [pscustomobject]@{ Version = $version; VerifiedFiles = $files.Count; TotalFiles = $files.Count + 1; DecoderSha256 = $decoder.decoderSha256 }
