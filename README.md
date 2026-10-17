@@ -104,7 +104,7 @@ node --test tests/*.test.cjs
 node scripts/check-privacy.js
 ```
 
-[GitHub Actions](https://github.com/JuuWaii/Melvune/actions/workflows/windows-packages.yml) 的候选构建流程生成 ZIP 与便携 EXE，并检查版本、隐私、摘要和图标；只上传构建产物，不自动创建 Release。本轮没有运行远端流程；公开发布另行安排，历史标签保留当时的发布配置。
+[GitHub Actions](https://github.com/JuuWaii/Melvune/actions/workflows/windows-packages.yml) 的候选构建流程生成 ZIP 与便携 EXE，并检查版本、隐私、摘要和图标；只上传构建产物，不自动创建 Release。改名后的云端构建与资源对照见 [GitHub改名验收](docs/GITHUB_RENAME_ACCEPTANCE.md)；新品牌Release发布另行安排，历史标签保留当时的发布配置。
 
 ## 许可与项目资料
 
