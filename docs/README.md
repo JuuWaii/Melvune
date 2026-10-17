@@ -3,6 +3,7 @@
 ## 使用与下载
 
 - [使用指南](USER_GUIDE.md)：连接来源、音乐库、歌单、歌词、队列和设置。
+- [rc.8 云端发布回执](RC8_PUBLICATION.md)。
 - [rc.8 更新说明](releases/0.2.0-rc.8.md)、[验收范围](RC8_ACCEPTANCE.md)、[用户验证单](RC8_USER_VALIDATION.md)。
 - [命名与数据目录](MELVUNE_MIGRATION.md)：独立配置、重新登录与旧数据保留。
 - [桌面联动](DESKTOP_INTEGRATION.md)、[音频输出](AUDIO_OUTPUT_ACCEPTANCE.md)、[队列恢复](QUEUE_SESSION.md)。
