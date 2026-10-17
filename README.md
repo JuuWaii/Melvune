@@ -20,14 +20,14 @@ rc.7 已完成黑白歌单背景标志、可切换分类/合并、侧栏底部�
 
 本地交付入口及状态见 [开发清单](docs/NEXT_DEVELOPMENT_CHECKLIST.md)：ZIP 解压后运行包内的启动脚本（新构建为 `Start-Melvune.cmd`，历史包为 `Start-FnMusic.cmd`）；便携 EXE 放在可写目录双击启动。运行库与解码依赖随包提供，无需另装 .NET 或 FFmpeg。ZIP 与便携 EXE 选择一种即可。
 
-以下为已公开的 [0.2.0-rc.1 Release](https://github.com/JuuWaii/fnmusic_pc/releases/tag/v0.2.0-rc.1)，功能早于本轮 rc.7，不包含其新增能力：
+以下为已公开的 [0.2.0-rc.1 Release](https://github.com/JuuWaii/Melvune/releases/tag/v0.2.0-rc.1)，功能早于本轮 rc.7，不包含其新增能力：
 
 | 版本 | 下载 | 使用方式 |
 | --- | --- | --- |
-| EXE 安装包 | [setup.exe](https://github.com/JuuWaii/fnmusic_pc/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64-setup.exe) | 常规安装入口；通过 **Options → Browse** 选择目录 |
-| MSI 安装包 | [setup.msi](https://github.com/JuuWaii/fnmusic_pc/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64-setup.msi) | Windows Installer，提供中文目录选择页 |
-| 便携 EXE | [portable.exe](https://github.com/JuuWaii/fnmusic_pc/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64-portable.exe) | 放在可写目录启动，首次运行在旁边解包 |
-| 完整 ZIP | [win-x64.zip](https://github.com/JuuWaii/fnmusic_pc/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64.zip) | 解压并保留完整目录，运行 `Start-FnMusic.cmd` 或 `FnMusic.App.exe` |
+| EXE 安装包 | [setup.exe](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64-setup.exe) | 常规安装入口；通过 **Options → Browse** 选择目录 |
+| MSI 安装包 | [setup.msi](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64-setup.msi) | Windows Installer，提供中文目录选择页 |
+| 便携 EXE | [portable.exe](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64-portable.exe) | 放在可写目录启动，首次运行在旁边解包 |
+| 完整 ZIP | [win-x64.zip](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.1/FnMusic-0.2.0-rc.1-win-x64.zip) | 解压并保留完整目录，运行 `Start-FnMusic.cmd` 或 `FnMusic.App.exe` |
 
 EXE 与 MSI 安装包选择一种即可，默认按当前用户安装到 `%LOCALAPPDATA%\Programs\FnMusic`，建立开始菜单快捷方式。自选目录会保存，供维修和卸载恢复；卸载保留独立的个人配置。
 
@@ -66,7 +66,7 @@ Release 同时提供 SHA-256 校验文件与构建来源信息。请下载 Relea
 需要独立配置时，可直接运行应用并传入绝对目录：
 
 ```powershell
-./FnMusic.App.exe "--data-directory=D:\FNMusicProfile"
+./Melvune.App.exe "--data-directory=D:\MelvuneProfile"
 ```
 
 ## 已知限制与反馈
@@ -77,7 +77,7 @@ MP3 远距离首次定位可能读取较多数据；素材库重关联缺少完�
 
 自定义 HTTP/JSON 首版最多 10000 首，字段方案仅访问对象成员；媒体必须同源且无查询参数，不跟随重定向，不支持账号认证、Cookie、自定义请求头、脚本转换和跨域 CDN。认证式自定义源、第三方服务端写入、转码、完整队列恢复、自定义快捷键、FN Connect/OAuth、自动更新和本轮完整安装器留待后续。只读信息接口需第三方按协议接入，不承诺自动兼容。
 
-遇到问题可提交 [Issue](https://github.com/JuuWaii/fnmusic_pc/issues)，注明版本、复现步骤、预期与实际结果。附截图或日志前，请隐去密码、令牌、服务地址和私人路径；集中验证项目见 [rc.5 用户验证单](docs/RC5_USER_VALIDATION.md)（公开 rc.1 使用[原验证单](docs/RC1_USER_VALIDATION.md)）。
+遇到问题可提交 [Issue](https://github.com/JuuWaii/Melvune/issues)，注明版本、复现步骤、预期与实际结果。附截图或日志前，请隐去密码、令牌、服务地址和私人路径；集中验证项目见 [rc.5 用户验证单](docs/RC5_USER_VALIDATION.md)（公开 rc.1 使用[原验证单](docs/RC1_USER_VALIDATION.md)）。
 
 ## 从源码构建
 
@@ -93,8 +93,8 @@ MP3 远距离首次定位可能读取较多数据；素材库重关联缺少完�
 构建发行包：
 
 ```powershell
-./scripts/package-preview.ps1 -Version 0.2.0-rc.5 -Name FnMusic-0.2.0-rc.5-win-x64
-./scripts/package-windows.ps1 -Payload 'dist/FnMusic-0.2.0-rc.5-win-x64' -Name FnMusic-0.2.0-rc.5-win-x64-portable -PortableOnly
+./scripts/package-preview.ps1 -Version 0.2.0-rc.7 -Name Melvune-0.2.0-rc.7-win-x64
+./scripts/package-windows.ps1 -Payload 'dist/Melvune-0.2.0-rc.7-win-x64' -Name Melvune-0.2.0-rc.7-win-x64-portable -PortableOnly
 ```
 
 脚本拒绝覆盖同名输出；已有产物时使用新名称，并用 `-Payload` 指向对应应用目录。辅助检查无需安装 npm 依赖：
@@ -104,11 +104,11 @@ node --test tests/*.test.cjs
 node scripts/check-privacy.js
 ```
 
-[GitHub Actions](https://github.com/JuuWaii/fnmusic_pc/actions/workflows/windows-packages.yml) 的候选构建流程生成 ZIP 与便携 EXE，并检查版本、隐私、摘要和图标；只上传构建产物，不自动创建 Release。本轮没有运行远端流程；公开发布另行安排，历史标签保留当时的发布配置。
+[GitHub Actions](https://github.com/JuuWaii/Melvune/actions/workflows/windows-packages.yml) 的候选构建流程生成 ZIP 与便携 EXE，并检查版本、隐私、摘要和图标；只上传构建产物，不自动创建 Release。本轮没有运行远端流程；公开发布另行安排，历史标签保留当时的发布配置。
 
 ## 许可与项目资料
 
-FnMusic 使用 [MIT 许可](LICENSE)。FFmpeg 使用 LGPL 2.1 或更高版本，完整对应源码、补丁和构建材料随包位于 `licenses/corresponding-source`；其他运行库与安装器许可也随包提供。
+Melvune 使用 [MIT 许可](LICENSE)。FFmpeg 使用 LGPL 2.1 或更高版本，完整对应源码、补丁和构建材料随包位于 `licenses/corresponding-source`；其他运行库与安装器许可也随包提供。
 
 [第三方声明](THIRD_PARTY_NOTICES.md) · [源码构建与替换](docs/BUILDING_SOURCES.md) · [解码器说明](docs/NATIVE_DECODER_DEPENDENCIES.md) · [Windows 封装与验证](docs/WINDOWS_PACKAGING.md)
 

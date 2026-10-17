@@ -3,7 +3,7 @@ import json
 import subprocess
 
 
-REPO = 'JuuWaii/fnmusic_pc'
+REPO = 'JuuWaii/Melvune'
 KEEP = 'v0.2.0-rc.1'
 REMOVE = {'v0.1.17', 'v0.1.18'}
 PACKAGE_HASHES = {

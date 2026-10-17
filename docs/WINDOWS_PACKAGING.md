@@ -6,7 +6,7 @@ Windows 10 2004 / build 19041 或更高版本、x64。
 
 最新推荐输出目录：`dist/FnMusic-0.2.0-rc.1-win-x64-windows-icon-fixed/`。
 这是保留的本机交付目录。2026-10-10 已另行公开
-[GitHub 0.2.0-rc.1 Release](https://github.com/JuuWaii/fnmusic_pc/releases/tag/v0.2.0-rc.1)，
+[GitHub 0.2.0-rc.1 Release](https://github.com/JuuWaii/Melvune/releases/tag/v0.2.0-rc.1)，
 云端附件以标签 `05236e3` 重新构建，公开附件哈希见 [发布记录](GITHUB_PUBLICATION.md)。
 旧 `windows/` 目录的 EXE 默认路径存在未展开变量问题；中间 `windows-icon/`
 试验包未记住自选目录，卸载会残留文件。两者均保留为历史，停止推荐。

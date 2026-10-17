@@ -13,11 +13,6 @@ on:
         default: 'v0.2.0-rc.1'
         required: true
         type: string
-  push:
-    branches:
-      - master
-    paths:
-      - '.github/workflows/publish-verified-candidate.yml'
 
 permissions:
   contents: read
