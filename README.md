@@ -16,7 +16,7 @@ Melvune（合听）是一款面向 Windows 的开源音乐播放器。它把本�
 
 ## 快速下载
 
-**当前候选版本：0.2.0-rc.9。** 支持 Windows 10 2004（19041）及以上 **x64** 系统。
+**当前候选版本：0.2.0-rc.9，已发布。** 支持 Windows 10 2004（19041）及以上 **x64** 系统。
 
 | 下载 | 如何使用 |
 | --- | --- |
@@ -26,7 +26,7 @@ Melvune（合听）是一款面向 Windows 的开源音乐播放器。它把本�
 | [完整 ZIP](https://github.com/JuuWaii/Melvune/releases/download/v0.2.0-rc.9/Melvune-0.2.0-rc.9-win-x64.zip) | 完整解压，运行 `Start-Melvune.cmd` 或 `Melvune.App.exe` |
 | [Release 与校验和](https://github.com/JuuWaii/Melvune/releases/tag/v0.2.0-rc.9) | 查看更新说明、`SHA256SUMS.txt` 和构建来源 `release.json` |
 
-运行时与解码依赖随包提供，无需另装 .NET 或 FFmpeg。此版本为**未签名的预发布候选版**，代码签名和自动更新尚未提供。请从本仓库 Release 下载，以该次云端构建附带的校验和为准。[发布流程](docs/RELEASING.md)说明构建来源与校验方式。
+运行时与解码依赖随包提供，无需另装 .NET 或 FFmpeg。此版本为**未签名的预发布候选版**，代码签名和自动更新尚未提供。请从本仓库 Release 下载，以该次云端构建附带的校验和为准。[rc.9交付回执](docs/RC9_PUBLICATION.md)记录构建、安装验收和附件摘要。
 
 > 改名前版本的配置不会自动迁入 Melvune。新版需要重新添加音乐源、登录和建立歌单；旧配置不会被覆盖。普通 ZIP 的配置在 `%LOCALAPPDATA%\Melvune.Native`，与便携版独立。详见 [配置与命名说明](docs/MELVUNE_MIGRATION.md)。
 
