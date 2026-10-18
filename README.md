@@ -79,7 +79,7 @@ Navidrome、Emby 和 Subsonic 接入当前以**只读浏览和原始音频播放
 - [rc.9 验收](docs/RC9_ACCEPTANCE.md) / [用户验证单](docs/RC9_USER_VALIDATION.md)：已验证范围和仍需真实环境验证的项目。
 - [贡献指南](CONTRIBUTING.md)：构建、检查与反馈约定。
 
-从源码构建需要 Windows x64、Git、Python 3.11+ 和 Node.js。脚本会在 `.tools` 中准备固定版本的 SDK 与解码工具链。
+从源码构建需要 Windows x64、PowerShell 7.2+、Git、Python 3.11+ 和 Node.js。脚本会在 `.tools` 中准备固定版本的 SDK 与解码工具链。
 
 ```powershell
 ./scripts/native.ps1 bootstrap

@@ -60,6 +60,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Preview cleanup checks failed' }
           python -m unittest discover -s tests -p test_installer_authoring.py
           if ($LASTEXITCODE -ne 0) { throw 'Installer authoring checks failed' }
+          python -m unittest discover -s tests -p test_installer_arguments.py
+          if ($LASTEXITCODE -ne 0) { throw 'Installer argument checks failed' }
       - name: Build ZIP, portable EXE, setup EXE and MSI
         shell: pwsh
         run: |
@@ -72,9 +74,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Portable verification failed' }
           python scripts/verify-icon-resources.py --icon assets/branding/melvune.ico dist/Melvune-0.2.0-rc.9-win-x64/Melvune.App.exe dist/Melvune-0.2.0-rc.9-win-x64-portable/Melvune-0.2.0-rc.9-win-x64-portable.exe dist/Melvune-0.2.0-rc.9-win-x64-portable-installers/Melvune-0.2.0-rc.9-win-x64-setup.exe
           if ($LASTEXITCODE -ne 0) { throw 'Application icon verification failed' }
-      - name: Exercise MSI and EXE install and uninstall
-        shell: pwsh
-        run: ./scripts/test-installer-smoke.ps1 -Packages dist/Melvune-0.2.0-rc.9-win-x64-portable-installers -Payload dist/Melvune-0.2.0-rc.9-win-x64
       - name: Stage verified release assets
         shell: pwsh
         run: |
@@ -89,9 +88,34 @@ jobs:
           compression-level: 0
           retention-days: 14
 
+  installation:
+    needs: package
+    runs-on: windows-2022
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: Melvune-0.2.0-rc.9-win-x64
+          path: dist/release-assets
+      - name: Verify downloaded assets and extract payload
+        shell: pwsh
+        run: |
+          python scripts/release-candidate.py verify --directory dist/release-assets --source $env:GITHUB_SHA --run-url "https://github.com/$env:GITHUB_REPOSITORY/actions/runs/$env:GITHUB_RUN_ID"
+          if ($LASTEXITCODE -ne 0) { throw 'Downloaded release assets failed verification' }
+          Expand-Archive -LiteralPath dist/release-assets/Melvune-0.2.0-rc.9-win-x64.zip -DestinationPath .review-audit/install-payload
+      - name: Exercise MSI and EXE install and uninstall
+        shell: pwsh
+        run: ./scripts/test-installer-smoke.ps1 -Packages dist/release-assets -Payload .review-audit/install-payload/Melvune-0.2.0-rc.9-win-x64
+
   publish:
     if: github.event_name == 'push' && github.ref == 'refs/tags/v0.2.0-rc.9'
-    needs: package
+    needs: [package, installation]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     permissions:

@@ -1,3 +1,4 @@
+#Requires -Version 7.2
 param([switch]$Run)
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent

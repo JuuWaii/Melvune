@@ -6,6 +6,7 @@ $ErrorActionPreference = 'Stop'
 # Only run on the disposable GitHub runner, never against a user's installation.
 if ($env:GITHUB_ACTIONS -ne 'true' -or $env:RUNNER_OS -ne 'Windows') { throw 'Installer smoke checks require a disposable Windows Actions runner' }
 $root = Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'installer-arguments.ps1')
 $packagesPath = if ([IO.Path]::IsPathRooted($Packages)) { [IO.Path]::GetFullPath($Packages) } else { [IO.Path]::GetFullPath((Join-Path $root $Packages)) }
 $payloadPath = if ([IO.Path]::IsPathRooted($Payload)) { [IO.Path]::GetFullPath($Payload) } else { [IO.Path]::GetFullPath((Join-Path $root $Payload)) }
 $work = Join-Path $env:RUNNER_TEMP ('Melvune 安装验收 [' + [Guid]::NewGuid().ToString('N') + ']')
@@ -20,10 +21,18 @@ Set-Content -LiteralPath $sentinel -Value $sentinelText
 function Invoke-InstallerCommand([string]$Executable, [string[]]$Arguments) {
     $start = [Diagnostics.ProcessStartInfo]::new($Executable)
     $start.UseShellExecute = $false
-    foreach ($argument in $Arguments) { $start.ArgumentList.Add($argument) }
+    $start.Arguments = ConvertTo-MelvuneInstallerArguments -Items $Arguments
+    Write-Output ('Installer command: ' + $Executable + ' ' + $start.Arguments)
     $process = [Diagnostics.Process]::Start($start)
-    if (-not $process.WaitForExit(240000)) { throw 'Installer did not finish within four minutes' }
-    if ($process.ExitCode -notin @(0,3010)) { throw ('Installer failed with exit code ' + $process.ExitCode) }
+    $finished = $process.WaitForExit(600000)
+    if (-not $finished -or $process.ExitCode -notin @(0,3010)) {
+        foreach ($log in Get-ChildItem -LiteralPath $work -Filter '*.log' -File) {
+            Write-Output ('Installer log: ' + $log.Name)
+            Get-Content -LiteralPath $log.FullName -Tail 100
+        }
+        if (-not $finished) { throw 'Installer did not finish within ten minutes' }
+        throw ('Installer failed with exit code ' + $process.ExitCode)
+    }
 }
 function Assert-Installed([string]$Directory) {
     foreach ($file in Get-ChildItem -LiteralPath $payloadPath -Recurse -File) {
